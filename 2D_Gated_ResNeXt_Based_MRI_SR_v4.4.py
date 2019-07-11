@@ -328,10 +328,10 @@ class Normal_Residual_Block(nn.Module): #----- In this version, the "cardinality
     def __init__(self, number_in_channel, number_out_channel, stride = 1, linear_projection = None, num_of_group = 32, gate_in_use = True, EPSILON = 1): #----- num_of_group is "cardinality"
         super(Normal_Residual_Block, self).__init__()     #----- Call the constructor of base class explicitly
         self.normal_path = nn.Sequential(
-                nn.Conv2d(number_in_channel, number_out_channel, 3, stride, 1, padding = 0, bias = False), #---- No need to make bias learnable, due using BatchNorm
+                nn.Conv2d(number_in_channel, number_out_channel, 3, stride, 1, bias = False), #---- No need to make bias learnable, due using BatchNorm
                 nn.BatchNorm2d(number_out_channel),
                 nn.ReLU(inplace = True), #-----inplace = True could overwrite the input of ReLU by using output to save memory(ReLU only needs output to calculate gradient )
-                nn.Conv2d(number_out_channel, number_out_channel, 3, 1, 1, padding = 0, bias = False, groups = num_of_group),
+                nn.Conv2d(number_out_channel, number_out_channel, 3, 1, 1, bias = False, groups = num_of_group),
                 nn.BatchNorm2d(number_out_channel) )
         self.linear_projection_on_shortcut_path = linear_projection
         self.gate_in_use = gate_in_use
@@ -368,7 +368,7 @@ class BottleNeck_Residual_Block(nn.Module): #----- In this version, the "cardina
                 nn.Conv2d(number_in_channel, int(number_out_channel/2), 1, 1, 0, bias = False), #---- No need to make bias learnable, due using BatchNorm
                 nn.BatchNorm2d(int(number_out_channel/2)),
                 nn.ReLU(inplace = True), #-----inplace = True could overwrite the input of ReLU by using output to save memory(ReLU only needs output to calculate gradient )
-                nn.Conv2d(int(number_out_channel/2), int(number_out_channel/2), 3, stride, padding = 0, groups = num_of_group, bias = False),
+                nn.Conv2d(int(number_out_channel/2), int(number_out_channel/2), 3, stride, padding = 1, groups = num_of_group, bias = False),
                 nn.BatchNorm2d(int(number_out_channel/2)),
                 nn.ReLU(inplace = True),
                 nn.Conv2d(int(number_out_channel/2), number_out_channel, 1, 1, 0, bias = False),
@@ -397,6 +397,20 @@ class BottleNeck_Residual_Block(nn.Module): #----- In this version, the "cardina
             out = out + residual_link
         return F.relu(out)
     
+	
+class UpsampleBLock(nn.Module):
+    def __init__(self, in_channels, up_scale):
+        super(UpsampleBLock, self).__init__()
+        self.conv = nn.Conv2d(in_channels, in_channels * up_scale ** 2, kernel_size=3, padding=1)
+        self.pixel_shuffle = nn.PixelShuffle(up_scale)
+        self.prelu = nn.PReLU()
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.pixel_shuffle(x)
+        x = self.prelu(x)
+        return x
+		
         
 "3D_ResNeXt"
 class ResNeXt_2D(nn.Module):                   #----- Define a Net class as derived class inherited from nn.Module
@@ -428,20 +442,26 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
             nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
         
             "declaration of the rest parts which consist of residual blocks"
-            self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 1, gate_in_use = True)
-            self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 1)
-            self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 1)
-# =============================================================================
-#         self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 32, stride = 1, dilation_rate = 4)
-# =============================================================================
-# =============================================================================
-#         self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 1, gate_in_use = True)
-#         self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 1)
-#         self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 1)
-#         self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 1)
-#         self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 1, gate_in_use = True)
-# =============================================================================
-        
+			self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
+			self.part2 = self.make_residual_parst(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
+			self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
+			self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
+			self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
+			self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
+			
+			self.part7 = nn.Sequential(UpsampleBLock(512, 2),
+			nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
+			self.part8 = nn.Sequential(UpsampleBLock(256, 2),
+			nn.Conv2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 1, padding = 1, bias = False))
+			self.part9 = nn.Sequential(UpsampleBLock(128, 2),
+			nn.Conv2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 1, padding = 1, bias = False))
+			self.part10 = nn.Sequential(UpsampleBLock(64, 2),
+			nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3, stride = 1, padding = 1, bias = False))
+			self.part11 = nn.Sequential(UpsampleBLock(32, 2),
+			nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
+			self.part12 = nn.Sequential(UpsampleBLock(16, 2),
+			nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
+	
 # =============================================================================
 #         "fully connected layers as regressor"
 #         self.regressor = nn.Linear(in_features = 1024, out_features = num_classes)
@@ -485,29 +505,31 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
         low_resolution_input = x
         if self.feature_extractor_in_front_bool == True:
             x = tc.cat((x, x, x), 1)
-        x = self.normal_block(x) #----- x --> normal_block --> result stores back in x
-        print('Before part1: ',x.size())
-        x = self.part1(x)
-        print('Part1: ',x.size())
-        x = self.part2(x)
-        print('Part2: ',x.size())
-        x = self.part3(x)
-        print('Part3: ',x.size())
-# =============================================================================
-#         x = self.part4(x)
-# =============================================================================
+        x0 = self.normal_block(x) #----- x --> normal_block --> result stores back in x
+        print('Before part1: ',x0.size())
+        x1 = self.part1(x0)
+        print('Part1: ',x1.size())
+        x2 = self.part2(x1)
+        print('Part2: ',x2.size())
+        x3 = self.part3(x2)
+        print('Part3: ',x3.size())
+		x4 = self.part4(x3)
+		x5 = self.part5(x4)
+		x6 = self.part6(x5)
+		
+		x7 = self.part7(x6) + x5
+		x8 = self.part8(x7) + x4
+		x9 = self.part9(x8) + x3
+		x10 = self.part10(x9) + x2
+		x11 = self.part11(x10) + x1
+		sr_resolution_output = self.part12(x11) + low_resolution_input
         
         "No needs for avg poolingbecause the output size from part5 is already N x 256 x 64 x 64(in 256 out channels/feature maps)"
         # x = F.avg_pool3d(x, kernel_size = 7) 
         
         # x = x.view(x.size()[0], -1)                     #----- Reshape the x to make it flat
-        print('Before regressor: ',x.size())
-        x = self.regressor(x)
-        print('After regressor: ',x.size())
-        print('low_resolution_input: ',low_resolution_input.size())
-        x = low_resolution_input + x #----- original low resolution image + the output from regressor
         
-        return x #----- return the x which is just right before passing the last activation function layer
+        return sr_resolution_output #----- return the sr_resolution_output which is just right before passing the last activation function layer
 
 
         
