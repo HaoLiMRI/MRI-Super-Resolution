@@ -439,28 +439,26 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
             nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False),
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
-        
-            "declaration of the rest parts which consist of residual blocks"
-			self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
-			self.part2 = self.make_residual_parst(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
-			self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
-			self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
-			self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
-			self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
+            nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1)
+	    self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
+	    self.part2 = self.make_residual_parst(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
+	    self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
+	    self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
+	    self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
+	    self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
 			
-			self.part7 = nn.Sequential(UpsampleBLock(512, 2),
-			nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
-			self.part8 = nn.Sequential(UpsampleBLock(256, 2),
-			nn.Conv2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 1, padding = 1, bias = False))
-			self.part9 = nn.Sequential(UpsampleBLock(128, 2),
-			nn.Conv2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 1, padding = 1, bias = False))
-			self.part10 = nn.Sequential(UpsampleBLock(64, 2),
-			nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3, stride = 1, padding = 1, bias = False))
-			self.part11 = nn.Sequential(UpsampleBLock(32, 2),
-			nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
-			self.part12 = nn.Sequential(UpsampleBLock(16, 2),
-			nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
+	    self.part7 = nn.Sequential(UpsampleBLock(512, 2),
+		nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
+	    self.part8 = nn.Sequential(UpsampleBLock(256, 2),
+		nn.Conv2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 1, padding = 1, bias = False))
+	    self.part9 = nn.Sequential(UpsampleBLock(128, 2),
+		nn.Conv2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 1, padding = 1, bias = False))
+	    self.part10 = nn.Sequential(UpsampleBLock(64, 2),
+		nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3, stride = 1, padding = 1, bias = False))
+	    self.part11 = nn.Sequential(UpsampleBLock(32, 2),
+		nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
+	    self.part12 = nn.Sequential(UpsampleBLock(16, 2),
+		nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
 	
 # =============================================================================
 #         "fully connected layers as regressor"
@@ -513,16 +511,16 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
         print('Part2: ',x2.size())
         x3 = self.part3(x2)
         print('Part3: ',x3.size())
-		x4 = self.part4(x3)
-		x5 = self.part5(x4)
-		x6 = self.part6(x5)
+	x4 = self.part4(x3)
+	x5 = self.part5(x4)
+	x6 = self.part6(x5)
 		
-		x7 = self.part7(x6) + x5
-		x8 = self.part8(x7) + x4
-		x9 = self.part9(x8) + x3
-		x10 = self.part10(x9) + x2
-		x11 = self.part11(x10) + x1
-		sr_resolution_output = self.part12(x11) + low_resolution_input
+	x7 = self.part7(x6) + x5
+	x8 = self.part8(x7) + x4
+	x9 = self.part9(x8) + x3
+	x10 = self.part10(x9) + x2
+	x11 = self.part11(x10) + x1
+	sr_resolution_output = self.part12(x11) + low_resolution_input
         
         "No needs for avg poolingbecause the output size from part5 is already N x 256 x 64 x 64(in 256 out channels/feature maps)"
         # x = F.avg_pool3d(x, kernel_size = 7) 
