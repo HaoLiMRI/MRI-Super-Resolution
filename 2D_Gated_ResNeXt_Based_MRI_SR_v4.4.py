@@ -439,26 +439,26 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
             nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False),
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1)
-	    self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
-	    self.part2 = self.make_residual_parst(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
-	    self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
-	    self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
-	    self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
-	    self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
+            nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
+            self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
+            self.part2 = self.make_residual_parst(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
+            self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
+            self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
+            self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
+            self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
 			
-	    self.part7 = nn.Sequential(UpsampleBLock(512, 2),
-		nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
-	    self.part8 = nn.Sequential(UpsampleBLock(256, 2),
-		nn.Conv2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 1, padding = 1, bias = False))
-	    self.part9 = nn.Sequential(UpsampleBLock(128, 2),
-		nn.Conv2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 1, padding = 1, bias = False))
-	    self.part10 = nn.Sequential(UpsampleBLock(64, 2),
-		nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3, stride = 1, padding = 1, bias = False))
-	    self.part11 = nn.Sequential(UpsampleBLock(32, 2),
-		nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
-	    self.part12 = nn.Sequential(UpsampleBLock(16, 2),
-		nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
+            self.part7 = nn.Sequential(UpsampleBLock(512, 2),
+                nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
+            self.part8 = nn.Sequential(UpsampleBLock(256, 2),
+                nn.Conv2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 1, padding = 1, bias = False))
+            self.part9 = nn.Sequential(UpsampleBLock(128, 2),
+                nn.Conv2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 1, padding = 1, bias = False))
+            self.part10 = nn.Sequential(UpsampleBLock(64, 2),
+                nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3, stride = 1, padding = 1, bias = False))
+            self.part11 = nn.Sequential(UpsampleBLock(32, 2),
+                nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
+            self.part12 = nn.Sequential(UpsampleBLock(16, 2),
+                nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
 	
 # =============================================================================
 #         "fully connected layers as regressor"
