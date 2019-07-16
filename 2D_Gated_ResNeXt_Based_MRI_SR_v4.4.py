@@ -158,7 +158,7 @@ import pytorch_msssim
 print('boolean value to see if GPU is ready:', tc.cuda.is_available())
 print('number of GPU is', tc.cuda.device_count())
 print(tc.cuda.get_device_name(0))
-use_cuda = False #-- boolean to choose GPU
+use_cuda = True #-- boolean to choose GPU
 since = time.clock()
 
 
@@ -175,7 +175,7 @@ Feature_Extractor_in_Front_of_Network = False
 # =============================================================================
 
 "Note folder log path is changed for 2D_Gated_Dilated_ResNeXt_Based_MRI_SR_v2"
-folder_log_path = 'D:\HaoLi\SR\data'
+folder_log_path = '/home/HaoLi/SR/Data/'
 file_names = os.listdir(folder_log_path)
 
 num_low_resolution_mat_file = 0
@@ -412,7 +412,7 @@ class UpsampleBLock(nn.Module):
         return x
 		
         
-"2D_ResNeXt"
+"3D_ResNeXt"
 class ResNeXt_2D(nn.Module):                   #----- Define a Net class as derived class inherited from nn.Module
     "Residual_Block_Type is either class 'BottleNeck_Residual_Block' or class 'Normal_Residual_Block"
     def __init__(self, Residual_Block_Type, feature_extractor_in_front_bool):                 #----- __init__ define the constructor of Net class, consist of declaration of components in network              
@@ -440,25 +440,25 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
-            self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
-            self.part2 = self.make_residual_parst(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
-            self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
-            self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
-            self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
-            self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
+        self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
+        self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
+        self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
+        self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
+        self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
+        self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
 			
-            self.part7 = nn.Sequential(UpsampleBLock(512, 2),
-                nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
-            self.part8 = nn.Sequential(UpsampleBLock(256, 2),
-                nn.Conv2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 1, padding = 1, bias = False))
-            self.part9 = nn.Sequential(UpsampleBLock(128, 2),
-                nn.Conv2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 1, padding = 1, bias = False))
-            self.part10 = nn.Sequential(UpsampleBLock(64, 2),
-                nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3, stride = 1, padding = 1, bias = False))
-            self.part11 = nn.Sequential(UpsampleBLock(32, 2),
-                nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
-            self.part12 = nn.Sequential(UpsampleBLock(16, 2),
-                nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
+        self.part7 = nn.Sequential(UpsampleBLock(512, 2),
+        nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
+        self.part8 = nn.Sequential(UpsampleBLock(256, 2),
+        nn.Conv2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 1, padding = 1, bias = False))
+        self.part9 = nn.Sequential(UpsampleBLock(128, 2),
+        nn.Conv2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 1, padding = 1, bias = False))
+        self.part10 = nn.Sequential(UpsampleBLock(64, 2),
+        nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3, stride = 1, padding = 1, bias = False))
+        self.part11 = nn.Sequential(UpsampleBLock(32, 2),
+        nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
+        self.part12 = nn.Sequential(UpsampleBLock(16, 2),
+        nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
 	
 # =============================================================================
 #         "fully connected layers as regressor"
@@ -504,23 +504,32 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
         if self.feature_extractor_in_front_bool == True:
             x = tc.cat((x, x, x), 1)
         x0 = self.normal_block(x) #----- x --> normal_block --> result stores back in x
-        print('Before part1: ',x0.size())
+#        print('Before part1: ',x0.size())
         x1 = self.part1(x0)
-        print('Part1: ',x1.size())
+#        print('Part1: ',x1.size())
         x2 = self.part2(x1)
-        print('Part2: ',x2.size())
+#        print('Part2: ',x2.size())
         x3 = self.part3(x2)
-        print('Part3: ',x3.size())
-	x4 = self.part4(x3)
-	x5 = self.part5(x4)
-	x6 = self.part6(x5)
-		
-	x7 = self.part7(x6) + x5
-	x8 = self.part8(x7) + x4
-	x9 = self.part9(x8) + x3
-	x10 = self.part10(x9) + x2
-	x11 = self.part11(x10) + x1
-	sr_resolution_output = self.part12(x11) + low_resolution_input
+#        print('Part3: ',x3.size())
+        x4 = self.part4(x3)
+#        print('Part4: ',x4.size())
+        x5 = self.part5(x4)
+#        print('Part5: ',x5.size())
+        x6 = self.part6(x5)
+#        print('Part6: ',x6.size())
+
+        x7 = self.part7(x6) + x5
+#        print('Part7: ',x7.size())
+        x8 = self.part8(x7) + x4
+#        print('Part8: ',x8.size())
+        x9 = self.part9(x8) + x3
+#        print('Part9: ',x9.size())
+        x10 = self.part10(x9) + x2
+#        print('Part10: ',x10.size())
+        x11 = self.part11(x10) + x1
+#        print('Part11: ',x11.size())
+        sr_resolution_output = self.part12(x11) + low_resolution_input
+#        print('sr_output: ',sr_resolution_output.size())
         
         "No needs for avg poolingbecause the output size from part5 is already N x 256 x 64 x 64(in 256 out channels/feature maps)"
         # x = F.avg_pool3d(x, kernel_size = 7) 
@@ -533,7 +542,16 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
         
 "Residual_Block_Type is either class 'BottleNeck_Residual_Block' or 'class Normal_Residual_Block'"
 device=tc.device("cuda" if use_cuda else "cpu")
-our_resnext = ResNeXt_2D(BottleNeck_Residual_Block, feature_extractor_in_front_bool = Feature_Extractor_in_Front_of_Network).to(device)
+# our_resnext = ResNeXt_2D(BottleNeck_Residual_Block, feature_extractor_in_front_bool = Feature_Extractor_in_Front_of_Network).to(device)
+our_resnext = ResNeXt_2D(BottleNeck_Residual_Block, feature_extractor_in_front_bool = Feature_Extractor_in_Front_of_Network)
+if tc.cuda.device_count()>1:
+    our_resnext=nn.DataParallel(our_resnext)
+our_resnext.to(device)
+
+
+
+
+
 # our_resnext = ResNeXt_3D(Normal_Residual_Block).to(device)
 print('this is our ResNeXt: ', our_resnext)
 
@@ -557,7 +575,7 @@ print('The loss function is MSE')
 loss_function_MSE = nn.MSELoss().to(device)        #----- here use MSE loss
 
 print('The loss function is L1')
-loss_function_L1 = nn.L1Loss().to(device)       #-----L1 loss
+loss_function_L1 = nn.SmoothL1Loss().to(device)       #-----L1 loss
 
 # print('The loss function is Cross Entropy')
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
@@ -630,21 +648,23 @@ for epoch in range(EPOCH_NUM):
         
         "calculate the gradients for all Variables during back prop"
         "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
-        feature_map_loss = 0.000000001*loss_function_MSE(SR_features, HR_features)
+        feature_map_loss = 0.00000001*loss_function_MSE(SR_features, HR_features)
         # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
         # print("feature_map_loss: ", feature_map_loss)
         # pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
-        pixel_wise_loss = 1*loss_function_L1(outputs, labels)
+        pixel_wise_loss = 10*loss_function_L1(outputs, labels)
         
         # print("pixel_wise_loss: ", pixel_wise_loss)
         # k_space_freq_loss = 0.001*loss_function_MSE(SR_freq, HR_freq)
         # print("k_space_freq_loss: ", k_space_freq_loss)
-        ssim_loss = 1-loss_function_MSSSIM(outputs, labels)
+        ssim_loss = 10*(1-loss_function_MSSSIM(outputs, labels))
         # print("ssim_loss: ", ssim_loss)
         
         # loss = pixel_wise_loss + ssim_loss
+#        loss = ssim_loss + pixel_wise_loss + feature_map_loss
+
         if ssim_loss < 0.2:
-            loss = ssim_loss + feature_map_loss
+            loss = 0.9*ssim_loss + feature_map_loss + 0.1*pixel_wise_loss
         else:
             loss = pixel_wise_loss + feature_map_loss
 #        loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
@@ -666,7 +686,7 @@ for epoch in range(EPOCH_NUM):
         # print('the all Variables have been updated')
         
         "print log info"
-        running_loss += loss.data[0]
+        running_loss += loss.data
         if i % 50 == 0: #----- print log info every 1000 batch
             if i == 0:
                 print('[%d, %5d] loss: %.3f' \
@@ -842,21 +862,21 @@ for i, training_data_2 in enumerate(trainloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR LR, HR training images"
-        scipy.io.savemat('../results/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-        scipy.io.savemat('../results/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-        scipy.io.savemat('../results/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+        scipy.io.savemat('/home/HaoLi/SR/Results/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
         
         
     
         for j in range(new_batch_size_for_checking):
             plt.imshow(SR_images_exam_train[j, :, :])
-            plt.savefig('../results/training_' + str(j) + '_SR_image.png')
+            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_SR_image.png')
             plt.show()
             plt.imshow(HR_images_training[j, 0, :, :])
-            plt.savefig('../results/training_' + str(j) + '_HR_image.png')
+            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_HR_image.png')
             plt.show()
             plt.imshow(LR_images_training[j, 0, :, :])
-            plt.savefig('../results/training_' + str(j) + '_LR_image.png')
+            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_LR_image.png')
             plt.show()
 
 print("examination of generated SR image by using training samples complete")
@@ -889,20 +909,20 @@ for i, testing_data_2 in enumerate(testloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR, HR and LR training images"
-        scipy.io.savemat('../results/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-        scipy.io.savemat('../results/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
-        scipy.io.savemat('../results/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+        scipy.io.savemat('/home/HaoLi/SR/Results/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
         
     
         for j in range(new_batch_size_for_checking):
             plt.imshow(SR_images_test[j, :, :])
-            plt.savefig('../results/testing_' + str(j) + '_SR_image.png')
+            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_SR_image.png')
             plt.show()            
             plt.imshow(HR_images_test[j, 0, :, :])
-            plt.savefig('../results/testing_' + str(j) + '_HR_image.png')
+            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_HR_image.png')
             plt.show()            
             plt.imshow(LR_images_test[j, 0, :, :])
-            plt.savefig('../results/testing_' + str(j) + '_LR_image.png')
+            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_LR_image.png')
             plt.show()            
 
 print("the predicting of generated SR image by using testing samples complete")
