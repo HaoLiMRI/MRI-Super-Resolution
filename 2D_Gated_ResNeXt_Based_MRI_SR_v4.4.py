@@ -657,14 +657,14 @@ for epoch in range(EPOCH_NUM):
         # print("pixel_wise_loss: ", pixel_wise_loss)
         # k_space_freq_loss = 0.001*loss_function_MSE(SR_freq, HR_freq)
         # print("k_space_freq_loss: ", k_space_freq_loss)
-        ssim_loss = 10*(1-loss_function_MSSSIM(outputs, labels))
+        ssim_loss = 1-loss_function_MSSSIM(outputs, labels)
         # print("ssim_loss: ", ssim_loss)
         
         # loss = pixel_wise_loss + ssim_loss
 #        loss = ssim_loss + pixel_wise_loss + feature_map_loss
 
         if ssim_loss < 0.2:
-            loss = 0.9*ssim_loss + feature_map_loss + 0.1*pixel_wise_loss
+            loss = ssim_loss + feature_map_loss
         else:
             loss = pixel_wise_loss + feature_map_loss
 #        loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
