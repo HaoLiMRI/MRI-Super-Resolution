@@ -163,7 +163,7 @@ since = time.clock()
 
 
 batch_size = 32
-EPOCH_NUM = 200
+EPOCH_NUM = 250
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
 
@@ -319,9 +319,9 @@ class FFT_K_SPACE(nn.Module):
         x_complex = tc.cat((x, tc.zeros_like(x)), -1)
         k_space_result = tc.fft(x_complex, 2)
         # print(k_space_result.size())
-        out = tc.sqrt(tc.mul(k_space_result[:, :, :, :, 0], k_space_result[:, :, :, :, 0]) + tc.mul(k_space_result[:, :, :, :, 1], k_space_result[:, :, :, :, 1]))
-        return out
-    
+#        out = tc.sqrt(tc.mul(k_space_result[:, :, :, :, 0], k_space_result[:, :, :, :, 0]) + tc.mul(k_space_result[:, :, :, :, 1], k_space_result[:, :, :, :, 1]))
+#        return out
+        return k_space_result
     
 
 class Normal_Residual_Block(nn.Module): #----- In this version, the "cardinality" is implemented by using property "group" in PyTorch for each conv layer
@@ -648,25 +648,36 @@ for epoch in range(EPOCH_NUM):
         
         "calculate the gradients for all Variables during back prop"
         "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
-        feature_map_loss = 0.00000001*loss_function_MSE(SR_features, HR_features)
+        feature_map_loss = 0.001*loss_function_MSE(SR_features, HR_features)
         # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
-        # print("feature_map_loss: ", feature_map_loss)
+#        print("feature_map_loss: ", feature_map_loss)
         # pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
         pixel_wise_loss = 10*loss_function_L1(outputs, labels)
         
-        # print("pixel_wise_loss: ", pixel_wise_loss)
-        # k_space_freq_loss = 0.001*loss_function_MSE(SR_freq, HR_freq)
-        # print("k_space_freq_loss: ", k_space_freq_loss)
+#        print("pixel_wise_loss: ", pixel_wise_loss)
+        k_space_freq_loss = 0.001*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+#        print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
+#        print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+#        print("k_space_freq_loss: ", k_space_freq_loss)
         ssim_loss = 1-loss_function_MSSSIM(outputs, labels)
-        # print("ssim_loss: ", ssim_loss)
+#        print("ssim_loss: ", ssim_loss)
         
         # loss = pixel_wise_loss + ssim_loss
-#        loss = ssim_loss + pixel_wise_loss + feature_map_loss
-
-        if ssim_loss < 0.2:
-            loss = ssim_loss + feature_map_loss
+        loss = pixel_wise_loss + feature_map_loss
+        
+        if ssim_loss < 0.5:
+            loss = ssim_loss + feature_map_loss + pixel_wise_loss
+#            print('ssim_loss')
         else:
             loss = pixel_wise_loss + feature_map_loss
+            
+        if tc.isnan(k_space_freq_loss) != 1:
+            loss = loss + k_space_freq_loss
+        
+#        if tc.isnan(ssim_loss) != 1:
+#            loss = loss + ssim_loss
+        
+#        print('loss: ', loss)
 #        loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
         # print('the loss has been checked')
 
@@ -699,7 +710,7 @@ for epoch in range(EPOCH_NUM):
             feature_map_loss_for_current_epoch = feature_map_loss
             pixel_wise_loss_for_current_epoch = pixel_wise_loss
             ssim_loss_for_current_epoch = ssim_loss
-            #k_space_freq_loss_for_current_epoch = k_space_freq_loss
+            k_space_freq_loss_for_current_epoch = k_space_freq_loss
             
             running_loss = 0.0
         
@@ -716,8 +727,8 @@ for epoch in range(EPOCH_NUM):
     f.write('\n')
     f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
     f.write('\n')
-    #f.write('The k_space_freq_loss for epoch %d  is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
-    #f.write('\n')
+    f.write('The k_space_freq_loss for epoch %d  is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
+    f.write('\n')
     f.write('The ssim_loss for epoch %d  is : %f' % (epoch, ssim_loss_for_current_epoch))
     f.write('\n')
     f.write('The training loss for epoch %d  is : %f' % (epoch, training_loss_for_current_epoch))
