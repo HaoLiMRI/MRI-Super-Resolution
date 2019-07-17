@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 "-------------------------------------------------------------------------------------------------"
 """
-2D_Gated_ResUNet_Based_MRI_SR Reconstruct
+2D_Gated_ResUNeXt_Based_MRI_SR Reconstruct
 """
 """
 Author: chisyliu@hotmail.com *
@@ -17,8 +17,8 @@ What have been done in MRI SR reconstruction by using deep learning
     1) ResNet has been used in MRI SR reconstruction in 2017[16]
     2) DenseNet has been used in MRI SR reconstruction in 2018[17]
 
-This is a demo code of 2D_Gated_Dilated_ResNeXt_Based_MRI_SR_v4.
-    0) This is the 2D version of Gated_Dilated_ResNeXt_Based_MRI_SR_v4, in this version we have following items:
+This is a demo code of 2D_Gated_ResUNeXt_Based_MRI_SR.
+    0) This is the 2D version of Gated_ResUNeXt_Based_MRI_SR, in this version we have following items:
         -) (This function is added in 4.2.0) Print out and save the training loss value for every epoch
         a) (This function is added in 4.1.0) Optional module(exist or NOT): a VGG feature extractor is added before the main "CNN based Reconstruct network"(so the input to "CNN based Reconstruct network" is feature map of LR image)
         b) Optional module(either one exist): either Pixel-Wise MSE loss or Pixel-Wise L1 loss
