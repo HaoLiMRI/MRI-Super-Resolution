@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 "-------------------------------------------------------------------------------------------------"
 """
-2D_Gated_Dilated_ResNeXt_Based_MRI_SR_v4 Reconstruct
+2D_Gated_ResUNet_Based_MRI_SR Reconstruct
 """
 """
-Author: jianan.liu@aptiv.com *
+Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 4.2.0
+Version: 4.5.0
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20181022
+This is the current version we are working on, in 20190717
 What have been done in MRI SR reconstruction by using deep learning
     1) ResNet has been used in MRI SR reconstruction in 2017[16]
     2) DenseNet has been used in MRI SR reconstruction in 2018[17]
