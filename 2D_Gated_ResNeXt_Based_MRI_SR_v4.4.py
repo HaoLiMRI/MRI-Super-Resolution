@@ -581,7 +581,7 @@ loss_function_L1 = nn.SmoothL1Loss().to(device)       #-----L1 loss
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
 print('The loss function is MS-SSIM')
-loss_function_MSSSIM = pytorch_msssim.MSSSIM(window_size = 11).to(device)       #-----L1 loss
+MSSSIM_function = pytorch_msssim.MSSSIM(window_size = 11).to(device)       #-----L1 loss
 
 # =============================================================================
 # print('The loss function is L1Loss')
@@ -659,11 +659,11 @@ for epoch in range(EPOCH_NUM):
 #        print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
 #        print("k_space_freq_loss: ", k_space_freq_loss)
-        ssim_loss = 1-loss_function_MSSSIM(outputs, labels)
+        ssim_loss = 1-MSSSIM_function(outputs, labels)
 #        print("ssim_loss: ", ssim_loss)
         
-        # loss = pixel_wise_loss + ssim_loss
-        loss = pixel_wise_loss + feature_map_loss
+#        loss = pixel_wise_loss + ssim_loss
+#        loss = pixel_wise_loss + feature_map_loss
         
         if ssim_loss < 0.5:
             loss = ssim_loss + feature_map_loss + pixel_wise_loss
