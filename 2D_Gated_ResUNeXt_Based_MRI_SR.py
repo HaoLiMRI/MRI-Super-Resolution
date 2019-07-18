@@ -440,12 +440,12 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
-        self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
-        self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
-        self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
-        self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
-        self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
-        self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
+        self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = False)
+        self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 2, gate_in_use = False)
+        self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2, gate_in_use = False)
+        self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2, gate_in_use = False)
+        self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = True)
+        self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = True)
 			
         self.part7 = nn.Sequential(UpsampleBLock(512, 2),
         nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
