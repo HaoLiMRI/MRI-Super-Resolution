@@ -7,6 +7,7 @@
 3. interpolation first to increase resolution little bit before leaving into U-Net(might NOT be useful since LR_MRI_image has same size as HR_MRI_image, LR_MRI_image just does NOT have high frequency information comepared with HR_MRI_image so tp speak)
         
 4. @TODO now
+        
         1.将小图拼接起来成为大图看下
         
         2.LR的SSIM似乎太低，调高一些再试一试
