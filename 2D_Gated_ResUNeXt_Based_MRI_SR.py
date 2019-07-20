@@ -440,12 +440,12 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
-        self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = True)
-        self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 2)
-        self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2)
-        self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2)
-        self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = False)
-        self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = False)
+        self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = False)
+        self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 2, gate_in_use = False)
+        self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2, gate_in_use = False)
+        self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2, gate_in_use = False)
+        self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = True)
+        self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = True)
 			
         self.part7 = nn.Sequential(UpsampleBLock(512, 2),
         nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
@@ -459,6 +459,7 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
         nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
         self.part12 = nn.Sequential(UpsampleBLock(16, 2),
         nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
+	self.dropout = nn.Dropout(p=0.3)
 	
 # =============================================================================
 #         "fully connected layers as regressor"
@@ -528,7 +529,9 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
 #        print('Part10: ',x10.size())
         x11 = self.part11(x10) + x1
 #        print('Part11: ',x11.size())
-        sr_resolution_output = self.part12(x11) + low_resolution_input
+#        sr_resolution_output = self.part12(x11) + low_resolution_input
+	
+	sr_resolution_output = self.dropout(self.part12(x11)) + low_resolution_input
 #        print('sr_output: ',sr_resolution_output.size())
         
         "No needs for avg poolingbecause the output size from part5 is already N x 256 x 64 x 64(in 256 out channels/feature maps)"
