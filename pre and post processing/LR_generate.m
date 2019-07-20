@@ -1,43 +1,77 @@
-function [HRGT,LR] = LR_generate(IMG1,num,scale_factor,test_data,zerofilling_cut_switch,fillingmode,calibration_lines)
+function [HRGT,LR] = LR_generate(IMG1,num,scale_factor,test_data,zerofilling_cut_switch,fillingmode,calibration_lines,switch_2d_3d)
 %LR_GENERATE 此处显示有关此函数的摘要
 %   此处显示详细说明
     IMG1=IMG1/max(max(max(IMG1)));
     [dim1,dim2,dim3]=size(IMG1);
-    kspace=fftn(IMG1);
-    
-    if zerofilling_cut_switch
-        if fillingmode
-            kspace(:,round(dim2*0.5/scale_factor)+1:round(dim2*(scale_factor-0.5)/scale_factor),:)=0;
-%           round(dim2*0.5/scale_factor)+1
-%           round(dim2*(scale_factor-0.5)/scale_factor)
-            kspace(:,:,round(dim3*0.5/scale_factor)+1:round(dim3*(scale_factor-0.5)/scale_factor))=0;
-%           round(dim3*0.5/scale_factor)+1
-%           round(dim3*(scale_factor-0.5)/scale_factor)
-        else
-            for i=1:dim2
-                if mod(i,scale_factor)~=1
-                    if ((i>(calibration_lines/2)) && (i<(dim2+1-calibration_lines/2)))
-                        kspace(:,i,:) = 0;
-                    end
-                    if ((i>(calibration_lines/2)) && (i<(dim3+1-calibration_lines/2)))
-                        kspace(:,:,i) = 0;
+    if switch_2d_3d
+        for slice=1:dim3
+            kspace(:,:,slice)=fftn(IMG1(:,:,slice));
+        end
+        if zerofilling_cut_switch
+            if fillingmode
+                kspace(:,ceil(dim2*0.5/scale_factor)+1:ceil(dim2*(scale_factor-0.5)/scale_factor),:)=0;
+%               ceil(dim2*0.5/scale_factor)+1
+%               ceil(dim2*(scale_factor-0.5)/scale_factor)
+            else
+                for i=1:dim2
+                    if mod(i,scale_factor)~=1
+                        if ((i>(calibration_lines/2)) && (i<(dim2+1-calibration_lines/2)))
+                            kspace(:,i,:) = 0;
+                        end
                     end
                 end
             end
+%           figure;imagesc(fftshift(real(kspace(:,:,ceil(dim3/2)))),[0 100]),colormap(gray);axis image;
+            for slice=1:dim3
+                IMG2(:,:,slice)=ifftn(kspace(:,:,slice));
+            end
+            IMG2(:,:,:)=sqrt(real(IMG2(:,:,:)).^2+imag(IMG2(:,:,:)).^2);
+            IMG2=IMG2/max(max(max(IMG2)));
+        else
+            kspace_0=fftshift(kspace);
+            kspace_cut=kspace_0(dim1*0.5*(scale_factor-1)/scale_factor+1:dim1*0.5*(scale_factor+1)/scale_factor,dim2*0.5*(scale_factor-1)/scale_factor+1:dim2*0.5*(scale_factor+1)/scale_factor,:);
+%            figure;imagesc(abs(kspace_cut(:,:,ceil(dim3/2))),[0 100]),colormap(gray);axis image;
+            for slice=1:dim3
+                IMG2=ifftn(fftshift(kspace_cut));
+            end
+            IMG2(:,:,:)=sqrt(real(IMG2(:,:,:)).^2+imag(IMG2(:,:,:)).^2);
+            IMG2=IMG2/max(max(max(IMG2)));
         end
-%         figure;imagesc(fftshift(real(permute(kspace(200,:,:),[2,3,1]))),[0 100]),colormap(gray);axis image;
-        IMG2=ifftn(kspace);
-        IMG2(:,:,:)=sqrt(real(IMG2(:,:,:)).^2+imag(IMG2(:,:,:)).^2);
-        IMG2=IMG2/max(max(max(IMG2)));
-    else
-        kspace_0=fftshift(kspace);
-        kspace_cut=kspace_0(dim1*0.5*(scale_factor-1)/scale_factor+1:dim1*0.5*(scale_factor+1)/scale_factor,dim2*0.5*(scale_factor-1)/scale_factor+1:dim2*0.5*(scale_factor+1)/scale_factor,dim3*0.5*(scale_factor-1)/scale_factor+1:dim3*0.5*(scale_factor+1)/scale_factor);
-        figure;imagesc(abs(permute(kspace_cut(round(200/scale_factor),:,:),[2,3,1])),[0 100]),colormap(gray);axis image;
-        IMG2=ifftn(fftshift(kspace_cut));
-        IMG2(:,:,:)=sqrt(real(IMG2(:,:,:)).^2+imag(IMG2(:,:,:)).^2);
-        IMG2=IMG2/max(max(max(IMG2)));
+    else    
+        kspace=fftn(IMG1);
+        if zerofilling_cut_switch
+            if fillingmode
+                kspace(:,ceil(dim2*0.5/scale_factor)+1:ceil(dim2*(scale_factor-0.5)/scale_factor),:)=0;
+%               ceil(dim2*0.5/scale_factor)+1
+%               ceil(dim2*(scale_factor-0.5)/scale_factor)
+                kspace(:,:,ceil(dim3*0.5/scale_factor)+1:ceil(dim3*(scale_factor-0.5)/scale_factor))=0;
+%               ceil(dim3*0.5/scale_factor)+1
+%               ceil(dim3*(scale_factor-0.5)/scale_factor)
+            else
+                for i=1:dim2
+                    if mod(i,scale_factor)~=1
+                        if ((i>(calibration_lines/2)) && (i<(dim2+1-calibration_lines/2)))
+                            kspace(:,i,:) = 0;
+                        end
+                        if ((i>(calibration_lines/2)) && (i<(dim3+1-calibration_lines/2)))
+                            kspace(:,:,i) = 0;
+                        end
+                    end
+                end
+            end
+%           figure;imagesc(fftshift(real(permute(kspace(200,:,:),[2,3,1]))),[0 100]),colormap(gray);axis image;
+            IMG2=ifftn(kspace);
+            IMG2(:,:,:)=sqrt(real(IMG2(:,:,:)).^2+imag(IMG2(:,:,:)).^2);
+            IMG2=IMG2/max(max(max(IMG2)));
+        else
+            kspace_0=fftshift(kspace);
+            kspace_cut=kspace_0(dim1*0.5*(scale_factor-1)/scale_factor+1:dim1*0.5*(scale_factor+1)/scale_factor,dim2*0.5*(scale_factor-1)/scale_factor+1:dim2*0.5*(scale_factor+1)/scale_factor,dim3*0.5*(scale_factor-1)/scale_factor+1:dim3*0.5*(scale_factor+1)/scale_factor);
+            figure;imagesc(abs(permute(kspace_cut(ceil(200/scale_factor),:,:),[2,3,1])),[0 100]),colormap(gray);axis image;
+            IMG2=ifftn(fftshift(kspace_cut));
+            IMG2(:,:,:)=sqrt(real(IMG2(:,:,:)).^2+imag(IMG2(:,:,:)).^2);
+            IMG2=IMG2/max(max(max(IMG2)));
+        end
     end
-
 %%
 %     slc = 65;
 %     WW = 0.4;
@@ -88,7 +122,7 @@ function [HRGT,LR] = LR_generate(IMG1,num,scale_factor,test_data,zerofilling_cut
                 if test_data == 0
                     counter = counter + 1;
                 else
-                    if std2(HRGT(:,:,counter))>=0.005
+                    if (std2(HRGT(:,:,counter))>=0.005)||(mean2(HRGT(:,:,counter))>0.05)
                         counter=counter+1;
                     end
                 end

@@ -7,12 +7,12 @@ test_data = 1;                      % Training data and test data switch. 1: tra
 zerofilling_cut_switch = 1;         % Kspace zero-filling or cutting. Cutting decrease the size of LR image.1: zero-filling, 0: cutting.
 fillingmode = 1;                    % Kspace continuous or interleaved zero-filling. 1: continuous, 0: interleaved.
 calibration_lines = 16;             % Nember of remained lines in kspace center.
-
+swich_2d_3d = 1;                    % 2d/3d kspace downsampling. 1: 2d, 0: 3d. 
 
 for num=1:len
     filename1=strcat('D:\HaoLi\SR\data\HRGT_org\HRGT_org_',num2str(num),'.mat'); 
     load(filename1);
-    [HRGT, LR]=LR_generate(IMG1,num,scale_factor,test_data,zerofilling_cut_switch,fillingmode,calibration_lines); 
+    [HRGT, LR]=LR_generate(IMG1,num,scale_factor,test_data,zerofilling_cut_switch,fillingmode,calibration_lines,switch_2d_3d); 
     
     filename2=strcat('D:\HaoLi\SR\data\',num2str(scale_factor),'_folds\data',num2str(num),'.mat');
     save(filename2, 'HRGT', 'LR', '-v7.3');
