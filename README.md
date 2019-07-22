@@ -15,3 +15,11 @@
 6. 换一个更好的upsampling的方案（有其他函数可以用，应该有一种比pixelshuffler更牛逼）
 7. 需要设计一个更好的loss来真实反映人对于超清的感受
 8. 10)might also consider changing the order of connection, from "Conv --> BN --> ReLU"(normal connection) to "BN --> ReLU --> Conv"(so called full pre-activation)[13] The authors of ResNet[1] found out the performance increased if order of connection changed to full pre-activation in [13]. However, note the BN should always be placed before ReLU or other activation functions, due that "BN is used to produce activations function with the desired distribution"[14] so it has to be before activate function
+
+
+
+长期计划：
+3D U-shape ResNeXt
+3D super resolution generative adversarial network (3DSRGAN)
+Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images。
+Magnification-arbitrary network: Super resolution with variable scale factor
