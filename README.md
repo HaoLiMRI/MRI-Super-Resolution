@@ -19,7 +19,7 @@
 
 
 长期计划：
-3D U-shape ResNeXt
-3D super resolution generative adversarial network (3DSRGAN)
-Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images。
-Magnification-arbitrary network: Super resolution with variable scale factor
+1. 3D ResNeXt
+2. 3D 3DSRGAN
+3. Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images
+4. Magnification-arbitrary network: Super resolution with variable scale factor
