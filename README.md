@@ -46,5 +46,15 @@
         
         两个方案
                 a. 要盯着代码什么时间放出来，在对方代码上面直接加我们的东西
+                        (pytorch复现在这https://github.com/chisyliu/srMRI_Meta-SR-Pytorch)
+                        相关模型EDSR.复现https://github.com/chisyliu/EDSR-PyTorch
                 b. 或者自己写，jianan大概看了一下论文，感觉自己写应该没问题
+
+
+
+
+
+
+## A collection of high-impact and state-of-the-art SR method
+https://github.com/chisyliu/Single-Image-Super-Resolution
  
