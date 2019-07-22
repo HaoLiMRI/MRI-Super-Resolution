@@ -43,12 +43,13 @@
         https://blog.csdn.net/m0_37615398/article/details/88382556
         https://blog.csdn.net/m0_38129460/article/details/88596262 
    看一下怎么扩展到MRI SR Reconstruction。感觉可以直接拿过来用到MRI SR。
-        
-        两个方案
-                a. 要盯着代码什么时间放出来，在对方代码上面直接加我们的东西
-                        (pytorch复现在这https://github.com/chisyliu/srMRI_Meta-SR-Pytorch)
-                        相关模型EDSR.复现https://github.com/chisyliu/EDSR-PyTorch
-                b. 或者自己写，jianan大概看了一下论文，感觉自己写应该没问题
+   
+        pytorch复现在这
+                https://github.com/chisyliu/srMRI_Meta-SR-Pytorch
+                        
+        相关模型EDSR
+                复现https://github.com/chisyliu/EDSR-PyTorch
+
 
 
 
