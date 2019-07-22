@@ -33,7 +33,7 @@
 长期计划：
 1. 2D 2DSRGAN(using U-ResNeXt)
 2. 3D U-ResNeXt
-3. 3D 3DSRGAN
+3. 3D 3DSRGAN(using U-ResNeXt)
 4. Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images
 5. 阅读这篇论文2019. Magnification-arbitrary network: Super resolution with variable scale factor。
         
