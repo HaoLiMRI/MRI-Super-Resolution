@@ -44,11 +44,11 @@
         https://blog.csdn.net/m0_38129460/article/details/88596262 
    看一下怎么扩展到MRI SR Reconstruction。感觉可以直接拿过来用到MRI SR。
    
-        pytorch复现在这
+        Meta-SR一作pytorch复现在这
                 https://github.com/chisyliu/srMRI_Meta-SR-Pytorch
                         
-        相关模型EDSR
-                复现https://github.com/chisyliu/EDSR-PyTorch
+        Meta-SR用了模型EDSR
+                复现在这https://github.com/chisyliu/EDSR-PyTorch
 
 
 
