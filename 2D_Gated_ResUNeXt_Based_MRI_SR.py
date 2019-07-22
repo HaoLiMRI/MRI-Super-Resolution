@@ -152,7 +152,7 @@ import time
 import scipy.io
 from torchvision.models import vgg19
 
-import pytorch_msssim
+import pytorch_ssim
 
 "-------------------------------------------------------------------------------------------------"
 print('boolean value to see if GPU is ready:', tc.cuda.is_available())
@@ -459,7 +459,7 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
         nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
         self.part12 = nn.Sequential(UpsampleBLock(16, 2),
         nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
-	self.dropout = nn.Dropout(p=0.3)
+        self.dropout = nn.Dropout(p=0.3)
 	
 # =============================================================================
 #         "fully connected layers as regressor"
@@ -531,7 +531,7 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
 #        print('Part11: ',x11.size())
 #        sr_resolution_output = self.part12(x11) + low_resolution_input
 	
-	sr_resolution_output = self.dropout(self.part12(x11)) + low_resolution_input
+        sr_resolution_output = self.dropout(self.part12(x11)) + low_resolution_input
 #        print('sr_output: ',sr_resolution_output.size())
         
         "No needs for avg poolingbecause the output size from part5 is already N x 256 x 64 x 64(in 256 out channels/feature maps)"
@@ -584,7 +584,7 @@ loss_function_L1 = nn.SmoothL1Loss().to(device)       #-----L1 loss
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
 print('The loss function is MS-SSIM')
-MSSSIM_function = pytorch_msssim.MSSSIM(window_size = 11).to(device)       #-----L1 loss
+SSIM_function = pytorch_ssim.SSIM().to(device)       #-----L1 loss
 
 # =============================================================================
 # print('The loss function is L1Loss')
@@ -653,24 +653,24 @@ for epoch in range(EPOCH_NUM):
         "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
         feature_map_loss = 0.001*loss_function_MSE(SR_features, HR_features)
         # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
-#        print("feature_map_loss: ", feature_map_loss)
+        print("feature_map_loss: ", feature_map_loss)
         # pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
         pixel_wise_loss = 10*loss_function_L1(outputs, labels)
         
-#        print("pixel_wise_loss: ", pixel_wise_loss)
+        print("pixel_wise_loss: ", pixel_wise_loss)
         k_space_freq_loss = 0.001*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-#        print("k_space_freq_loss: ", k_space_freq_loss)
-        ssim_loss = 1-MSSSIM_function(outputs, labels)
-#        print("ssim_loss: ", ssim_loss)
+        print("k_space_freq_loss: ", k_space_freq_loss)
+        ssim_loss = 1-SSIM_function(outputs, labels)
+        print("ssim_loss: ", ssim_loss)
         
 #        loss = pixel_wise_loss + ssim_loss
 #        loss = pixel_wise_loss + feature_map_loss
         
         if ssim_loss < 0.5:
             loss = ssim_loss + feature_map_loss + pixel_wise_loss
-#            print('ssim_loss')
+            print('ssim_loss')
         else:
             loss = pixel_wise_loss + feature_map_loss
             
@@ -680,7 +680,7 @@ for epoch in range(EPOCH_NUM):
 #        if tc.isnan(ssim_loss) != 1:
 #            loss = loss + ssim_loss
         
-#        print('loss: ', loss)
+        print('loss: ', loss)
 #        loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
         # print('the loss has been checked')
 
