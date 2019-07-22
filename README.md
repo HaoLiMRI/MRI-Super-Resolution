@@ -10,11 +10,9 @@
 1. 重新生成LR图像，对2D网络图像只做层内模糊。并且需要提高生成的LR的SSIM
         
         已重新生成2D 1/4，1/6，1/8 LR图像。
-        
 2. 解决过拟合
         
         现在已经带dropout,但逻辑上dropout不应该对的。之后还要再研究结果
-        
 3. 对更多细节部分增加ssim权重(如何用数量的方式表征"细节比较多"，比如概率？在loss里面需要重新设计一下对细节比较多的部分增加weight，类似分类任务的focal loss的方式)
 4. pytorch上ssim值过大，检查或重写(Check this repo: https://github.com/chisyliu/srMRI_SRGAN-2/blob/master/pytorch_ssim/__init__.py)
         已经换为pytorch_SSIM来构造SSIM
@@ -41,8 +39,7 @@
         相关资料 
         https://www.chainnews.com/articles/367464091791.htm
         https://blog.csdn.net/m0_37615398/article/details/88382556
-        https://blog.csdn.net/m0_38129460/article/details/88596262
-   
+        https://blog.csdn.net/m0_38129460/article/details/88596262 
    看一下怎么扩展到MRI SR Reconstruction。感觉可以直接拿过来用到MRI SR。
         
         两个方案
