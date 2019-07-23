@@ -54,7 +54,7 @@
         Meta-Learning: Learning to Learn Fast
         https://lilianweng.github.io/lil-log/2018/11/30/meta-learning.html
         
-   Note:我们现在设计基于U-ResNeXt的网络是处理LR与HR,SR都有相同的size的case。而Meta-SR应该是handle输入LR与HR,SR的size有r倍差距的case
+   Note:**我们现在设计基于U-ResNeXt的网络是处理LR与HR,SR都有相同的size的case。而Meta-SR应该是handle输入LR与HR,SR的size有r倍差距的case**
         
    
 
