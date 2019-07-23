@@ -97,6 +97,25 @@
 
 
 
+
+**interesting paper我们可以看一看，也许有帮助可以给我们参考或者可以用**
+1. Lightweight Image Super-Resolution with Adaptive Weighted Learning Network https://arxiv.org/abs/1904.02358
+        
+        我们有Lightweight需求吗？
+        
+2. Efficient Deep Neural Network for Photo-realistic Image Super-Resolution https://arxiv.org/abs/1903.02240
+
+3. Deep Learning for Multiple-Image Super-Resolution https://arxiv.org/abs/1903.00440
+        
+        不确定multiple-image SR具体是什么意思，需要看并且确认我们有需求吗？
+        
+4. Single MR Image Super-Resolution via Channel Splitting and Serial Fusion Network https://arxiv.org/abs/1901.06484
+
+        可以看看别人怎么做MRI SR，可以启发一下我们的task
+
+
+
+
 ## A collection of high-impact and state-of-the-art SR method
 https://github.com/chisyliu/Single-Image-Super-Resolution
  
