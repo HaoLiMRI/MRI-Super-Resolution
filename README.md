@@ -62,8 +62,14 @@
    
         Meta-SR一作pytorch复现在这
                 https://github.com/chisyliu/srMRI_Meta-SR-Pytorch
+                其中复现了多种SR Reconstruction网络模型，包括
+                EDSR (2017. Enhanced Deep Residual Networks for Single Image Super-Resolution https://arxiv.org/abs/1707.02921), 
+                MDSR (2017. Enhanced Deep Residual Networks for Single Image Super-Resolution https://arxiv.org/abs/1707.02921), 
+                DDBPN (2018. Deep Back-Projection Networks For Super-Resolution https://arxiv.org/abs/1803.02735),
+                RDN (2018. Residual Dense Network for Image Super-Resolution https://arxiv.org/abs/1802.08797)，
+                RCAN (2018. Image Super-Resolution Using Very Deep Residual Channel Attention Networks https://arxiv.org/abs/1807.02758)                 并用这些模型分别作为Meta-SR的feature learning module来设计Meta-SR
                         
-        Meta-SR用了模型EDSR
+        EDSR
                 复现在这https://github.com/chisyliu/EDSR-PyTorch
                 
    What is meta-learning?
