@@ -123,6 +123,8 @@
 6. MS-SSIM: https://ece.uwaterloo.ca/~z70wang/publications/msssim.pdf
 7. 多种方法对比：https://blog.csdn.net/qq_35860352/article/details/84037501
                 https://blog.csdn.net/qq_23304241/article/details/80953613
+8. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5527267/pdf/JMI-004-035501.pdf
+
 -----
 
 
