@@ -95,8 +95,8 @@
  
  
  **Note:**
- 1. *我们现在设计基于U-ResNeXt的网络是处理LR与HR,SR都有相同的size的case。而EDSR, RDN, Meta-SR都应该是handle输入LR与HR,SR的size有r倍差距的case*
- 2. *总结来看，所有的SR图像重构网络基本都是两个部分组成。第一部分是feature learing module,可以基于resnet, densenet, U-Net的前半部分，等等.第二部分是upscale module,可以基于EDSR，RDN里面的sup pixel convolution(sup pixel convolution就是我们正在用的U-Net的后半部分的pixelshuffer),Meta-SR里面的Meta upscale module等等。*
+ 1. 我们现在设计基于U-ResNeXt的网络是处理LR与HR,SR都有相同的size的case。而EDSR, RDN, Meta-SR都应该是handle输入LR与HR,SR的size有r倍差距的case
+ 2. 总结来看，所有的SR图像重构网络基本都是两个部分组成。第一部分是feature learing module,可以基于resnet, densenet, U-Net的前半部分，等等.第二部分是upscale module,可以基于EDSR，RDN里面的sup pixel convolution(sup pixel convolution就是我们正在用的U-Net的后半部分的pixelshuffer),Meta-SR里面的Meta upscale module等等。
 -----
         
    
