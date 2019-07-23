@@ -37,11 +37,12 @@
 
 -----
 ## 长期计划：
-1. 2D 2DSRGAN(using U-ResNeXt)
-2. 3D U-ResNeXt
-3. 3D 3DSRGAN(using U-ResNeXt)
+1. 2D 2DSRGAN(using U-ResNeXt) MRI SR
+2. 3D U-ResNeXt MRI SR
+3. 3D 3DSRGAN(using U-ResNeXt) MRI SR
 4. Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images
-5. 阅读这2篇论文
+5. 2D RDN MRI SR
+        阅读这2篇论文
 
         2017. Enhanced Deep Residual Networks for Single Image Super-Resolution
                 
