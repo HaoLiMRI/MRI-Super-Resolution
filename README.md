@@ -45,13 +45,13 @@
 
         2017. Enhanced Deep Residual Networks for Single Image Super-Resolution
                 
-                论文:https://arxiv.org/abs/1707.02921
+                EDSR.MDSR论文:https://arxiv.org/abs/1707.02921
                 
                 代码在这:https://github.com/chisyliu/EDSR-PyTorch
         
         2018. Residual Dense Network for Image Super-Resolution
                 
-                论文:https://arxiv.org/abs/1802.08797
+                RDN论文:https://arxiv.org/abs/1802.08797
                 
                 代码在这:https://github.com/chisyliu/RDN
                 
