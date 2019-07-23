@@ -80,6 +80,7 @@
 
 
 **写作思路**
+只针对(2D MRI SR)&&(Non-Self super resolution)，都有如下写作内容可以好多paper
 1. 基于现有的Gated U-ResNeXt，加上各种loss，实现的是LR和HR，SR的size相同时候的MRI SR重构
 2. 基于SRGAN，用Gated U-ResNeXt，加上各种loss，实现的是LR和HR，SR的size相同时候的MRI SR重构
 3. 基于RDN，加上各种loss，实现的是LR和HR，SR的size不相同并且resize factor固定不任意的MRI SR重构
