@@ -49,7 +49,12 @@
                         
         Meta-SR用了模型EDSR
                 复现在这https://github.com/chisyliu/EDSR-PyTorch
-
+                
+   What is meta-learning?
+        Meta-Learning: Learning to Learn Fast
+        https://lilianweng.github.io/lil-log/2018/11/30/meta-learning.html
+        
+   
 
 
 
