@@ -63,7 +63,8 @@
 
         该文用meta learning的方式自适应的学习了一个weight prediction network的weights，用这个weight prediction network去预测upscale时所用的filter的weights。传统的fixed resize factor方案（e.g. EDSR, RDN, etc）都是用的sup pixel convolution做upscale module, sup pixel convolution filter的weights是从LR and HR training data放在EDSR or RDN + sup pixel convolution网络直接学来的。
         sup pixel convolution论文
-                2016.Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional Neural Network 下载（https://arxiv.org/pdf/1609.05158.pdf）
+          
+          2016.Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional Neural Network 下载（https://arxiv.org/pdf/1609.05158.pdf）
        
        
         相关资料 
