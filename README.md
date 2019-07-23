@@ -69,12 +69,16 @@
    What is meta-learning?
         Meta-Learning: Learning to Learn Fast
         https://lilianweng.github.io/lil-log/2018/11/30/meta-learning.html
+-----
+ 
+ 
+ 
  
  
  **Note:**
  1. __*我们现在设计基于U-ResNeXt的网络是处理LR与HR,SR都有相同的size的case。而EDSR, RDN, Meta-SR都应该是handle输入LR与HR,SR的size有r倍差距的case*__
  2. __*总结来看，所有的SR图像重构网络基本都是两个部分组成。第一部分是feature learing module,可以基于resnet, densenet, U-Net的前半部分，等等.第二部分是upscale module,可以基于EDSR，RDN里面的sup pixel convolution，我们正在用的U-Net的后半部分的pixelshuffer,Meta-SR里面的Meta upscale module等等。*__
- 
+-----
         
    
 
@@ -85,7 +89,7 @@
 2. 基于SRGAN，用Gated U-ResNeXt，加上各种loss，实现的是LR和HR，SR的size相同时候的MRI SR重构
 3. 基于RDN，加上各种loss，实现的是LR和HR，SR的size不相同并且resize factor固定不任意的MRI SR重构
 4. 基于RDN based Meta-SR，加上各种loss，实现的是LR和HR，SR的size不相同并且resize factor任意的MRI SR重构
-
+-----
 
 
 
@@ -94,6 +98,7 @@
 1. 非常重要，非常好总结 https://medium.com/beyondminds/an-introduction-to-super-resolution-using-deep-learning-f60aff9a499d
 2. Deep Learning for Single Image Super-Resolution: Overview https://arxiv.org/pdf/1808.03344.pdf
 3. A Deep Journey into Super-resolution: A survey https://arxiv.org/pdf/1904.07523.pdf
+-----
 
 
 
@@ -112,7 +117,7 @@
 4. Single MR Image Super-Resolution via Channel Splitting and Serial Fusion Network https://arxiv.org/abs/1901.06484
 
         可以看看别人怎么做MRI SR，可以启发一下我们的task不知道有没有可以对我们有意义的部分
-
+-----
 
 
 
