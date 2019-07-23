@@ -36,13 +36,22 @@
 2. 3D U-ResNeXt
 3. 3D 3DSRGAN(using U-ResNeXt)
 4. Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images
-5. 阅读这篇论文2019. Meta-SR: Magnification-arbitrary network for Super resolution with variable scale factor(https://arxiv.org/abs/1903.00875 )。
+5. 阅读这2篇论文
+        2017. Enhanced Deep Residual Networks for Single Image Super-Resolution
+                论文:https://arxiv.org/abs/1707.02921
+                代码在这:https://github.com/chisyliu/EDSR-PyTorch
+        2018. Residual Dense Network for Image Super-Resolution
+                论文:https://arxiv.org/abs/1802.08797
+                代码在这:https://github.com/chisyliu/RDN
+   这两个网络都可以直接用来做MRI SR重建(特别是后者，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建     
+        
+6. 阅读这篇论文2019. Meta-SR: Magnification-arbitrary network for Super resolution with variable scale factor(https://arxiv.org/abs/1903.00875 )。
         
         相关资料 
         https://www.chainnews.com/articles/367464091791.htm
         https://blog.csdn.net/m0_37615398/article/details/88382556
         https://blog.csdn.net/m0_38129460/article/details/88596262 
-   看一下怎么扩展到MRI SR Reconstruction。感觉可以直接拿过来用到MRI SR。
+   看一下怎么扩展到MRI SR Reconstruction。感觉可以直接拿过来用到MRI SR。Meta-SR用在我们的MRI SR话，具体的feature learning module可以考虑用各种feature extractor，比如ResNet，Gated-ResNeXt，EDSR, RDN。
    
         Meta-SR一作pytorch复现在这
                 https://github.com/chisyliu/srMRI_Meta-SR-Pytorch
@@ -53,8 +62,12 @@
    What is meta-learning?
         Meta-Learning: Learning to Learn Fast
         https://lilianweng.github.io/lil-log/2018/11/30/meta-learning.html
-        
- **Note:我们现在设计基于U-ResNeXt的网络是处理LR与HR,SR都有相同的size的case。而Meta-SR应该是handle输入LR与HR,SR的size有r倍差距的case**
+ 
+ 
+ **Note:**
+ 1. __*我们现在设计基于U-ResNeXt的网络是处理LR与HR,SR都有相同的size的case。而EDSR, RDN, Meta-SR都应该是handle输入LR与HR,SR的size有r倍差距的case*__
+ 2. __*总结来看，所有的SR图像重构网络基本都是两个部分组成。第一部分是feature learing module,可以基于resnet, densenet, U-Net的前半部分，等等.第二部分是upscale module,可以基于EDSR，RDN里面的sup pixel convolution，我们正在用的U-Net的后半部分的pixelshuffer,Meta-SR里面的Meta upscale module等等。*__
+ 
         
    
 
