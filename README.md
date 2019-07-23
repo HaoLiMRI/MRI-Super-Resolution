@@ -37,12 +37,19 @@
 3. 3D 3DSRGAN(using U-ResNeXt)
 4. Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images
 5. 阅读这2篇论文
+
         2017. Enhanced Deep Residual Networks for Single Image Super-Resolution
+                
                 论文:https://arxiv.org/abs/1707.02921
+                
                 代码在这:https://github.com/chisyliu/EDSR-PyTorch
+        
         2018. Residual Dense Network for Image Super-Resolution
+                
                 论文:https://arxiv.org/abs/1802.08797
+                
                 代码在这:https://github.com/chisyliu/RDN
+                
    这两个网络都可以直接用来做MRI SR重建(特别是后者，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建     
         
 6. 阅读这篇论文2019. Meta-SR: Magnification-arbitrary network for Super resolution with variable scale factor(https://arxiv.org/abs/1903.00875 )。
