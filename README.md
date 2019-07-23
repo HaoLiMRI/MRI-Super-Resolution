@@ -89,6 +89,14 @@
 
 
 
+
+**需要花时间阅读并且讨论总结的paper**
+1. 非常重要，非常好总结 https://medium.com/beyondminds/an-introduction-to-super-resolution-using-deep-learning-f60aff9a499d
+2. Deep Learning for Single Image Super-Resolution: Overview https://arxiv.org/pdf/1808.03344.pdf
+3. A Deep Journey into Super-resolution: A survey https://arxiv.org/pdf/1904.07523.pdf
+
+
+
 ## A collection of high-impact and state-of-the-art SR method
 https://github.com/chisyliu/Single-Image-Super-Resolution
  
