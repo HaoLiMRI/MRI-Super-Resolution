@@ -69,7 +69,8 @@
                 c. DDBPN (2018. Deep Back-Projection Networks For Super-Resolution https://arxiv.org/abs/1803.02735),
                 d. RDN (2018. Residual Dense Network for Image Super-Resolution https://arxiv.org/abs/1802.08797),
                         相关资料 https://blog.csdn.net/qq_14845119/article/details/81459859                        
-                e. RCAN (2018. Image Super-Resolution Using Very Deep Residual Channel Attention Networks https://arxiv.org/abs/1807.02758)                 并用这些模型分别作为Meta-SR的feature learning module来设计Meta-SR
+                e. RCAN (2018. Image Super-Resolution Using Very Deep Residual Channel Attention Networks https://arxiv.org/abs/1807.02758)                 
+                并用这些模型分别作为Meta-SR的feature learning module来设计Meta-SR
 
    What is meta-learning?
         Meta-Learning: Learning to Learn Fast
