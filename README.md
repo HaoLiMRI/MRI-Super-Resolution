@@ -111,7 +111,7 @@
         
 4. Single MR Image Super-Resolution via Channel Splitting and Serial Fusion Network https://arxiv.org/abs/1901.06484
 
-        可以看看别人怎么做MRI SR，可以启发一下我们的task
+        可以看看别人怎么做MRI SR，可以启发一下我们的task不知道有没有可以对我们有意义的部分
 
 
 
