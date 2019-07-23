@@ -19,8 +19,11 @@
         已经换为pytorch_SSIM来构造SSIM
 5. 将小图拼接起来成为大图看下
 6. 换一个更好的upsampling的方案（有其他函数可以用，应该有一种比pixelshuffler更牛逼）
+        
         各种upsampling技术见这 https://blog.csdn.net/g11d111/article/details/82855946
+        
         另外注意，Meta-SR其实主要也是提出了一种基于Meta learning的upscale module/upsampling的方案
+        
 7. 需要设计一个更好的loss来真实反映人对于超清的感受
 8. 10)might also consider changing the order of connection, from "Conv --> BN --> ReLU"(normal connection) to "BN --> ReLU --> Conv"(so called full pre-activation)[13] The authors of ResNet[1] found out the performance increased if order of connection changed to full pre-activation in [13]. However, note the BN should always be placed before ReLU or other activation functions, due that "BN is used to produce activations function with the desired distribution"[14] so it has to be before activate function
 9. 研究一下另一个imgae content based SSIM，用这个作为SSIM loss或者用SSIM和image content based SSIM一起作为SSIM loss。
