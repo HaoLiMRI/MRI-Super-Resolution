@@ -38,8 +38,8 @@
 
 -----
 ## 长期计划：
-1. 2D RDN MRI SR
-        阅读这2篇论文
+1. 2D RDN MRI SR和2D DDBPN MRI SR
+        阅读这几篇论文
 
         2017. Enhanced Deep Residual Networks for Single Image Super-Resolution
                 
@@ -53,7 +53,18 @@
                 
                 代码在这:https://github.com/chisyliu/RDN
                 
-   这两个网络都可以直接用来做MRI SR重建(特别是后者，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建
+                Comment:去掉了所有的batch norm,用了一些经常都可以看到的所谓的global residual link,把dense block后的output与dense block的input又做了一下summation于是就结合了resnet block变为了residual dense block，还把每一个Residual dense block的output最后都concatenate到一起。
+                
+         2018. Deep Back-Projection Networks For Super-Resolution 
+         
+                DDBPN论文:https://arxiv.org/abs/1803.02735
+                
+                代码在这:https://github.com/chisyliu/DBPN-Pytorch
+                
+                Comment:
+                
+                
+   这几个网络都可以直接用来做MRI SR重建(特别是第二个，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建
    
 2. 2D 2DSRGAN(using U-ResNeXt) MRI SR
 3. 3D U-ResNeXt MRI SR
