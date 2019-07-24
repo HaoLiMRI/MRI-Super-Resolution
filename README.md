@@ -7,14 +7,14 @@
 3. interpolation first to increase resolution little bit before leaving into U-Net(might NOT be useful since LR_MRI_image has same size as HR_MRI_image, LR_MRI_image just does NOT have high frequency information comepared with HR_MRI_image so tp speak)
         
 ## 20190722新任务
-1. 重新生成LR图像，对2D网络图像只做层内模糊。并且需要提高生成的LR的SSIM
+1. ~~重新生成LR图像，对2D网络图像只做层内模糊。并且需要提高生成的LR的SSIM~~
         
         已重新生成2D 1/4，1/6，1/8 LR图像。
 2. 解决过拟合
         
         现在已经带dropout,但逻辑上dropout不应该对的。之后还要再研究结果
 3. 对更多细节部分增加ssim权重(如何用数量的方式表征"细节比较多"，比如概率？在loss里面需要重新设计一下对细节比较多的部分增加weight，类似分类任务的focal loss的方式)
-4. pytorch上ssim值过大，检查或重写(Check this repo: https://github.com/chisyliu/srMRI_SRGAN-2/blob/master/pytorch_ssim/__init__.py)
+4. ~~pytorch上ssim值过大，检查或重写(Check this repo: https://github.com/chisyliu/srMRI_SRGAN-2/blob/master/pytorch_ssim/__init__.py)~~
         
         已经换为pytorch_SSIM来构造SSIM
 5. 将小图拼接起来成为大图看下
