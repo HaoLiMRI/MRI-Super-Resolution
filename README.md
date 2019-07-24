@@ -125,6 +125,8 @@
 7. 多种方法对比：https://blog.csdn.net/qq_35860352/article/details/84037501
                 https://blog.csdn.net/qq_23304241/article/details/80953613
 8. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5527267/pdf/JMI-004-035501.pdf
+9. 这篇文章总结了2018年SR比赛的一些算法，还提到了SRGAN比其他方法重建得到的图像要清晰，但在PSNR和SSIM上都要比其他方法甚至是bicubic上采用得到都要低很多。主要原因SRGAN使用了style transfer里用到的感知损失（当然也用非GAN方法使用感知损失的，例如EnhanceNet[8]），而感知损失重建的图像在人类的认知视觉上更舒服，但细节恢复上确实会和原图相差很多。所以在该文author理解，即便是超分辨率重建，依然可以将其分为两个方向。第一个方向力求恢复出真实可靠的细节部分，应用场景例如医学影像上的超分辨率重建，低分辨率摄像头人脸或者外形的恢复等对细节要求苛刻的场景。另一个则追求整体视觉效果，细节部位要求不高。例如低分辨率视频电视的恢复、相机模糊图像的恢复等。
+        https://zhuanlan.zhihu.com/p/39930043
 
 -----
 
