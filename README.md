@@ -62,7 +62,8 @@
                 
                 代码在这:https://github.com/chisyliu/DBPN-Pytorch
                 
-                Comment:
+                Comment:不用sub pixel conv(pixel shuffle)来实现upsampling，而是用transpose conv实现upsampling。关于trans
+                pose conv具体内容见https://blog.csdn.net/tsyccnh/article/details/87357447
                 
                 
    这几个网络都可以直接用来做MRI SR重建(特别是第二个，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建
