@@ -12,9 +12,11 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 """
-In the original paper which proposed DDBPN(2018. Deep Back-Projection Networks For Super-Resolution, mentioned as "original DBPN paper" in following), authors also try to avoid using batch norm in the network.
-They point out: "Unlike the original DenseNets, we avoid dropout and batch norm, which are not suitable for SR, because they remove the range flexibility of the features [31]. Instead, we use 1 x 1 
-convolution layer as feature pooling and dimensional reduction [42, 12] before entering the projection unit"
+In the original paper which proposed DDBPN(2018. Deep Back-Projection Networks For Super-Resolution, mentioned as "original DBPN paper" in following), there are some important facts:
+    1. DDBNP actually avoid using batch norm in the network. They point out: "Unlike the original DenseNets, we avoid dropout and batch norm, which are not suitable for SR, because they remove the range flexibility of the features [31]. Instead, we use 1 x 1 
+       convolution layer as feature pooling and dimensional reduction [42, 12] before entering the projection unit"
+    2. DDBNP take transpose conv for upsampling, NOT sub-pixel conv for upsampling as RDN use
+    3. DDBPN follows the principle of "iterative up and downsampling", NOT follows the principle of "single upsampling" as RDN use and "predefined upsampling" as use
 """
 
 def make_model(args, parent=False):
