@@ -56,7 +56,11 @@
                 
                 代码在这:https://github.com/chisyliu/RDN
                 
-                Comment:去掉了所有的batch norm,用了一些经常都可以看到的所谓的global residual link,把dense block后的output与dense block的input又做了一下summation于是就结合了resnet block变为了residual dense block，还把每一个Residual dense block的output最后都concatenate到一起。
+                Comment:
+                        去掉了所有的batch norm;
+                        用了一些经常都可以看到的所谓的global residual link;
+                        把dense block后的output与dense block的input又做了一下summation于是就结合了resnet block变为了residual dense block;
+                        还把每一个Residual dense block的output最后都concatenate到一起。
                 
          2018. Deep Back-Projection Networks For Super-Resolution 
          
@@ -64,8 +68,10 @@
                 
                 代码在这:https://github.com/chisyliu/DBPN-Pytorch
                 
-                Comment:不用sub pixel conv(pixel shuffle)来实现upsampling，而是用transpose conv实现upsampling。关于trans
-                pose conv具体内容见https://blog.csdn.net/tsyccnh/article/details/87357447
+                Comment:
+                        这篇paper不用sub pixel conv(pixel shuffle)来实现upsampling，而是用transpose conv实现upsampling。
+                        关于transpose conv具体内容见https://blog.csdn.net/tsyccnh/article/details/87357447
+                        这篇paper没有像EDSR, RDN，以及我们现在用的based on U-ResNeXt的模型一样在后半部分用single upsampling module，也不是像某篇韩国人paper中那样用predefined upsampling在进入网络之前就interpolate生成一个upsampling的图像，也没有做所谓progressive upsampling来逐渐step by step进行upsampling，而是设计了所谓iterative up and downsampling来up down up down这样来做
                 
                 
    这几个网络都可以直接用来做MRI SR重建(特别是第二个，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建
