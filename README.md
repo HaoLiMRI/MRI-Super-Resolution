@@ -71,7 +71,7 @@
                 Comment:
                         这篇paper不用sub pixel conv(pixel shuffle)来实现upsampling，而是用transpose conv实现upsampling。
                         关于transpose conv具体内容见https://blog.csdn.net/tsyccnh/article/details/87357447
-                        这篇paper没有像EDSR, RDN，以及我们现在用的based on U-ResNeXt的模型一样在后半部分用single upsampling module，也不是像某篇韩国人paper中那样用predefined upsampling在进入网络之前就interpolate生成一个upsampling的图像，也没有做所谓progressive upsampling来逐渐step by step进行upsampling，而是设计了所谓iterative up and downsampling来up down up down这样来做
+                        这篇paper没有像EDSR, RDN，以及我们现在用的based on U-ResNeXt的模型一样在后半部分用single upsampling module，也不是像某篇韩国人paper中那样用predefined upsampling在进入网络之前就interpolate生成一个upsampling的图像，也没有做所谓progressive upsampling来逐渐step by step进行upsampling，而是设计了所谓iterative up and downsampling来upsampling downsampling upsampling downsampling这样来做
                 
                 
    这几个网络都可以直接用来做MRI SR重建(特别是第二个，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建
