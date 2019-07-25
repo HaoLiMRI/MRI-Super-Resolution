@@ -4,6 +4,7 @@ This is the demo code for RDN model proposed to generate super resolution(SR) im
 https://arxiv.org/abs/1802.08797
 """
 
+import common_modules as common
 
 import math
 
@@ -87,6 +88,9 @@ class RDB(nn.Module):
         self.LFF = nn.Conv2d(G0 + C*G, G0, 1, padding=0, stride=1) # Beware after this LFF the number of feature maps(channels) become G0 again
 
     def forward(self, x):
+        """
+        implement the flow of Residual Dense Block as figure 3 of original RDN paper
+        """
         return self.LFF(self.convs(x)) + x # output = output + residual link, for local residual learning
 
 
@@ -96,7 +100,7 @@ class RDN(nn.Module):
     """
     def __init__(self, args):
         """
-        args: Batch of specification of arguements, which have been defined outside rdn_sr.py
+        args: Set of specification of arguements, which have been defined outside rdn_sr.py
               it includes several arguements, e.g.
               r: resize factor, e.g. 2, 3, 4, ... 
               G0: 
@@ -162,6 +166,9 @@ class RDN(nn.Module):
             raise ValueError("scale must be 2 or 3 or 4.")
 
     def forward(self, x):
+        """
+        implement the flow of Residual Dense Network as figure 2 of original RDN paper
+        """
         x = self.sub_mean(x)
         f__1 = self.SFENet1(x)
         x  = self.SFENet2(f__1)
