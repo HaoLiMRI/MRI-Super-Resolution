@@ -34,6 +34,7 @@
 
         看上去S好像性能提升的能力最差，所以应该加大相关weight，penalize这个部分loss效果
 10. ~~MS-SSIM跑一下看看性能~~
+        
         已跑，性能非常烂
 11. 研究一下另一个imgae content based SSIM(IW-SSIM)，用这个作为SSIM loss或者用SSIM和image content based SSIM一起作为SSIM loss。
         
