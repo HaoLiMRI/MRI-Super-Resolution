@@ -33,7 +33,8 @@
 9. 重新构建SSIM loss，首先用 "a x log(C) + b x log(L) + c x log(S)"方案构架,跑200epoches后看一看C,L,S哪一个很高不怎么降，之后再设置对应的weight更高来加快penalize这个对应的东西。
 
         看上去S好像性能提升的能力最差，所以应该加大相关weight，penalize这个部分loss效果
-10. MS-SSIM跑一下看看性能
+10. ~~MS-SSIM跑一下看看性能~~
+        已跑，性能非常烂
 11. 研究一下另一个imgae content based SSIM(IW-SSIM)，用这个作为SSIM loss或者用SSIM和image content based SSIM一起作为SSIM loss。
         
         需要实现一个pytorch image content based SSIM。两个方案
