@@ -16,6 +16,13 @@
 3. 对更多细节部分增加ssim权重(如何用数量的方式表征"细节比较多"，比如概率？在loss里面需要重新设计一下对细节比较多的部分增加weight，类似分类任务的focal loss的方式)
         
         李昊老板建议gradient based SSIM。要看一下这个是什么，用下
+        a) http://kresttechnology.com/krest-academic-projects/krest-mtech-projects/ECE/dspmt/[36].pdf
+        b) https://ieeexplore.ieee.org/abstract/document/4107183
+        基于边缘检测，计算强度变化速率，包含contrast和structure信息。均匀图片内gradient总和很小，对比度大的组织交界面会产生很大的梯度。
+        目前实验中，网络为了匹配l和c产生的很强的噪声，噪点和周围像素之间也会产生梯度，使图片内梯度的总和和分布与原图不同。所以使用文章b中对gradient         map求c和s的方法应该会进一步体现出这种差异。
+        但是对于没有复杂结构的图片，整体梯度总和很小，梯度图直接的差异可能也很小，在batch中做平均还是会降低复杂图片产生的loss。
+        不过可以根据图片的梯度总和判断图片内结构的复杂程度，在做平均的时候加上更高的权重。
+        
 4. ~~pytorch上ssim值过大，检查或重写(Check this repo: https://github.com/chisyliu/srMRI_SRGAN-2/blob/master/pytorch_ssim/__init__.py)~~
         
         已经换为pytorch_SSIM来构造SSIM
