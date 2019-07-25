@@ -37,8 +37,9 @@
         可以用transpose conv来做upsampling。具体见此https://blog.csdn.net/tsyccnh/article/details/87357447
         
 7. 需要设计一个更好的loss来真实反映人对于超清的感受
-   不同loss function的比较: https://arxiv.org/abs/1511.08861
-                           https://www.sciencedirect.com/science/article/pii/S1047320319301336
+   不同loss function的比较: 
+   https://arxiv.org/abs/1511.08861
+   https://www.sciencedirect.com/science/article/pii/S1047320319301336
 
 8. 10)might also consider changing the order of connection, from "Conv --> BN --> ReLU"(normal connection) to "BN --> ReLU --> Conv"(so called full pre-activation)[13] The authors of ResNet[1] found out the performance increased if order of connection changed to full pre-activation in [13]. However, note the BN should always be placed before ReLU or other activation functions, due that "BN is used to produce activations function with the desired distribution"[14] so it has to be before activate function
 9. 重新构建SSIM loss，首先用 "a x log(C) + b x log(L) + c x log(S)"方案构架,跑200epoches后看一看C,L,S哪一个很高不怎么降，之后再设置对应的weight更高来加快penalize这个对应的东西。
