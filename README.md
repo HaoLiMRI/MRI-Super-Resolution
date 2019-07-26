@@ -61,14 +61,11 @@
         according to DDBPN paper, "Unlike the original DenseNets, we avoid dropout and batch norm, which are not suitable for SR, because they remove the range flexibility of the features [31]. Instead, we use 1  1 convolution layer as feature pooling and dimensional reduction [42, 12] before entering the projection unit.
 13. 换个optimization algorithm, e.g. SGD with momentum and weight decay.
 
-不同optimizer比较  https://zhuanlan.zhihu.com/p/62585696
+        不同optimizer比较  https://zhuanlan.zhihu.com/p/62585696
 
         SGD 算法虽然简洁，但其在神经网络训练中的性能堪比高级二阶优化方法。尽管 SGD 每一次用小批量算出来的更新方向可能并非那么精确，但更新多了效果出乎意料地好。
-
         一般而言，SGD 各种变体可以分成两大类：1）自适应学习率机制，如 AdaGrad 和 Adam；2）加速机制，如 Polyak heavyball 和 Nesterov momentum 等。这两种方法都利用之前累积的梯度信息实现快速收敛，它们希望借鉴以往的更新方向。但是，要想实现神经网络性能提升，通常需要花销高昂的超参数调整。
-
         其实很多研究者都发现目前的最优化方法可能有些缺点，不论是 Adam 还是带动量的 SGD，它们都有难以解决的问题。例如我们目前最常用的 Adam，我们拿它做实验是没啥问题的，但要是想追求收敛性能，那么最好还是用 SGD+Momentum。但使用动量机制又会有新的问题，我们需要调整多个超参数以获得比较好的效果，不能像 Adam 给个默认的学习率 0.0001 就差不多了。
-
         在 ICLR 2018 的最佳论文 On the Convergence of Adam and Beyond 中，研究者明确指出了 Adam 收敛不好的原因。他们表明在利用历史梯度的移动均值情况下，模型只能根据短期梯度信息为每个参数设计学习率，因此也就导致了收敛性表现不太好。
 
 
