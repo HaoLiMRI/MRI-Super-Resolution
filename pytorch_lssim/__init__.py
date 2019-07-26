@@ -1,3 +1,8 @@
+"""
+Because of different importances of three factors, 
+LSSIM is calculated by sum up the weighted logarithms of luminance, contrast and structure factors.
+"""
+
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -5,16 +10,22 @@ import numpy as np
 from math import exp
 
 def gaussian(window_size, sigma):
+    # define gaussian distribution for the window
+    
     gauss = torch.Tensor([exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
     return gauss/gauss.sum()
 
 def create_window(window_size, channel):
+    # create window (convolution kernel) with pre-defined gaussian distribution
+    
     _1D_window = gaussian(window_size, 1.5).unsqueeze(1)
     _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
     window = Variable(_2D_window.expand(channel, 1, window_size, window_size).contiguous())
     return window
 
 def _lssim(img1, img2, window, window_size, channel, size_average = True):
+    # calculte LSSIM in each window
+    
     mu1 = F.conv2d(img1, window, padding = window_size//2, groups = channel)
     mu2 = F.conv2d(img2, window, padding = window_size//2, groups = channel)
 
@@ -60,6 +71,8 @@ def _lssim(img1, img2, window, window_size, channel, size_average = True):
         return lssim_map.mean(1).mean(1).mean(1)
 
 class LSSIM(torch.nn.Module):
+    # calculate average of LSSIM from all windows
+    
     def __init__(self, window_size = 11, size_average = True):
         super(LSSIM, self).__init__()
         self.window_size = window_size
