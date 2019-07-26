@@ -72,6 +72,7 @@
         
         论文见这 https://arxiv.org/pdf/1907.08610v1.pdf
         资料 https://zhuanlan.zhihu.com/p/75184359
+        Keras下的Lookahead Optimizer实现 https://github.com/chisyliu/keras_lookahead
 
 -----
 ## 长期计划：
