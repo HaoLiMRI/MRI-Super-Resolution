@@ -59,8 +59,6 @@
 12. 去掉所有的batch norm.
 
         according to DDBPN paper, "Unlike the original DenseNets, we avoid dropout and batch norm, which are not suitable for SR, because they remove the range flexibility of the features [31]. Instead, we use 1  1 convolution layer as feature pooling and dimensional reduction [42, 12] before entering the projection unit.
-        
-        
 13. 换个optimization algorithm, e.g. SGD with momentum and weight decay.
 
         SGD 算法虽然简洁，但其在神经网络训练中的性能堪比高级二阶优化方法。尽管 SGD 每一次用小批量算出来的更新方向可能并非那么精确，但更新多了效果出乎意料地好。
