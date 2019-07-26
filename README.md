@@ -114,7 +114,7 @@
    这几个网络都可以直接用来做MRI SR重建(特别是第二个，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建
    
 2. 2D 2DSRGAN(using U-ResNeXt) MRI SR
-3. 2D 2DESRGAN(using other feature extractor based generator, e.g. RDN, DDBPN, etc, to replace the generator proposed in original paper: "Residual-in-Residual Dense Block (RRDB) without batch normalization layers".)
+3. 2D 2DESRGAN(using other feature extractor based generator, e.g. RDN, DDBPN, etc, to replace the generator proposed in original paper: "Residual-in-Residual Dense Block (RRDB) without batch normalization layers".) MRI SR
         
         original ESRGAN code is: https://github.com/chisyliu/ESRGAN
 3. 3D U-ResNeXt MRI SR
