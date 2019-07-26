@@ -14,7 +14,7 @@ def create_window(window_size, channel):
     window = Variable(_2D_window.expand(channel, 1, window_size, window_size).contiguous())
     return window
 
-def _ssim(img1, img2, window, window_size, channel, size_average = True):
+def _lssim(img1, img2, window, window_size, channel, size_average = True):
     mu1 = F.conv2d(img1, window, padding = window_size//2, groups = channel)
     mu2 = F.conv2d(img2, window, padding = window_size//2, groups = channel)
 
@@ -41,27 +41,27 @@ def _ssim(img1, img2, window, window_size, channel, size_average = True):
     print('Contrast: ',contrast_factor.mean(),'. log: ',torch.log(contrast_factor).mean())
     print('Structure: ',structure_factor.mean(),'. log: ',torch.log(structure_factor).mean())
 
-    ssim_map = 0
+    lssim_map = 0
     
     if torch.isnan(torch.log(luminance_factor).mean())!=1 and  torch.isinf(torch.log(luminance_factor).mean())!=1:
-        ssim_map = ssim_map + weight_luminance * torch.log(luminance_factor)
+        lssim_map = lssim_map + weight_luminance * torch.log(luminance_factor)
     
     if torch.isnan(torch.log(contrast_factor).mean())!=1 and  torch.isinf(torch.log(contrast_factor).mean())!=1:
-        ssim_map = ssim_map + weight_contrast * torch.log(contrast_factor)
+        lssim_map = lssim_map + weight_contrast * torch.log(contrast_factor)
         
     if torch.isnan(torch.log(structure_factor).mean())!=1 and  torch.isinf(torch.log(structure_factor).mean())!=1:
-        ssim_map = ssim_map + weight_structure * torch.log(structure_factor)
+        lssim_map = lssim_map + weight_structure * torch.log(structure_factor)
 
-#    ssim_map = ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2))
+#    lssim_map = ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2))
 
     if size_average:
-        return ssim_map.mean()
+        return lssim_map.mean()
     else:
-        return ssim_map.mean(1).mean(1).mean(1)
+        return lssim_map.mean(1).mean(1).mean(1)
 
-class SSIM(torch.nn.Module):
+class LSSIM(torch.nn.Module):
     def __init__(self, window_size = 11, size_average = True):
-        super(SSIM, self).__init__()
+        super(LSSIM, self).__init__()
         self.window_size = window_size
         self.size_average = size_average
         self.channel = 1
@@ -83,9 +83,9 @@ class SSIM(torch.nn.Module):
             self.channel = channel
 
 
-        return _ssim(img1, img2, window, self.window_size, channel, self.size_average)
+        return _lssim(img1, img2, window, self.window_size, channel, self.size_average)
 
-def ssim(img1, img2, window_size = 11, size_average = True):
+def lssim(img1, img2, window_size = 11, size_average = True):
     (_, channel, _, _) = img1.size()
     window = create_window(window_size, channel)
     
@@ -93,4 +93,4 @@ def ssim(img1, img2, window_size = 11, size_average = True):
         window = window.cuda(img1.get_device())
     window = window.type_as(img1)
     
-    return _ssim(img1, img2, window, window_size, channel, size_average)
+    return _lssim(img1, img2, window, window_size, channel, size_average)
