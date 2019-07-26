@@ -6,7 +6,7 @@
 
 3. interpolation first to increase resolution little bit before leaving into U-Net(might NOT be useful since LR_MRI_image has same size as HR_MRI_image, LR_MRI_image just does NOT have high frequency information comepared with HR_MRI_image so tp speak)
         
-## 20190722新任务
+## 最近新任务
 1. ~~重新生成LR图像，对2D网络图像只做层内模糊。并且需要提高生成的LR的SSIM~~
         
         已重新生成2D 1/4，1/6，1/8 LR图像。
