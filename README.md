@@ -75,6 +75,8 @@
         论文见这 https://arxiv.org/pdf/1907.08610v1.pdf
         资料 https://zhuanlan.zhihu.com/p/75184359
         Keras下的Lookahead Optimizer实现 https://github.com/chisyliu/keras_lookahead
+        Pytorch下Lookahead Optimizer实现 https://github.com/chisyliu/lookahead.pytorch
+        Jianan看一下这个怎么实现的，确认是否可以移植过来用。如果真的如这篇paper作者讲的那样好，则有可能解决现在loss降不下去的问题
 
 -----
 ## 长期计划：
