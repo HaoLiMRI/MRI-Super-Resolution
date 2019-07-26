@@ -25,29 +25,34 @@ def create_window(window_size, channel):
 
 def _lssim(img1, img2, window, window_size, channel, size_average = True):
     # calculte LSSIM in each window
+    # theory and equations can be found in: 
+    # https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.58.1939&rep=rep1&type=pdf
     
-    mu1 = F.conv2d(img1, window, padding = window_size//2, groups = channel)
-    mu2 = F.conv2d(img2, window, padding = window_size//2, groups = channel)
+    mu1 = F.conv2d(img1, window, padding = window_size//2, groups = channel)        # Mean of image1 in windows
+    mu2 = F.conv2d(img2, window, padding = window_size//2, groups = channel)        # Mean of image2 in windows
 
     mu1_sq = mu1.pow(2)
     mu2_sq = mu2.pow(2)
     mu1_mu2 = mu1*mu2
 
-    sigma1_sq = F.conv2d(img1*img1, window, padding = window_size//2, groups = channel) - mu1_sq
-    sigma2_sq = F.conv2d(img2*img2, window, padding = window_size//2, groups = channel) - mu2_sq
-    sigma12 = F.conv2d(img1*img2, window, padding = window_size//2, groups = channel) - mu1_mu2
+    sigma1_sq = F.conv2d(img1*img1, window, padding = window_size//2, groups = channel) - mu1_sq        # Variance of image1 
+    sigma2_sq = F.conv2d(img2*img2, window, padding = window_size//2, groups = channel) - mu2_sq        # Variance of image2
+    sigma12 = F.conv2d(img1*img2, window, padding = window_size//2, groups = channel) - mu1_mu2         # Covariance of image1 and image2
 
-    C1 = 0.01**2
-    C2 = 0.03**2
-    C3 = C2/2
-
+                        #==============================================#
+    C1 = 0.01**2        # should be (0.01*dynamic range)^2             #
+    C2 = 0.03**2        # should be (0.03*dynamic range)^2             #
+    C3 = C2/2           # since data is normalized, dynamic range is 1 #
+                        #==============================================#
+    
     weight_luminance = 1        # weighting of luminance_factor
     weight_contrast = 2         # weighting of contrast_factor
     weight_structure = 4        # weighting of structure_factor
 
-    luminance_factor = (2*mu1_mu2 + C1)/(mu1_sq + mu2_sq + C1)/2 + 0.5                                              # calculate lunimance_factor and rescale to (0,1)
-    contrast_factor = (2*torch.sqrt(sigma1_sq)*torch.sqrt(sigma2_sq)+C2)/(sigma1_sq + sigma2_sq + C2)/2 + 0.5       # calculate contrast_factor and rescale to (0,1)
-    structure_factor = (sigma12 + C3)/(torch.sqrt(sigma1_sq)*torch.sqrt(sigma2_sq)+C3)/2 + 0.5                      # calculate structure_factor and rescale to (0,1)
+    # calculate lunimance_factor, contrast_factor and structure_factor, and rescale to (0,1) to avoid negative values    
+    luminance_factor = (2*mu1_mu2 + C1)/(mu1_sq + mu2_sq + C1)/2 + 0.5                                              
+    contrast_factor = (2*torch.sqrt(sigma1_sq)*torch.sqrt(sigma2_sq)+C2)/(sigma1_sq + sigma2_sq + C2)/2 + 0.5       
+    structure_factor = (sigma12 + C3)/(torch.sqrt(sigma1_sq)*torch.sqrt(sigma2_sq)+C3)/2 + 0.5                      
     print('Luminance: ',luminance_factor.mean(),'. log: ',torch.log(luminance_factor).mean())
     print('Contrast: ',contrast_factor.mean(),'. log: ',torch.log(contrast_factor).mean())
     print('Structure: ',structure_factor.mean(),'. log: ',torch.log(structure_factor).mean())
@@ -63,7 +68,7 @@ def _lssim(img1, img2, window, window_size, channel, size_average = True):
     if torch.isnan(torch.log(structure_factor).mean())!=1 and  torch.isinf(torch.log(structure_factor).mean())!=1:
         lssim_map = lssim_map + weight_structure * torch.log(structure_factor)
 
-#    lssim_map = ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2))
+#    lssim_map = ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2))          # original ssim
 
     if size_average:
         return lssim_map.mean()
