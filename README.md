@@ -37,6 +37,7 @@
         可以用transpose conv来做upsampling。具体见此https://blog.csdn.net/tsyccnh/article/details/87357447
         
 7. 需要设计一个更好的loss来真实反映人对于超清的感受
+   
    不同loss function的比较: 
    https://arxiv.org/abs/1511.08861
    https://www.sciencedirect.com/science/article/pii/S1047320319301336
