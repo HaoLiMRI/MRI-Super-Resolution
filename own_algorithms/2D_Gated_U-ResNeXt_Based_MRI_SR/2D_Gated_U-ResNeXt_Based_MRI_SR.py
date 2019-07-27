@@ -12,20 +12,18 @@ Version: 4.5.0
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20190717
-What have been done in MRI SR reconstruction by using deep learning
-    1) ResNet has been used in MRI SR reconstruction in 2017[16]
-    2) DenseNet has been used in MRI SR reconstruction in 2018[17]
-
+This is the current version we are working on, in 20190727
 This is a demo code of 2D_Gated_U-ResNeXt_Based_MRI_SR.
     0) This is the 2D version of Gated_U-ResNeXt_Based_MRI_SR, in this version we have following items:
-        -) (This function is added in 4.2.0) Print out and save the training loss value for every epoch
-        a) (This function is added in 4.1.0) Optional module(exist or NOT): a VGG feature extractor is added before the main "CNN based Reconstruct network"(so the input to "CNN based Reconstruct network" is feature map of LR image)
+        a) Optional module(exist or NOT): a VGG feature extractor is added before the main "CNN based Reconstruct network"(so the input to "CNN based Reconstruct network" is feature map of LR image)
         b) Optional module(either one exist): either Pixel-Wise MSE loss or Pixel-Wise L1 loss
         c) Optional module(exist or NOT): weighted k space loss(fft loss)
         d) Optional module(exist or NOT): weighted VGG loss
         e) Optional module(exist or NOT): weighted L1 Regularization
-        	 loss function = Pixel-Wise MSE loss(or Pixel-Wise L1 loss) + weighted VGG loss + weighted k space loss + weighted L1 Regularization
+        f) Optional module(): ssim_loss
+        g) Optional module(): log_ssim_loss
+        h) Optional module(): ms-ssim_loss
+        loss function = Pixel-Wise MSE loss(or Pixel-Wise L1 loss) + weighted VGG loss + weighted k space loss + log_ssim_loss + weighted L1 Regularization
        
         
        NOT like v1 there uses the layer of 3D image/video as channel directly. In this 2D v2 version, the data format has been changed. The input data
@@ -166,6 +164,8 @@ batch_size = 32
 EPOCH_NUM = 250
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
+Use_Batch_Norm = False
+Use_Transpose_Conv_as_Upsampling_Approach = True
 
 """""""""""""""""""""""""""""""""""""""""""""
 1. MRI HR and LR Data pair preprocessing part
@@ -308,8 +308,7 @@ class FeatureExtractor(nn.Module):
         return out
     
     
-"first calculate the fft, calculate abs after it" 
-"Question is: Do we have to abs? if not, how to handle the complex value in MSE?" 
+"Calculate the k space result" 
 class FFT_K_SPACE(nn.Module):
     def __init__(self):
         super(FFT_K_SPACE, self).__init__()
@@ -325,14 +324,20 @@ class FFT_K_SPACE(nn.Module):
     
 
 class Normal_Residual_Block(nn.Module): #----- In this version, the "cardinality" is implemented by using property "group" in PyTorch for each conv layer
-    def __init__(self, number_in_channel, number_out_channel, stride = 1, linear_projection = None, num_of_group = 32, gate_in_use = True, EPSILON = 1): #----- num_of_group is "cardinality"
+    def __init__(self, number_in_channel, number_out_channel, stride = 1, linear_projection = None, num_of_group = 32, gate_in_use = True, EPSILON = 1, Use_Batch_Norm = True): #----- num_of_group is "cardinality"
         super(Normal_Residual_Block, self).__init__()     #----- Call the constructor of base class explicitly
-        self.normal_path = nn.Sequential(
+        if (Use_Batch_Norm == True):
+            self.normal_path = nn.Sequential(
                 nn.Conv2d(number_in_channel, number_out_channel, 3, stride, 1, bias = False), #---- No need to make bias learnable, due using BatchNorm
                 nn.BatchNorm2d(number_out_channel),
                 nn.ReLU(inplace = True), #-----inplace = True could overwrite the input of ReLU by using output to save memory(ReLU only needs output to calculate gradient )
                 nn.Conv2d(number_out_channel, number_out_channel, 3, 1, 1, bias = False, groups = num_of_group),
-                nn.BatchNorm2d(number_out_channel) )
+                nn.BatchNorm2d(number_out_channel))
+        else:
+            self.normal_path = nn.Sequential(
+                nn.Conv2d(number_in_channel, number_out_channel, 3, stride, 1, bias = False), #---- No need to make bias learnable, due using BatchNorm
+                nn.ReLU(inplace = True), #-----inplace = True could overwrite the input of ReLU by using output to save memory(ReLU only needs output to calculate gradient )
+                nn.Conv2d(number_out_channel, number_out_channel, 3, 1, 1, bias = False, groups = num_of_group))
         self.linear_projection_on_shortcut_path = linear_projection
         self.gate_in_use = gate_in_use
         self.epsilon = EPSILON
@@ -360,19 +365,27 @@ class Normal_Residual_Block(nn.Module): #----- In this version, the "cardinality
 
 class BottleNeck_Residual_Block(nn.Module): #----- In this version, the "cardinality" is implemented by using property "group" in PyTorch for each conv layer
     "Note: number_out_channel must be even number"
-    def __init__(self, number_in_channel, number_out_channel, stride = 1, linear_projection = None, num_of_group = 32, gate_in_use = True, EPSILON = 1): #----- num_of_group is "cardinality"
+    def __init__(self, number_in_channel, number_out_channel, stride = 1, linear_projection = None, num_of_group = 32, gate_in_use = True, EPSILON = 1, Use_Batch_Norm = True): #----- num_of_group is "cardinality"
         super(BottleNeck_Residual_Block, self).__init__()     #----- Call the constructor of base class explicitly
         if number_out_channel % 2 == 1:
             print('Warning: number_out_channel for Bottle Neck Residual Block is NOT even number')
-        self.normal_path = nn.Sequential(
-                nn.Conv2d(number_in_channel, int(number_out_channel/2), 1, 1, 0, bias = False), #---- No need to make bias learnable, due using BatchNorm
-                nn.BatchNorm2d(int(number_out_channel/2)),
-                nn.ReLU(inplace = True), #-----inplace = True could overwrite the input of ReLU by using output to save memory(ReLU only needs output to calculate gradient )
-                nn.Conv2d(int(number_out_channel/2), int(number_out_channel/2), 3, stride, padding = 1, groups = num_of_group, bias = False),
-                nn.BatchNorm2d(int(number_out_channel/2)),
-                nn.ReLU(inplace = True),
-                nn.Conv2d(int(number_out_channel/2), number_out_channel, 1, 1, 0, bias = False),
-                nn.BatchNorm2d(number_out_channel))
+        if (Use_Batch_Norm == True):
+            self.normal_path = nn.Sequential(
+                    nn.Conv2d(number_in_channel, int(number_out_channel/2), 1, 1, 0, bias = False), #---- No need to make bias learnable, due using BatchNorm
+                    nn.BatchNorm2d(int(number_out_channel/2)),
+                    nn.ReLU(inplace = True), #-----inplace = True could overwrite the input of ReLU by using output to save memory(ReLU only needs output to calculate gradient )
+                    nn.Conv2d(int(number_out_channel/2), int(number_out_channel/2), 3, stride, padding = 1, groups = num_of_group, bias = False),
+                    nn.BatchNorm2d(int(number_out_channel/2)),
+                    nn.ReLU(inplace = True),
+                    nn.Conv2d(int(number_out_channel/2), number_out_channel, 1, 1, 0, bias = False),
+                    nn.BatchNorm2d(number_out_channel))
+        else:
+            self.normal_path = nn.Sequential(
+                    nn.Conv2d(number_in_channel, int(number_out_channel/2), 1, 1, 0, bias = False), #---- No need to make bias learnable, due using BatchNorm
+                    nn.ReLU(inplace = True), #-----inplace = True could overwrite the input of ReLU by using output to save memory(ReLU only needs output to calculate gradient )
+                    nn.Conv2d(int(number_out_channel/2), int(number_out_channel/2), 3, stride, padding = 1, groups = num_of_group, bias = False),
+                    nn.ReLU(inplace = True),
+                    nn.Conv2d(int(number_out_channel/2), number_out_channel, 1, 1, 0, bias = False))                 
         self.linear_projection_on_shortcut_path = linear_projection
         self.gate_in_use = gate_in_use
         self.epsilon = EPSILON
@@ -399,65 +412,96 @@ class BottleNeck_Residual_Block(nn.Module): #----- In this version, the "cardina
     
 	
 class UpsampleBLock(nn.Module):
-    def __init__(self, in_channels, up_scale):
+    def __init__(self, in_channels, up_scale, Use_Transpose_Conv_as_Upsampling_Approach):
         super(UpsampleBLock, self).__init__()
+
+        self.Use_Transpose_Conv_as_Upsampling_Approach = Use_Transpose_Conv_as_Upsampling_Approach
+        kernel_size_for_trans_conv, stride_for_trans_conv, padding_for_trans_conv = {
+            # W2=(W1−F+2P)/S+1, H2=(H1−F+2P)/S+1. For this particular configuration (kernel_size = 6, stride = 2, padding = 2) it means shriks 1/2 for normal conv layer, and expands/upscales 2 for transpose conv layers
+            2: (6, 2, 2),
+            #  For this particular configuration (kernel_size = 8, stride = 4, padding = 2) it means shriks 1/4 for normal conv layer, and expands/upscales 4 for transpose conv layers
+            4: (8, 4, 2), 
+            # For this particular configuration (kernel_size = 12, stride = 8, padding = 2) it means shriks 1/8 for normal conv layer, and expands/upscales 8 for transpose conv layers
+            8: (12, 8, 2)
+        }[up_scale]
         self.conv = nn.Conv2d(in_channels, in_channels * up_scale ** 2, kernel_size=3, padding=1)
         self.pixel_shuffle = nn.PixelShuffle(up_scale)
         self.prelu = nn.PReLU()
-
+        self.trans_conv = nn.ConvTranspose2d(in_channels, in_channels, kernel_size_for_trans_conv, stride=stride_for_trans_conv, padding=padding_for_trans_conv)
+            
     def forward(self, x):
-        x = self.conv(x)
-        x = self.pixel_shuffle(x)
-        x = self.prelu(x)
+        if (self.Use_Transpose_Conv_as_Upsampling_Approach == False): # use sub-pixel conv as way of upsampling
+            x = self.conv(x)
+            x = self.pixel_shuffle(x)
+            x = self.prelu(x)
+        else: # transpose conv as way of upsampling
+            x = self.trans_conv(x)
+            x = self.prelu(x)
+
         return x
 		
         
 "3D_ResNeXt"
 class ResNeXt_2D(nn.Module):                   #----- Define a Net class as derived class inherited from nn.Module
     "Residual_Block_Type is either class 'BottleNeck_Residual_Block' or class 'Normal_Residual_Block"
-    def __init__(self, Residual_Block_Type, feature_extractor_in_front_bool):                 #----- __init__ define the constructor of Net class, consist of declaration of components in network              
+    def __init__(self, Residual_Block_Type, feature_extractor_in_front_bool, Use_Batch_Norm, Use_Transpose_Conv_as_Upsampling_Approach):                 #----- __init__ define the constructor of Net class, consist of declaration of components in network              
         super(ResNeXt_2D, self).__init__()     #----- Call the constructor of base class explicitly
         
         self.feature_extractor_in_front_bool = feature_extractor_in_front_bool
+        self.Use_Batch_Norm = Use_Batch_Norm
+        self.Use_Transpose_Conv_as_Upsampling_Approach = Use_Transpose_Conv_as_Upsampling_Approach
         if self.feature_extractor_in_front_bool == True:
-            "declaration of the first non-residual normal block, upsmapling deconvolution"
-            self.normal_block = nn.Sequential(FeatureExtractor(),
-            nn.ConvTranspose2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 2, padding = 1, output_padding = 1, bias = False),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 2, padding = 1, output_padding = 1, bias = False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True))
+            "declaration of the first non-residual normal block"
+            if (self.Use_Batch_Norm == True):
+                self.normal_block = nn.Sequential(FeatureExtractor(),
+                nn.ConvTranspose2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 2, padding = 1, output_padding = 1, bias = False),
+                nn.BatchNorm2d(128),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 2, padding = 1, output_padding = 1, bias = False),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True))
+            else:
+                self.normal_block = nn.Sequential(FeatureExtractor(),
+                nn.ConvTranspose2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 2, padding = 1, output_padding = 1, bias = False),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 2, padding = 1, output_padding = 1, bias = False),
+                nn.ReLU(inplace=True))
             
             "declaration of the rest parts which consist of residual blocks"
-            self.part1 = self.make_residual_part(Residual_Block_Type, 64, 32, 3, 1, stride = 1, gate_in_use = True)
-            self.part2 = self.make_residual_part(Residual_Block_Type, 32, 32, 4, 1, stride = 1)
-            self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 1)
+            self.part1 = self.make_residual_part(Residual_Block_Type, 64, 32, 3, 1, stride = 1, gate_in_use = False, Use_Batch_Norm = self.Use_Batch_Norm)
+            self.part2 = self.make_residual_part(Residual_Block_Type, 32, 32, 4, 1, stride = 1, gate_in_use = False, Use_Batch_Norm = self.Use_Batch_Norm)
+            self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 1, gate_in_use = True, Use_Batch_Norm = self.Use_Batch_Norm)
         else:
             "declaration of the first non-residual normal block"
-            self.normal_block = nn.Sequential(
-            nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False),
-            nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
-        self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = False)
-        self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 2, gate_in_use = False)
-        self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2, gate_in_use = False)
-        self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2, gate_in_use = False)
-        self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = True)
-        self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = True)
+            if (self.Use_Batch_Norm == True):
+                self.normal_block = nn.Sequential(
+                nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False),
+                nn.BatchNorm2d(16),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
+            else:
+                self.normal_block = nn.Sequential(
+                nn.Conv2d(in_channels = 1, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size = 3, stride = 1, padding = 1))
+        self.part1 = self.make_residual_part(Residual_Block_Type, 16, 16, 3, 1, stride = 2, gate_in_use = False, Use_Batch_Norm = self.Use_Batch_Norm)
+        self.part2 = self.make_residual_part(Residual_Block_Type, 16, 32, 4, 1, stride = 2, gate_in_use = False, Use_Batch_Norm = self.Use_Batch_Norm)
+        self.part3 = self.make_residual_part(Residual_Block_Type, 32, 64, 6, 1, stride = 2, gate_in_use = False, Use_Batch_Norm = self.Use_Batch_Norm)
+        self.part4 = self.make_residual_part(Residual_Block_Type, 64, 128, 3, 1, stride = 2, gate_in_use = False, Use_Batch_Norm = self.Use_Batch_Norm)
+        self.part5 = self.make_residual_part(Residual_Block_Type, 128, 256, 3, 1, stride = 2, gate_in_use = True, Use_Batch_Norm = self.Use_Batch_Norm)
+        self.part6 = self.make_residual_part(Residual_Block_Type, 256, 512, 3, 1, stride = 2, gate_in_use = True, Use_Batch_Norm = self.Use_Batch_Norm)
 			
-        self.part7 = nn.Sequential(UpsampleBLock(512, 2),
+        self.part7 = nn.Sequential(UpsampleBLock(512, 2, Use_Transpose_Conv_as_Upsampling_Approach = self.Use_Transpose_Conv_as_Upsampling_Approach),
         nn.Conv2d(in_channels = 512, out_channels = 256, kernel_size = 3, stride = 1, padding = 1, bias = False))
-        self.part8 = nn.Sequential(UpsampleBLock(256, 2),
+        self.part8 = nn.Sequential(UpsampleBLock(256, 2, Use_Transpose_Conv_as_Upsampling_Approach = self.Use_Transpose_Conv_as_Upsampling_Approach),
         nn.Conv2d(in_channels = 256, out_channels = 128, kernel_size = 3, stride = 1, padding = 1, bias = False))
-        self.part9 = nn.Sequential(UpsampleBLock(128, 2),
+        self.part9 = nn.Sequential(UpsampleBLock(128, 2, Use_Transpose_Conv_as_Upsampling_Approach = self.Use_Transpose_Conv_as_Upsampling_Approach),
         nn.Conv2d(in_channels = 128, out_channels = 64, kernel_size = 3, stride = 1, padding = 1, bias = False))
-        self.part10 = nn.Sequential(UpsampleBLock(64, 2),
+        self.part10 = nn.Sequential(UpsampleBLock(64, 2, Use_Transpose_Conv_as_Upsampling_Approach = self.Use_Transpose_Conv_as_Upsampling_Approach),
         nn.Conv2d(in_channels = 64, out_channels = 32, kernel_size = 3, stride = 1, padding = 1, bias = False))
-        self.part11 = nn.Sequential(UpsampleBLock(32, 2),
+        self.part11 = nn.Sequential(UpsampleBLock(32, 2, Use_Transpose_Conv_as_Upsampling_Approach = self.Use_Transpose_Conv_as_Upsampling_Approach),
         nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
-        self.part12 = nn.Sequential(UpsampleBLock(16, 2),
+        self.part12 = nn.Sequential(UpsampleBLock(16, 2, Use_Transpose_Conv_as_Upsampling_Approach = self.Use_Transpose_Conv_as_Upsampling_Approach),
         nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
         self.dropout = nn.Dropout(p=0.3)
 	
@@ -481,22 +525,23 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
                 
-                
-
-    def make_residual_part(self, Residual_Block_Type, number_in_channel, number_out_channel, number_of_residual_blocks, num_of_group, stride = 1, padding = 0, gate_in_use = True, EPSILON = 1):
+    def make_residual_part(self, Residual_Block_Type, number_in_channel, number_out_channel, number_of_residual_blocks, num_of_group, stride = 1, padding = 0, gate_in_use = True, EPSILON = 1, Use_Batch_Norm = True):
         linear_projection = None        
         if (stride != 1) or (number_in_channel != number_out_channel): 
         #----- in case the stride is NOT 1, or number_in_channel is NOT same as number_out_channel, adapte the size and number of out channel of residual link
-            linear_projection = nn.Sequential(
-                    nn.Conv2d(number_in_channel, number_out_channel, 1, stride, padding = 0, bias = False),
-                    nn.BatchNorm2d(number_out_channel))
+            if (Use_Batch_Norm == True):
+                linear_projection = nn.Sequential(
+                        nn.Conv2d(number_in_channel, number_out_channel, 1, stride, padding = 0, bias = False),
+                        nn.BatchNorm2d(number_out_channel))
+            else:
+                linear_projection = nn.Conv2d(number_in_channel, number_out_channel, 1, stride, padding = 0, bias = False)
             
         parts = []
-        parts.append(Residual_Block_Type(number_in_channel, number_out_channel, stride, linear_projection, num_of_group, gate_in_use, EPSILON))
+        parts.append(Residual_Block_Type(number_in_channel, number_out_channel, stride, linear_projection, num_of_group, gate_in_use, EPSILON, Use_Batch_Norm))
 
         for i in range(1, number_of_residual_blocks):
             print('in and out channels for this residual block is ', number_out_channel)
-            parts.append(Residual_Block_Type(number_out_channel, number_out_channel, num_of_group = num_of_group, gate_in_use = gate_in_use, EPSILON = EPSILON))
+            parts.append(Residual_Block_Type(number_out_channel, number_out_channel, num_of_group = num_of_group, gate_in_use = gate_in_use, EPSILON = EPSILON, Use_Batch_Norm = Use_Batch_Norm))
         return nn.Sequential(*parts) #----- iteratively pass each element in the list, see https://stackoverflow.com/questions/3480184/unpack-a-list-in-python for detail
         
     "All the forward propagation behavier is implemented in this function"
@@ -546,7 +591,7 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
 "Residual_Block_Type is either class 'BottleNeck_Residual_Block' or 'class Normal_Residual_Block'"
 device=tc.device("cuda" if use_cuda else "cpu")
 # our_resnext = ResNeXt_2D(BottleNeck_Residual_Block, feature_extractor_in_front_bool = Feature_Extractor_in_Front_of_Network).to(device)
-our_resnext = ResNeXt_2D(BottleNeck_Residual_Block, feature_extractor_in_front_bool = Feature_Extractor_in_Front_of_Network)
+our_resnext = ResNeXt_2D(BottleNeck_Residual_Block, feature_extractor_in_front_bool = Feature_Extractor_in_Front_of_Network, Use_Batch_Norm = Use_Batch_Norm, Use_Transpose_Conv_as_Upsampling_Approach = Use_Transpose_Conv_as_Upsampling_Approach)
 if tc.cuda.device_count()>1:
     our_resnext=nn.DataParallel(our_resnext)
 our_resnext.to(device)
@@ -578,13 +623,13 @@ print('The loss function is MSE')
 loss_function_MSE = nn.MSELoss().to(device)        #----- here use MSE loss
 
 print('The loss function is L1')
-loss_function_L1 = nn.SmoothL1Loss().to(device)       #-----L1 loss
+loss_function_L1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
 
 # print('The loss function is Cross Entropy')
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
 print('The loss function is MS-SSIM')
-SSIM_function = pytorch_ssim.SSIM().to(device)       #-----L1 loss
+SSIM_function = pytorch_ssim.SSIM().to(device)       #----- ssim loss
 
 # =============================================================================
 # print('The loss function is L1Loss')
