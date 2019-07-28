@@ -76,6 +76,10 @@
         Pytorch下Lookahead Optimizer实现 https://github.com/chisyliu/lookahead.pytorch
         Jianan看一下这个怎么实现的，确认是否可以移植过来用。如果真的如这篇paper作者讲的那样好，则有可能解决现在loss降不下去的问题
 
+
+15. 论文每一部分谁来负责更新已经分配完毕。20190729这一周开始Jianan Liu和Hao Li开始分别写作各自负责的部分，同时更新相对应reference。
+
+        论文地址 https://www.overleaf.com/project/5d3cb9370f7d706eca0260cc
 -----
 ## 长期计划：
 1. 2D RDN MRI SR和2D DDBPN MRI SR
