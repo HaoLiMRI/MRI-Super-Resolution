@@ -58,7 +58,9 @@
                 b. 或者自己写，在pytorch_SSIM上修改
 12. 去掉所有的batch norm.
 
-        according to DDBPN paper, "Unlike the original DenseNets, we avoid dropout and batch norm, which are not suitable for SR, because they remove the range flexibility of the features [31]. Instead, we use 1  1 convolution layer as feature pooling and dimensional reduction [42, 12] before entering the projection unit.
+        according to DDBPN paper, "Unlike the original DenseNets, we avoid dropout and batch norm, which are not suitable for SR, because they remove the range flexibility of the features [31]. Instead, we use 1 x 1 convolution layer as feature pooling and dimensional reduction [42, 12] before entering the projection unit.
+        
+        In paper which proposed EDSR; MDSR, 2017. Enhanced Deep Residual Networks for Single Image Super-Resolution, authors claim "Since batch normalization layers normalize the features, they get rid of range flexibility from networks by normalizing the features, it is better to remove them"
 13. 换个optimization algorithm, e.g. SGD with momentum and weight decay.
 
         不同optimizer比较  https://zhuanlan.zhihu.com/p/62585696
