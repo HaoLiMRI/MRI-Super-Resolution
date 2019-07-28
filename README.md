@@ -82,6 +82,10 @@
 15. 论文"Structure, Frequency and Perceptual Refinement for MRI Super Resolution Reconstruction with UResNeXt"每一部分谁来负责更新已经分配完毕。20190729这一周开始Jianan Liu和Hao Li开始分别写作各自负责的部分，同时更新相对应reference。
 
         论文地址 https://www.overleaf.com/project/5d3cb9370f7d706eca0260cc
+        
+        
+16. 设计新的network model-2D_RDN_Based_MRI_SR。用RDN网络作为新的MRI SR的网络模型并完成python file
+
 -----
 ## 长期计划：
 1. 2D RDN MRI SR和2D DDBPN MRI SR
