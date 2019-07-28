@@ -23,6 +23,7 @@ This is a demo code of 2D_Gated_U-ResNeXt_Based_MRI_SR.
         f) Optional module(): ssim_loss
         g) Optional module(): log_ssim_loss
         h) Optional module(): ms-ssim_loss
+	i) add option to use lookahead optimizer
         loss function = Pixel-Wise MSE loss(or Pixel-Wise L1 loss) + weighted VGG loss + weighted k space loss + log_ssim_loss + weighted L1 Regularization
        
         
@@ -151,6 +152,7 @@ import scipy.io
 from torchvision.models import vgg19
 
 import pytorch_ssim
+from optimizer import lookahead
 
 "-------------------------------------------------------------------------------------------------"
 print('boolean value to see if GPU is ready:', tc.cuda.is_available())
@@ -166,6 +168,7 @@ SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
 Use_Batch_Norm = False
 Use_Transpose_Conv_as_Upsampling_Approach = True
+Use_Lookahead_Optimizer = True
 
 """""""""""""""""""""""""""""""""""""""""""""
 1. MRI HR and LR Data pair preprocessing part
@@ -614,9 +617,13 @@ print('this is our FFT_K_SPACE: ', fft_k_space)
 4. Setup optimization algorithm part
 """""""""""""""""""""""""""""""""""""""
 "set an optimizer"
-# optimizer = opt.SGD(our_resnext.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
-optimizer = opt.Adam(our_resnext.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-9)    #----- use Adam algorithm for all parameters of our_classifier
-scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100], gamma=0.1)
+if (Use_Lookahead_Optimizer):
+    base_opt = opt.Adam(our_resnext.parameters(), lr=1e-3, betas=(0.9, 0.999)) #----- use Adam algorithm as based optimizer A
+    optimizer = Lookahead(base_opt, k=5, alpha=0.5) # Initialize Lookahead
+else:
+    # optimizer = opt.SGD(our_resnext.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
+    optimizer = opt.Adam(our_resnext.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-9)    #----- use Adam algorithm for all parameters of our_classifier
+    scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100], gamma=0.1)
 
 "set a loss function"
 print('The loss function is MSE')
