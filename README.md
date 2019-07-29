@@ -188,7 +188,8 @@
 
 **需要花时间阅读并且讨论总结的paper**
 1. 非常重要，非常好总结 https://medium.com/beyondminds/an-introduction-to-super-resolution-using-deep-learning-f60aff9a499d
-2. Deep Learning for Single Image Super-Resolution: Overview https://arxiv.org/pdf/1808.03344.pdf
+2. Deep Learning for Image Super-resolution: A Survey https://arxiv.org/pdf/1902.06068.pdf
+2. Deep Learning for Single Image Super-Resolution: A Brief Review https://arxiv.org/pdf/1808.03344.pdf
 3. A Deep Journey into Super-resolution: A survey https://arxiv.org/pdf/1904.07523.pdf
 4. Information Content Weighted Structural Similarity Index (IW-SSIM) for Image Quality Assessment: http://www.ece.uwaterloo.ca/~z70wang/publications/IWSSIM.pdf
 5. SSIM: http://www.cns.nyu.edu/pub/eero/wang03-reprint.pdf
