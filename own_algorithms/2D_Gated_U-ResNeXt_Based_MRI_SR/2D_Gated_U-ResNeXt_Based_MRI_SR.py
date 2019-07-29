@@ -152,7 +152,7 @@ import scipy.io
 from torchvision.models import vgg19
 
 import pytorch_ssim
-from optimizer import Lookahead
+from optimizer import lookahead
 
 "-------------------------------------------------------------------------------------------------"
 print('boolean value to see if GPU is ready:', tc.cuda.is_available())
