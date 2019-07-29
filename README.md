@@ -28,13 +28,11 @@
         
         已经换为pytorch_SSIM来构造SSIM
 5. 将小图拼接起来成为大图看下
-6. 换一个更好的upsampling的方案（有其他函数可以用，应该有一种比pixelshuffler更牛逼）
+6. ~~换一个更好的upsampling的方案（有其他函数可以用，应该有一种比pixelshuffler更牛逼）~~
         
         各种upsampling技术见这 https://blog.csdn.net/g11d111/article/details/82855946
-        
         另外注意，Meta-SR其实主要也是提出了一种基于Meta learning的upscale module/upsampling的方案
-        
-        可以用transpose conv来做upsampling。具体见此https://blog.csdn.net/tsyccnh/article/details/87357447
+        新增transpose conv来做upsampling。具体见此https://blog.csdn.net/tsyccnh/article/details/87357447
         
 7. 需要设计一个更好的loss来真实反映人对于超清的感受
    
@@ -56,8 +54,9 @@
                 a. 找现成pytorch image content based SSIM代码，用对方代码直接作为我们需要的代码
                 
                 b. 或者自己写，在pytorch_SSIM上修改
-12. 去掉所有的batch norm.
+12. ~~去掉所有的batch norm.~~
 
+        搞定
         according to DDBPN paper, "Unlike the original DenseNets, we avoid dropout and batch norm, which are not suitable for SR, because they remove the range flexibility of the features [31]. Instead, we use 1 x 1 convolution layer as feature pooling and dimensional reduction [42, 12] before entering the projection unit.
         
         In paper which proposed EDSR; MDSR, 2017. Enhanced Deep Residual Networks for Single Image Super-Resolution, authors claim "Since batch normalization layers normalize the features, they get rid of range flexibility from networks by normalizing the features, it is better to remove them"
@@ -71,8 +70,9 @@
         在 ICLR 2018 的最佳论文 On the Convergence of Adam and Beyond 中，研究者明确指出了 Adam 收敛不好的原因。他们表明在利用历史梯度的移动均值情况下，模型只能根据短期梯度信息为每个参数设计学习率，因此也就导致了收敛性表现不太好。
 
 
-14. 最近有一个新的optimization alg称之为Lookahead Optimizer据说非常牛逼，甚至不需要怎么精细的设置optimizer的参数就可以有比较好的效果
+14. ~~最近有一个新的optimization alg称之为Lookahead Optimizer据说非常牛逼，甚至不需要怎么精细的设置optimizer的参数就可以有比较好的效果~~
         
+        DONE lookahead opt
         论文见这 https://arxiv.org/pdf/1907.08610v1.pdf
         资料 https://zhuanlan.zhihu.com/p/75184359
         Pytorch下Lookahead Optimizer实现 https://github.com/chisyliu/lookahead.pytorch
