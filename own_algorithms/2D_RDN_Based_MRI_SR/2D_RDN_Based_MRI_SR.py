@@ -479,7 +479,7 @@ print('this is our FFT_K_SPACE: ', fft_k_space)
 "set an optimizer"
 if (Use_Lookahead_Optimizer):
     base_opt = opt.Adam(our_rdn_mri_sr_2d.parameters(), lr=1e-3, betas=(0.9, 0.999)) #----- use Adam algorithm as based optimizer A
-    optimizer = Lookahead(base_opt, k=5, alpha=0.5) # Initialize Lookahead
+    optimizer = lookahead.Lookahead(base_opt, k=5, alpha=0.5) # Initialize Lookahead
 else:
     # optimizer = opt.SGD(our_resnext.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
     optimizer = opt.Adam(our_rdn_mri_sr_2d.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-9)    #----- use Adam algorithm for all parameters of our_classifier
@@ -518,8 +518,10 @@ for epoch in range(EPOCH_NUM):
 # =============================================================================
 #     print('This is the ', epoch, ' epoch')
 # =============================================================================
-    
-    scheduler.step()
+    if (Use_Lookahead_Optimizer):
+        optimizer.step()
+    else:
+        scheduler.step()
     
     running_loss = 0.0
     for i, data in enumerate(trainloader, 0):
