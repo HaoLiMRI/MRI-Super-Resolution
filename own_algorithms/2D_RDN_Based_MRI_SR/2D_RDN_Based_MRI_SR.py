@@ -26,6 +26,7 @@ This is a demo code of 2D_RDN_Based_MRI_SR.
         f) Optional module(): ssim_loss
         g) Optional module(): log_ssim_loss
         h) Optional module(): ms-ssim_loss
+	i) add option to use lookahead optimizer
         loss function = Pixel-Wise MSE loss(or Pixel-Wise L1 loss) + weighted VGG loss + weighted k space loss + log_ssim_loss + weighted L1 Regularization
        
         
