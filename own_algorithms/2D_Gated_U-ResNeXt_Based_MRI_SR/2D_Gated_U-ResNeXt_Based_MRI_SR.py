@@ -296,6 +296,19 @@ testloader = tc.utils.data.DataLoader(
 "Note: all size of in and out channels, stride, padding, etc, could refer to table 1 from Kaiming[1], size of each layer output depends on input data"
 "Residual block, as submodule"
 
+"calculate gradient map for any input image"
+def calculate_gradient_map(img):
+    vertical_edge_mask = torch.Tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+    horizontal_edge_mask = torch.Tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+
+    gradient_vertical_map = F.conv2d(img, vertical_edge_mask, padding = 1, stride = 1)
+    gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1)
+
+    gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
+
+    return gradient_map
+
+
 "FeatureExtractor"
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -719,6 +732,8 @@ for epoch in range(EPOCH_NUM):
 #        ssim_loss = 1-SSIM_function(outputs, labels)
         ssim_loss = loss_function_L1(SSIM_function(labels,labels),SSIM_function(outputs, labels))
         print("ssim_loss: ", ssim_loss)
+
+        gradient_map_loss = loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
         
 #        loss = pixel_wise_loss + ssim_loss
         loss = pixel_wise_loss + feature_map_loss
@@ -734,6 +749,9 @@ for epoch in range(EPOCH_NUM):
         
         if tc.isnan(ssim_loss) != 1:
             loss = loss + ssim_loss
+
+        if tc.isnan(gradient_map_loss) != 1:
+            loss = loss + gradient_map_loss
         
 #        print('loss: ', loss)
 #        loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
