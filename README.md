@@ -101,6 +101,10 @@
 >> 论文下载 https://arxiv.org/pdf/1907.05598.pdf
 >> Comment or Question: 这篇赶快看看，人家怎么插值得到的图像的SSIM才只有不到0.5，但之后啥网络生成的SR都有0.9以上（但说的应该是整张图的，感觉我们真的需要把整个图拼起来看一看并且算一下SSIM）
 
+- Channel Splitting Network for Single MR Image Super-Resolution
+>> 这篇论文里LR的SSIM与我们的比较接近
+>> 论文下载：https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8736987
+
 - Compressed Sensing MRI via a Multi-scale Dilated Residual Convolution Network
 >> 论文下载 https://arxiv.org/abs/1906.05251
 
