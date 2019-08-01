@@ -715,10 +715,10 @@ for epoch in range(EPOCH_NUM):
         k_space_freq_loss = 0.01*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-#        print("k_space_freq_loss: ", k_space_freq_loss)
+        print("k_space_freq_loss: ", k_space_freq_loss)
 #        ssim_loss = 1-SSIM_function(outputs, labels)
-#        ssim_loss = loss_function_L1(SSIM_function(labels,labels),SSIM_function(outputs, labels))
-#        print("ssim_loss: ", ssim_loss)
+        ssim_loss = loss_function_L1(SSIM_function(labels,labels),SSIM_function(outputs, labels))
+        print("ssim_loss: ", ssim_loss)
         
 #        loss = pixel_wise_loss + ssim_loss
         loss = pixel_wise_loss + feature_map_loss
