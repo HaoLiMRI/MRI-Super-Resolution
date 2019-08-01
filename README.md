@@ -86,6 +86,39 @@
         
 16. 设计新的network model-2D_RDN_Based_MRI_SR。用RDN网络作为新的MRI SR的网络模型并完成python file
 
+
+
+
+
+-----
+## 每天抽一些时间读以下的论文，讨论：
+- Progressive Perception-Oriented Network for Single Image Super-Resolution
+>> 论文下载 https://arxiv.org/abs/1907.10399
+>> Code下载 https://github.com/Zheng222/PPON
+>> Comment or Question: 这篇赶快看看，他好像除了设计了一个GAN网络之外还用了SSIM和MS-SSIM作为loss，仔细看一下他怎么设计的loss。大致看了一下他的代码，可以看到他的里面有VGG feature extractor,GAN,residual block,sub-pixel conv upsampling(pixel shuffler)，然后GAN的generator用的是他所谓的PPON（progressively upsampling）
+
+- Compressed Sensing MRI via a Multi-scale Dilated Residual Convolution Network
+>> 论文下载 https://arxiv.org/abs/1906.05251
+
+- MRI Super-Resolution with Ensemble Learning and Complementary Priors
+>> 论文下载 https://arxiv.org/abs/1907.03063
+
+- Learned Image Downscaling for Upscaling using Content Adaptive Resampler
+>> 论文下载 https://arxiv.org/abs/1907.12904
+>> Code下载 https://github.com/sunwj/CAR
+>> Comment or Question: 这个东西有啥用？设计了一个网络从HR生成LR，再用EDSR生成SR
+
+- Image Enhancement by Recurrently-trained Super-resolution Network
+>> 论文下载 https://arxiv.org/abs/1907.11341
+>> Comment or Question: 这个好像生成了一个比HR更牛逼更高分辨率的SR图像?为啥可以这么牛逼
+
+
+
+
+
+
+
+
 -----
 ## 长期计划：
 1. 2D RDN MRI SR和2D DDBPN MRI SR
