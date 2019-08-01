@@ -116,6 +116,11 @@
 >> 论文下载 https://arxiv.org/abs/1907.11341
 >> Comment or Question: 这个好像生成了一个比HR更牛逼更高分辨率的SR图像?为啥可以这么牛逼
 
+- Hybrid Residual Attention Network for Single Image Super Resolution
+>> 论文下载 https://arxiv.org/abs/1907.05514
+>> Comment or Question: 注意这篇论文作对比用的网络都是感觉比较弱的网络模型来做reference
+
+
 
 
 
