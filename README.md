@@ -86,7 +86,9 @@
         
 16. 设计新的network model-2D_RDN_Based_MRI_SR。用RDN网络作为新的MRI SR的网络模型并完成python file
 
-
+17. 增加gradient map based L1 loss
+        
+        根据这篇论文https://ieeexplore.ieee.org/abstract/document/4107183，计算gradient map
 
 
 
