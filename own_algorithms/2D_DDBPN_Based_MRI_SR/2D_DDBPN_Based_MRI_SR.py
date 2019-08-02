@@ -107,6 +107,7 @@ EPOCH_NUM = 250
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
 Use_Lookahead_Optimizer = True
+Maintain_Same_Size = True # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
 
 
 # --------------------------- configuration of parameters for RDN --------------------------- #
@@ -474,9 +475,11 @@ class DDBPN_MRI_SR_2D(nn.Module):
         h_list.append(self.upmodules[-1](tc.cat(l_list, dim=1))) # last up projection units, concatenate all the outputs from all down projection units in list "upmodules", leave into the final up projection unit
         # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ #
 
-        downsized_concatenated_out = self.down_size_converter(tc.cat(h_list, dim=1)) # concatenate all the output from each up projection unit in list "upmodules" and leave them into down_size_converter module 
-
-        out = self.reconstruction(downsized_concatenated_out) # into reconstruction module to lower the number of channels
+		if (Maintain_Same_Size == True):
+            downsized_concatenated_out = self.down_size_converter(tc.cat(h_list, dim=1)) # concatenate all the output from each up projection unit in list "upmodules" and leave them into down_size_converter module 
+            out = self.reconstruction(downsized_concatenated_out) # into reconstruction module to lower the number of channels
+        else:
+            out = self.reconstruction(tc.cat(h_list, dim=1)) # into reconstruction module to lower the number of channels
         
         # substraction mean in the very early stage, now add mean. I don't understand the purpose
         """ out = self.add_mean(out) """
