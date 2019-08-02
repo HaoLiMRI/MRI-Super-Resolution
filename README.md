@@ -103,6 +103,11 @@
 >> 论文下载 https://arxiv.org/pdf/1907.05598.pdf
 >> Comment or Question: 这篇赶快看看，人家怎么插值得到的图像的SSIM才只有不到0.5，但之后啥网络生成的SR都有0.9以上（但说的应该是整张图的，感觉我们真的需要把整个图拼起来看一看并且算一下SSIM）
 
+- 
+>> 论文下载 https://arxiv.org/ftp/arxiv/papers/1803/1803.01417.pdf
+>> Comment or Question: 这篇赶快看看，还是UCLA的那个中国人用GAN做的，然后好像generator是什么resnet和densenet揉到一块的。你看他最后那个figure2的细节感觉就和我们的生成的细节差别不太大，好像稍微好一些可是人家用的是GAN。我说细节差距不很大是因为你看也是像我们的一样明亮对比挺明显，但好像结构相似上更好一点。不过有可能是某些特定的细节部分图像效果比较好，他选择了（比如像我们training的13th）
+
+
 - Channel Splitting Network for Single MR Image Super-Resolution
 >> 这篇论文里LR的SSIM数值与我们的比较接近
 >> 论文下载：https://arxiv.org/abs/1810.06453
