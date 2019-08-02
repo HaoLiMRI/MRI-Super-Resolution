@@ -108,6 +108,7 @@ EPOCH_NUM = 250
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
 Use_Lookahead_Optimizer = True
+Maintain_Same_Size = True # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
 
 
 # --------------------------- configuration of parameters for RDN --------------------------- #
@@ -451,7 +452,8 @@ class RDN_MRI_SR_2D(nn.Module):
         x = self.GFF(tc.cat(RDBs_out,1))
         x += f__1 # output = output + residual link, for global residual learning
 
-        x = self.down_size_converter(x) # extra down_size_converter is needed to shtik size of image r times
+		if (Maintain_Same_Size == True):
+        	x = self.down_size_converter(x) # extra down_size_converter is needed to shtik size of image r times if we expect same size as input LR for SR output
 
         x = self.UPNet(x)
         # do NOT understand why need this, may NOT be useful for us
