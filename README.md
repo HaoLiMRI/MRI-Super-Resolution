@@ -111,6 +111,11 @@
 https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resolution_oa_biomarkers.html
 >> Comment or Question: 我觉得细节效果并没有我们现在的好
 
+- ESRGAN: Enhanced Super-Resolution Generative Adversarial Networks
+>> 论文下载 https://arxiv.org/pdf/1809.00219.pdf
+>> Comment or Question: ESRGAN来做计算机视觉SR的original paper.这个文章提出了一种挺牛逼的想法。做一个PSNR导向的GAN模型和SR，再微调（怎么做？用什么数据微调？）得到一个GAN导向的GAN模型和SR，之后他们给了两种方案-1. 对两个网络的参数进行插值，得到一个新的模型的参数，用这个新的参数的模型来生成SR。2.对两个模型的SR进行插值，得到一个新SR。据他们说第一种方案好。
+感觉我们可以参考这个思路，做两个网络一个PSNR+视觉导向，一个MRI细节（称之为fidelity）导向。但可能需要直接对两个生成SR进行插值生成一个新的SR。
+
 - Brain MRI super-resolution using 3D generative adversarial networks
 >> 论文下载 https://openreview.net/pdf?id=rJevSbniM
 >> Comment or Question: 
