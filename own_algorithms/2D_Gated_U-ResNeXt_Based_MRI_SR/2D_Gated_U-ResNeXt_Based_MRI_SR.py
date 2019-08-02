@@ -296,6 +296,22 @@ testloader = tc.utils.data.DataLoader(
 "Note: all size of in and out channels, stride, padding, etc, could refer to table 1 from Kaiming[1], size of each layer output depends on input data"
 "Residual block, as submodule"
 
+"calculate gradient map for any input image"
+def calculate_gradient_map(img):
+    vertical_edge_mask = tc.Tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+    horizontal_edge_mask = tc.Tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+
+    vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).unsqueeze(0).to(device)
+    horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).unsqueeze(0).to(device)
+    
+    gradient_vertical_map = F.conv2d(img, vertical_edge_mask, padding = 1, stride = 1,groups = 1)
+    gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
+
+    gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
+
+    return gradient_map
+
+
 "FeatureExtractor"
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -444,7 +460,7 @@ class UpsampleBLock(nn.Module):
         return x
 		
         
-"3D_ResNeXt"
+"2D_ResNeXt"
 class ResNeXt_2D(nn.Module):                   #----- Define a Net class as derived class inherited from nn.Module
     "Residual_Block_Type is either class 'BottleNeck_Residual_Block' or class 'Normal_Residual_Block"
     def __init__(self, Residual_Block_Type, feature_extractor_in_front_bool, Use_Batch_Norm, Use_Transpose_Conv_as_Upsampling_Approach):                 #----- __init__ define the constructor of Net class, consist of declaration of components in network              
@@ -715,10 +731,13 @@ for epoch in range(EPOCH_NUM):
         k_space_freq_loss = 0.01*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-        print("k_space_freq_loss: ", k_space_freq_loss)
+#        print("k_space_freq_loss: ", k_space_freq_loss)
 #        ssim_loss = 1-SSIM_function(outputs, labels)
         ssim_loss = loss_function_L1(SSIM_function(labels,labels),SSIM_function(outputs, labels))
-        print("ssim_loss: ", ssim_loss)
+#        print("ssim_loss: ", ssim_loss)
+
+        gradient_map_loss = 10*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
+        print('gradient_loss: ', gradient_map_loss)
         
 #        loss = pixel_wise_loss + ssim_loss
         loss = pixel_wise_loss + feature_map_loss
@@ -734,8 +753,11 @@ for epoch in range(EPOCH_NUM):
         
         if tc.isnan(ssim_loss) != 1:
             loss = loss + ssim_loss
+
+        if tc.isnan(gradient_map_loss) != 1:
+            loss = loss + gradient_map_loss
         
-#        print('loss: ', loss)
+        print('loss: ', loss)
 #        loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
         # print('the loss has been checked')
 
@@ -768,6 +790,7 @@ for epoch in range(EPOCH_NUM):
             feature_map_loss_for_current_epoch = feature_map_loss
             pixel_wise_loss_for_current_epoch = pixel_wise_loss
             ssim_loss_for_current_epoch = ssim_loss
+            gradient_map_loss_for_current_epoch = gradient_map_loss
             k_space_freq_loss_for_current_epoch = k_space_freq_loss
             
             running_loss = 0.0
@@ -780,7 +803,7 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('result_UResNeXt_bnf_tcf_laf_150_32_4folds_2d.txt', 'w')
+        f = open('result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d.txt', 'w')
     f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
     f.write('\n')
     f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
@@ -788,6 +811,8 @@ for epoch in range(EPOCH_NUM):
     f.write('The k_space_freq_loss for epoch %d  is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
     f.write('\n')
     f.write('The ssim_loss for epoch %d  is : %f' % (epoch, ssim_loss_for_current_epoch))
+    f.write('\n')
+    f.write('The gradient_map_loss for epoch %d  is : %f' % (epoch, gradient_map_loss_for_current_epoch))
     f.write('\n')
     f.write('The training loss for epoch %d  is : %f' % (epoch, training_loss_for_current_epoch))
     f.write('\n')
@@ -931,9 +956,9 @@ for i, training_data_2 in enumerate(trainloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR LR, HR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_bnf_tcf_laf_150_32_4folds_2d/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_bnf_tcf_laf_150_32_4folds_2d/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_bnf_tcf_laf_150_32_4folds_2d/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
         
         
     
@@ -978,9 +1003,9 @@ for i, testing_data_2 in enumerate(testloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR, HR and LR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_bnf_tcf_laf_150_32_4folds_2d/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_bnf_tcf_laf_150_32_4folds_2d/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_bnf_tcf_laf_150_32_4folds_2d/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
         
     
 #        for j in range(new_batch_size_for_checking):
