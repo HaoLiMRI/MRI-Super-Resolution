@@ -107,6 +107,10 @@
 >> 论文下载 https://arxiv.org/ftp/arxiv/papers/1803/1803.01417.pdf
 >> Comment or Question: 这篇赶快看看，还是UCLA的那个中国人用GAN做的，然后好像generator是什么resnet和densenet揉到一块的。你看他最后那个figure2的细节感觉就和我们的生成的细节差别不太大，好像稍微好一些可是人家用的是GAN。我说细节差距不很大是因为你看也是像我们的一样明亮对比挺明显，但好像结构相似上更好一点。不过有可能是某些特定的细节部分图像效果比较好，他选择了（比如像我们training的13th）
 
+- stanford
+https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resolution_oa_biomarkers.html
+>> Comment or Question: 我觉得细节效果并没有我们现在的好
+
 - Brain MRI super-resolution using 3D generative adversarial networks
 >> 论文下载 https://openreview.net/pdf?id=rJevSbniM
 >> Comment or Question: 
