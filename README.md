@@ -85,7 +85,7 @@
         论文地址 https://www.overleaf.com/project/5d3cb9370f7d706eca0260cc
         
         
-16. 设计新的network model-2D_RDN_Based_MRI_SR。用RDN网络作为新的MRI SR的网络模型并完成python file
+16. ~~设计新的network model-2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR。用RDN与DDBPN网络作为新的MRI SR的网络模型并完成python file~~
 
 17. 增加gradient map based L1 loss
         
