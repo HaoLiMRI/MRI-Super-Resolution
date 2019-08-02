@@ -41,9 +41,10 @@
    https://www.sciencedirect.com/science/article/pii/S1047320319301336
 
 8. 10)might also consider changing the order of connection, from "Conv --> BN --> ReLU"(normal connection) to "BN --> ReLU --> Conv"(so called full pre-activation)[13] The authors of ResNet[1] found out the performance increased if order of connection changed to full pre-activation in [13]. However, note the BN should always be placed before ReLU or other activation functions, due that "BN is used to produce activations function with the desired distribution"[14] so it has to be before activate function
-9. 重新构建SSIM loss，首先用 "a x log(C) + b x log(L) + c x log(S)"方案构架,跑200epoches后看一看C,L,S哪一个很高不怎么降，之后再设置对应的weight更高来加快penalize这个对应的东西。
+9. ~~重新构建SSIM loss，首先用 "a x log(C) + b x log(L) + c x log(S)"方案构架,跑200epoches后看一看C,L,S哪一个很高不怎么降，之后再设置对应的weight更高来加快penalize这个对应的东西。看上去S好像性能提升的能力最差，所以应该加大相关weight，penalize这个部分loss效果~~
 
-        看上去S好像性能提升的能力最差，所以应该加大相关weight，penalize这个部分loss效果
+        已跑。性能不好
+        
 10. ~~MS-SSIM跑一下看看性能~~
         
         已跑，性能非常烂
@@ -89,6 +90,14 @@
 17. 增加gradient map based L1 loss
         
         根据这篇论文https://ieeexplore.ieee.org/abstract/document/4107183，计算gradient map
+        
+18. 调通2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，使其可以生成变大size或者不变size的SR。
+
+19. 基于2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，用小size的LR图像和大size的HR图像训练，尝试各种loss等方案领其生成足够好的大size的SR图像。
+
+20. 基于2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，用小size的LR图像和大size的HR图像训练，尝试各种loss等方案领其生成足够好的大size的SR图像。之后做transfer learning，固定网络多数parameters只令最后一部分可变trainable(e.g. 最后的upscaling layer trainable)，用大size的HR图像跟更大size的SHR图像训练，让网络生成更大size的足够好的SSR(super super resolution)图像。
+
+21. 基于论文Image Enhancement by Recurrently-trained Super-resolution Network (https://arxiv.org/abs/1907.11341) 提供的recurrently training 思路来生成比HR图像更牛逼的SSR(super super resolution)图像
 
 
 
