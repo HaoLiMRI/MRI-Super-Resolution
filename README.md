@@ -152,6 +152,9 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 >> Comment or Question: 注意这篇论文作对比用的网络都是感觉比较弱的网络模型来做reference
 
 
+- SELF SUPER-RESOLUTION FOR MAGNETIC RESONANCE IMAGES USING DEEP NETWORKS
+>> 论文下载: https://arxiv.org/pdf/1802.09431.pdf
+
 
 
 
