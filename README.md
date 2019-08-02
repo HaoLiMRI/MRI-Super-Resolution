@@ -155,6 +155,7 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 - SELF SUPER-RESOLUTION FOR MAGNETIC RESONANCE IMAGES
 >> 论文下载：https://link.springer.com/content/pdf/10.1007%2F978-3-319-46726-9_64.pdf
 >> 论文下载：https://arxiv.org/pdf/1802.09431.pdf
+>> Comment or Question: 
 
 
 
