@@ -27,7 +27,9 @@
 4. ~~pytorch上ssim值过大，检查或重写(Check this repo: https://github.com/chisyliu/srMRI_SRGAN-2/blob/master/pytorch_ssim/__init__.py)~~
         
         已经换为pytorch_SSIM来构造SSIM
-5. 将小图拼接起来成为大图看下
+        
+5. 将小图拼接起来成为大图看下.对于LR大图，SR大图还有HR大图都计算一下SSIM，看看是否SR大图与HR大图SSIM足够高而LR大图相对低
+
 6. ~~换一个更好的upsampling的方案（有其他函数可以用，应该有一种比pixelshuffler更牛逼）~~
         
         各种upsampling技术见这 https://blog.csdn.net/g11d111/article/details/82855946
