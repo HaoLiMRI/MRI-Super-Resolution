@@ -457,7 +457,7 @@ class UpsampleBLock(nn.Module):
         return x
 		
         
-"3D_ResNeXt"
+"2D_ResNeXt"
 class ResNeXt_2D(nn.Module):                   #----- Define a Net class as derived class inherited from nn.Module
     "Residual_Block_Type is either class 'BottleNeck_Residual_Block' or class 'Normal_Residual_Block"
     def __init__(self, Residual_Block_Type, feature_extractor_in_front_bool, Use_Batch_Norm, Use_Transpose_Conv_as_Upsampling_Approach):                 #----- __init__ define the constructor of Net class, consist of declaration of components in network              
