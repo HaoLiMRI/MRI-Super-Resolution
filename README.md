@@ -116,11 +116,11 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 >> Comment or Question: ESRGAN来做计算机视觉SR的original paper.这个文章提出了一种挺牛逼的想法。做一个PSNR导向的GAN模型和SR，再微调（怎么做？用什么数据微调？）得到一个GAN导向的GAN模型和SR，之后他们给了两种方案-1. 对两个网络的参数进行插值，得到一个新的模型的参数，用这个新的参数的模型来生成SR。2.对两个模型的SR进行插值，得到一个新SR。据他们说第一种方案好。
 感觉我们可以参考这个思路，做两个网络一个PSNR+视觉导向，一个MRI细节（称之为fidelity）导向。但可能需要直接对两个生成SR进行插值生成一个新的SR。
 
-- 2018. Compressed Sensing MRI Reconstruction using a Generative Adversarial Network with a Cyclic Loss
+- Compressed Sensing MRI Reconstruction using a Generative Adversarial Network with a Cyclic Loss
 >> 论文下载 https://arxiv.org/pdf/1709.00753.pdf
 >> Comment or Question: 用cycle GAN做SR MRI
 
-- 2019. Translating and Segmenting Multimodal Medical Volumes with Cycle- and Shape-Consistency Generative Adversarial Network
+- Translating and Segmenting Multimodal Medical Volumes with Cycle- and Shape-Consistency Generative Adversarial Network
 >> 论文下载 https://arxiv.org/pdf/1802.09655.pdf
 >> Comment or Question: 这篇论文好像非常牛，用cycle GAN做CT到MRI或MRI到CT的生成。
 
