@@ -143,6 +143,10 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 >> 这篇论文里LR的SSIM数值与我们的比较接近
 >> 论文下载：https://arxiv.org/abs/1810.06453
 
+- Single MR Image Super-Resolution via Channel Splitting and Serial Fusion Network
+>> 论文下载：https://arxiv.org/abs/1810.06453
+>> 和上面同一个作者，思路类似
+
 - Compressed Sensing MRI via a Multi-scale Dilated Residual Convolution Network
 >> 论文下载 https://arxiv.org/abs/1906.05251
 
