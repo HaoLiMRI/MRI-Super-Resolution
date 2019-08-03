@@ -91,7 +91,7 @@
 
 17. 增加gradient map based L1 loss
         
-        根据这篇论文https://ieeexplore.ieee.org/abstract/document/4107183，计算gradient map
+        根据这篇论文https://ieeexplore.ieee.org/abstract/document/4107183，计算gradient map。再对SR的gradient map和HR的gradient map求minimize L1 error function
         
 18. 调通2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，使其可以生成变大size或者不变size的SR。
 
