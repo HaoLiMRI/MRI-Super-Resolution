@@ -97,7 +97,7 @@
 
 19. 基于2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，用小size的LR图像和大size的HR图像训练，尝试各种loss等方案领其生成足够好的大size的SR图像。
 
-20. 基于2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，用小size的LR图像和大size的HR图像训练，尝试各种loss等方案领其生成足够好的大size的SR图像。之后做transfer learning，固定网络多数parameters只令最后一部分可变trainable(e.g. 最后的upscaling layer trainable)，用大size的HR图像跟更大size的SHR图像训练，让网络生成更大size的足够好的SSR(super super resolution)图像。
+20. 基于2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，用小size的LR图像和大size的HR图像训练，尝试各种loss等方案领其生成足够好的大size的SR图像。之后做transfer learning，固定网络多数parameters只令最后一部分可变trainable(e.g. 最后的upscaling layer trainable)，用大size的HR图像跟更大size的SHR图像训练，让网络生成更大size的足够好的ESR(Enhanced Super Resolution)图像。
 
 21. 基于论文Image Enhancement by Recurrently-trained Super-resolution Network (https://arxiv.org/abs/1907.11341) 提供的recurrently training 思路来生成比HR图像更牛逼的ESR(Enhanced Super Resolution)图像
 
