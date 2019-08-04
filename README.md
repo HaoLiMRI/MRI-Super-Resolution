@@ -227,7 +227,7 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
         original ESRGAN code is: https://github.com/chisyliu/ESRGAN
 3. 3D U-ResNeXt MRI SR
 4. 3D 3DSRGAN(using U-ResNeXt) MRI SR
-5. Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images   
+5. Enhanced Self super resolution: Down-sized LR images are generated from HR images, and used to train the neural network. Use the trained neural network to process HR images and produce higher resolution images   
         
 6. 阅读这篇论文2019. Meta-SR: Magnification-arbitrary network for Super resolution with variable scale factor(https://arxiv.org/abs/1903.00875 )。
 
@@ -258,6 +258,10 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
    What is meta-learning?
         Meta-Learning: Learning to Learn Fast
         https://lilianweng.github.io/lil-log/2018/11/30/meta-learning.html
+        
+7. MRI Segmentation. 好像主流应该就是用U-Net来做MRI segmentation (U-Net见 U-Net: Convolutional Networks for Biomedical Image Segmentation https://arxiv.org/abs/1505.04597).根据jianan现在的理解，如果有标注好的训练数据，完全可以直接用RDN和DDBPN的网络结构直接做training来做segmentation。如何设计一个好的loss function可能是重点。
+
+        如果没有标注好的训练数据，可以考虑用open data set: LGG MRI Segmentation Dataset  https://www.kaggle.com/mateuszbuda/lgg-mri-segmentation
 -----
  
  
