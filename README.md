@@ -263,6 +263,11 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 根据jianan现在的理解，如果有标注好的训练数据，完全可以直接用RDN和DDBPN的网络结构直接做training来做segmentation。如何设计一个好的loss function可能是重点。
 
         如果没有标注好的训练数据，可以考虑用open data set: LGG MRI Segmentation Dataset  https://www.kaggle.com/mateuszbuda/lgg-mri-segmentation
+
+8. Super resolution + segmentation，文章很少，几乎没有MRI相关的
+- Highly Accurate Facial Nerve Segmentation Refinement From CBCT/CT Imaging Using a Super-Resolution Classification Approach
+  下载地址：https://ieeexplore.ieee.org/document/7911203
+
 -----
  
  
