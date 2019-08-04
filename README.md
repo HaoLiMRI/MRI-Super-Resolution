@@ -101,6 +101,8 @@
 
 21. 基于论文Image Enhancement by Recurrently-trained Super-resolution Network (https://arxiv.org/abs/1907.11341) 提供的recurrently training 思路来生成比HR图像更牛逼的ESR(Enhanced Super Resolution)图像
 
+22. MRI Segmentation. 好像主流应该就是用U-Net来做MRI segmentation (U-Net见 U-Net: Convolutional Networks for Biomedical Image Segmentation https://arxiv.org/abs/1505.04597). 根据jianan现在的理解，如果有标注好的训练数据，完全可以直接用RDN和DDBPN的网络结构直接做training来做segmentation。如何设计一个好的loss function可能是重点。
+
 
 
 -----
