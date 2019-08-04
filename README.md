@@ -267,7 +267,8 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 8. Super resolution + segmentation，文章很少，几乎没有MRI相关的
 - Highly Accurate Facial Nerve Segmentation Refinement From CBCT/CT Imaging Using a Super-Resolution Classification Approach
   下载地址：https://ieeexplore.ieee.org/document/7911203
-
+- Utility of Deep Learning Super-Resolution in the Context of Osteoarthritis MRI Biomarkers，stanford今年新的文章，里面有两个网络，一个SR，一个segmentation。
+   下载地址：https://onlinelibrary.wiley.com/doi/pdf/10.1002/jmri.26872
 -----
  
  
