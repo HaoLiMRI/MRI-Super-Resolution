@@ -28,7 +28,8 @@
         early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss，直到test data的loss不降却上升时候stop。
         
         多加几个dropout试下
-        
+	
+	减少网络的深度
         
 3. 对更多细节部分增加ssim权重(如何用数量的方式表征"细节比较多"，比如概率？在loss里面需要重新设计一下对细节比较多的部分增加weight，类似分类任务的focal loss的方式)
         
