@@ -22,8 +22,7 @@
 		L1_reg = 0
 		for param in net.parameters():
 			L1_reg += torch.sum(torch.abs(param))
-		loss += 0.001 * L1_reg  # lambda=0.001
-                
+		loss += 0.001 * L1_reg  # lambda=0.001           
         用上节的代码试了一下，使用L1正则化项时如果指定和使用L2 正则化项时相同的λ=0.01 会发生under-fitting，似乎如果要用L1 正则化的话要把其系数设置的小一点，所以这里用了0.001。
         
         early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss，直到test data的loss不降却上升时候stop。
