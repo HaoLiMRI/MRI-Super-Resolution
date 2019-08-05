@@ -297,6 +297,11 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
   下载地址：https://ieeexplore.ieee.org/document/7911203
 - Utility of Deep Learning Super-Resolution in the Context of Osteoarthritis MRI Biomarkers，stanford今年新的文章，里面有两个网络，一个SR，一个segmentation。
    下载地址：https://onlinelibrary.wiley.com/doi/pdf/10.1002/jmri.26872
+   
+9. 多channel训练，然后做平均，也需可以修正对分布的估计。
+   由Channel Splitting Network for Single MR Image Super-Resolution想到的
+   下载地址：https://arxiv.org/pdf/1810.06453.pdf
+   
 -----
  
  
