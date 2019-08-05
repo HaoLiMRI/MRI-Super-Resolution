@@ -92,7 +92,7 @@ import time
 import scipy.io
 from torchvision.models import vgg19
 
-import pytorch_ssim
+import pytorch_ssim_l1
 from optimizer import lookahead
 
 "-------------------------------------------------------------------------------------------------"
@@ -104,10 +104,10 @@ since = time.clock()
 
 
 batch_size = 32
-EPOCH_NUM = 250
+EPOCH_NUM = 150
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
-Use_Lookahead_Optimizer = True
+Use_Lookahead_Optimizer = False
 Maintain_Same_Size = True # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
 
 
@@ -248,6 +248,23 @@ the growth rate denotes as G for short.
 """""""""""""""""""""""""""""""""""""""
 3. Define ResNeXt architecture part
 """""""""""""""""""""""""""""""""""""""
+
+"calculate gradient map for any input image"
+def calculate_gradient_map(img):
+    vertical_edge_mask = tc.Tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+    horizontal_edge_mask = tc.Tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+
+    vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).unsqueeze(0).to(device)
+    horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).unsqueeze(0).to(device)
+    
+    gradient_vertical_map = F.conv2d(img, vertical_edge_mask, padding = 1, stride = 1,groups = 1)
+    gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
+
+    gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
+
+    return gradient_map
+
+
 "FeatureExtractor"
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -360,7 +377,7 @@ class RDN_MRI_SR_2D(nn.Module):
               G0: 
               kSize: default kernel conv filter size
         """
-        super(RDN, self).__init__()
+        super(RDN_MRI_SR_2D, self).__init__()
         r = args['scale'] # downsize and upscale factor inside RDN_MRI_SR_2D model, e.g. 2, or 4 
         G0 = args['G0'] # 
         kSize = args['RDNkSize'] #
@@ -452,8 +469,8 @@ class RDN_MRI_SR_2D(nn.Module):
         x = self.GFF(tc.cat(RDBs_out,1))
         x += f__1 # output = output + residual link, for global residual learning
 
-		if (Maintain_Same_Size == True):
-        	x = self.down_size_converter(x) # extra down_size_converter is needed to shtik size of image r times if we expect same size as input LR for SR output
+        if (Maintain_Same_Size == True):
+            x = self.down_size_converter(x) # extra down_size_converter is needed to shtik size of image r times if we expect same size as input LR for SR output
 
         x = self.UPNet(x)
         # do NOT understand why need this, may NOT be useful for us
@@ -467,6 +484,7 @@ our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
 if tc.cuda.device_count()>1:
     our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d)
 our_rdn_mri_sr_2d.to(device)
+
 print('this is our RDN_MRI_SR_2D: ', our_rdn_mri_sr_2d)
 
 feature_extractor = FeatureExtractor().to(device)
@@ -499,7 +517,7 @@ loss_function_L1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
 print('The loss function is MS-SSIM')
-SSIM_function = pytorch_ssim.SSIM().to(device)       #----- ssim loss
+SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
 
 # =============================================================================
 # print('The loss function is L1Loss')
@@ -517,6 +535,10 @@ SSIM_function = pytorch_ssim.SSIM().to(device)       #----- ssim loss
 """""""""""""""""""""""""""
 "Train the ResNeXt34"
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
+
+"Set training mode"
+our_rdn_mri_sr_2d.train()
+
 for epoch in range(EPOCH_NUM):
 # =============================================================================
 #     print('This is the ', epoch, ' epoch')
@@ -568,34 +590,41 @@ for epoch in range(EPOCH_NUM):
         
         "calculate the gradients for all Variables during back prop"
         "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
-        feature_map_loss = 0.001*loss_function_MSE(SR_features, HR_features)
+        feature_map_loss = 0.01*loss_function_MSE(SR_features, HR_features)
         # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
         print("feature_map_loss: ", feature_map_loss)
         # pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
-        pixel_wise_loss = 10*loss_function_L1(outputs, labels)
+        pixel_wise_loss = 100*loss_function_L1(outputs, labels)
         
         print("pixel_wise_loss: ", pixel_wise_loss)
-        k_space_freq_loss = 0.001*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+        k_space_freq_loss = 0.01*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
 #        print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
         print("k_space_freq_loss: ", k_space_freq_loss)
-        ssim_loss = 1-SSIM_function(outputs, labels)
+#        ssim_loss = 1-SSIM_function(outputs, labels)
+        ssim_loss = loss_function_L1(SSIM_function(labels,labels),SSIM_function(outputs, labels))
         print("ssim_loss: ", ssim_loss)
         
-#        loss = pixel_wise_loss + ssim_loss
-#        loss = pixel_wise_loss + feature_map_loss
+        gradient_map_loss = 100*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
+        print('gradient_loss: ', gradient_map_loss)
         
-        if ssim_loss < 0.5:
-            loss = ssim_loss + feature_map_loss + pixel_wise_loss
-            print('ssim_loss')
-        else:
-            loss = pixel_wise_loss + feature_map_loss
+#        loss = pixel_wise_loss + ssim_loss
+        loss = pixel_wise_loss + feature_map_loss
+        
+#        if ssim_loss < 0.5:
+#            loss = ssim_loss + feature_map_loss + pixel_wise_loss
+#            print('ssim_loss')
+#        else:
+#            loss = pixel_wise_loss + feature_map_loss
             
         if tc.isnan(k_space_freq_loss) != 1:
             loss = loss + k_space_freq_loss
         
-#        if tc.isnan(ssim_loss) != 1:
-#            loss = loss + ssim_loss
+        if tc.isnan(ssim_loss) != 1:
+            loss = loss + ssim_loss
+            
+        if tc.isnan(gradient_map_loss) != 1:
+            loss = loss + gradient_map_loss
         
         print('loss: ', loss)
 #        loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
@@ -630,6 +659,7 @@ for epoch in range(EPOCH_NUM):
             feature_map_loss_for_current_epoch = feature_map_loss
             pixel_wise_loss_for_current_epoch = pixel_wise_loss
             ssim_loss_for_current_epoch = ssim_loss
+            gradient_map_loss_for_current_epoch = gradient_map_loss
             k_space_freq_loss_for_current_epoch = k_space_freq_loss
             
             running_loss = 0.0
@@ -642,7 +672,7 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('result_RDN_MRI_SR_2D_all_epoch.txt', 'w')
+        f = open('result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d.txt', 'w')
     f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
     f.write('\n')
     f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
@@ -650,6 +680,8 @@ for epoch in range(EPOCH_NUM):
     f.write('The k_space_freq_loss for epoch %d  is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
     f.write('\n')
     f.write('The ssim_loss for epoch %d  is : %f' % (epoch, ssim_loss_for_current_epoch))
+    f.write('\n')
+    f.write('The gradient_map_loss for epoch %d  is : %f' % (epoch, gradient_map_loss_for_current_epoch))
     f.write('\n')
     f.write('The training loss for epoch %d  is : %f' % (epoch, training_loss_for_current_epoch))
     f.write('\n')
@@ -767,6 +799,10 @@ testloader = tc.utils.data.DataLoader(
                     num_workers = 0)
 
 
+"Set to evaluation mode"
+our_rdn_mri_sr_2d.eval()
+
+
 "exam the generated SR MRI image by using training LR image data and save them"
 # =============================================================================
 # for data in testloader:
@@ -793,22 +829,22 @@ for i, training_data_2 in enumerate(trainloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR LR, HR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
         
         
     
-        for j in range(new_batch_size_for_checking):
-            plt.imshow(SR_images_exam_train[j, :, :])
-            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_SR_image.png')
-            plt.show()
-            plt.imshow(HR_images_training[j, 0, :, :])
-            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_HR_image.png')
-            plt.show()
-            plt.imshow(LR_images_training[j, 0, :, :])
-            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_LR_image.png')
-            plt.show()
+#        for j in range(new_batch_size_for_checking):
+#            plt.imshow(SR_images_exam_train[j, :, :])
+#            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_SR_image.png')
+#            plt.show()
+#            plt.imshow(HR_images_training[j, 0, :, :])
+#            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_HR_image.png')
+#            plt.show()
+#            plt.imshow(LR_images_training[j, 0, :, :])
+#            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_LR_image.png')
+#            plt.show()
 
 print("examination of generated SR image by using training samples complete")
 
@@ -840,21 +876,21 @@ for i, testing_data_2 in enumerate(testloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR, HR and LR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-        scipy.io.savemat('/home/HaoLi/SR/Results/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
         
     
-        for j in range(new_batch_size_for_checking):
-            plt.imshow(SR_images_test[j, :, :])
-            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_SR_image.png')
-            plt.show()            
-            plt.imshow(HR_images_test[j, 0, :, :])
-            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_HR_image.png')
-            plt.show()            
-            plt.imshow(LR_images_test[j, 0, :, :])
-            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_LR_image.png')
-            plt.show()            
+#        for j in range(new_batch_size_for_checking):
+#            plt.imshow(SR_images_test[j, :, :])
+#            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_SR_image.png')
+#            plt.show()            
+#            plt.imshow(HR_images_test[j, 0, :, :])
+#            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_HR_image.png')
+#            plt.show()            
+#            plt.imshow(LR_images_test[j, 0, :, :])
+#            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_LR_image.png')
+#            plt.show()            
 
 print("the predicting of generated SR image by using testing samples complete")
 
