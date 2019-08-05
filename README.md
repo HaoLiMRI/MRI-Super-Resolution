@@ -12,7 +12,13 @@
         已重新生成2D 1/4，1/6，1/8 LR图像。
 2. 解决过拟合
         
-        现在已经在最后一层之后带dropout,但逻辑上dropout不应该对的。之后还要再研究结果
+        现在已经在最后一层之后带dropout,可以调大dropout prob
+        
+        L2 regularization。但有论文说不应该只是weight decay实现L2 regularization，而应该改这个方式。https://arxiv.org/pdf/1711.05101.pdf
+        
+        L1 regularization。好像需要手动加，见 https://zhuanlan.zhihu.com/p/69339955
+        
+        early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss，直到test data的loss不降却上升时候stop。
         
         多加几个dropout试下
         
