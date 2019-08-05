@@ -670,6 +670,10 @@ SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
 """""""""""""""""""""""""""
 "Train the ResNeXt34"
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
+
+"Set network to training mode"
+our_resnext.train()
+
 for epoch in range(EPOCH_NUM):
 # =============================================================================
 #     print('This is the ', epoch, ' epoch')
@@ -929,6 +933,9 @@ testloader = tc.utils.data.DataLoader(
                     shuffle = True, 
                     num_workers = 0)
 
+
+"Set network to evaluation mode"
+our_resnext.eval()
 
 "exam the generated SR MRI image by using training LR image data and save them"
 # =============================================================================
