@@ -29,8 +29,10 @@
         
         多加几个dropout试下
 	
-	减少网络的深度
-        
+		减少网络的深度
+		
+		增大batch size从而减小每个epoch内iteration的次数
+        	
 3. 对更多细节部分增加ssim权重(如何用数量的方式表征"细节比较多"，比如概率？在loss里面需要重新设计一下对细节比较多的部分增加weight，类似分类任务的focal loss的方式)
         
         李昊老板建议gradient based SSIM。要看一下这个是什么，用下
