@@ -93,9 +93,11 @@
         
         根据这篇论文https://ieeexplore.ieee.org/abstract/document/4107183，计算gradient map。再对SR的gradient map和HR的gradient map求minimize L1 error function
         
-18. 调通2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，使其可以生成变大size或者不变size的SR。
+18. ~~调通2D_RDN_Based_MRI_SRR，使其可以生成变大size或者不变size的SR。~~
 
-19. 基于2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，用小size的LR图像和大size的HR图像训练，尝试各种loss等方案领其生成足够好的大size的SR图像。
+18. 调通2D_DDBPN_Based_MRI_SR，使其可以生成变大size或者不变size的SR。
+
+19. 基于2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，用一样的size的LR图像和HR图像训练，尝试各种loss等方案领其生成足够好SR图像。
 
 20. 基于2D_RDN_Based_MRI_SR与2D_DDBPN_Based_MRI_SR，用小size的LR图像和大size的HR图像训练，尝试各种loss等方案领其生成足够好的大size的SR图像。之后做transfer learning，固定网络多数parameters只令最后一部分可变trainable(e.g. 最后的upscaling layer trainable)，用大size的HR图像跟更大size的SHR图像训练，让网络生成更大size的足够好的ESR(Enhanced Super Resolution)图像。
 
