@@ -15,6 +15,8 @@
         现在已经在最后一层之后带dropout,可以调大dropout prob
         
         L2 regularization。但有论文说不应该只是weight decay实现L2 regularization，而应该改这个方式。https://arxiv.org/pdf/1711.05101.pdf
+	
+		early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss。之后需要在大概test data的loss不降却上升时候stop。
         
         L1 regularization。好像需要手动加，见 https://zhuanlan.zhihu.com/p/69339955
         在PyTorch中还没有直接设置L1 范数的方法，可以在训练时Loss做BP之前（也就是.backward()之前）手动为Loss 加上L1范数：
@@ -24,8 +26,6 @@
 			L1_reg += torch.sum(torch.abs(param))
 		loss += 0.001 * L1_reg  # lambda=0.001           
         用上节的代码试了一下，使用L1正则化项时如果指定和使用L2 正则化项时相同的λ=0.01 会发生under-fitting，似乎如果要用L1 正则化的话要把其系数设置的小一点，所以这里用了0.001。
-        
-        early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss，直到test data的loss不降却上升时候stop。
         
         多加几个dropout试下
 	
