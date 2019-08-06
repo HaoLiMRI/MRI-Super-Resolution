@@ -670,8 +670,6 @@ SSIM_function = pytorch_msssim_l1.MSSSIM().to(device)       #----- ssim loss
 """""""""""""""""""""""""""
 "Train the ResNeXt34"
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
-"Set training mode"
-our_resnext.train()
 
 for epoch in range(EPOCH_NUM):
     "Set training mode"
