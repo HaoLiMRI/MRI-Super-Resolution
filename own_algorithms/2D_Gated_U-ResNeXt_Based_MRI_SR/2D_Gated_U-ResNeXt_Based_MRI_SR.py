@@ -151,7 +151,7 @@ import time
 import scipy.io
 from torchvision.models import vgg19
 
-import pytorch_ssim_l1
+import pytorch_msssim_l1
 from optimizer import lookahead
 
 "-------------------------------------------------------------------------------------------------"
@@ -522,7 +522,7 @@ class ResNeXt_2D(nn.Module):                   #----- Define a Net class as deri
         nn.Conv2d(in_channels = 32, out_channels = 16, kernel_size = 3, stride = 1, padding = 1, bias = False))
         self.part12 = nn.Sequential(UpsampleBLock(16, 2, Use_Transpose_Conv_as_Upsampling_Approach = self.Use_Transpose_Conv_as_Upsampling_Approach),
         nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 3, stride = 1, padding = 1, bias = False))
-        self.dropout = nn.Dropout(p=0.3)
+        self.dropout = nn.Dropout(p=0.5)
 	
 # =============================================================================
 #         "fully connected layers as regressor"
@@ -638,7 +638,7 @@ if (Use_Lookahead_Optimizer):
     optimizer = lookahead.Lookahead(base_opt, k=5, alpha=0.5) # Initialize Lookahead
 else:
     # optimizer = opt.SGD(our_resnext.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
-    optimizer = opt.Adam(our_resnext.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-9)    #----- use Adam algorithm for all parameters of our_classifier
+    optimizer = opt.Adam(our_resnext.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-5)    #----- use Adam algorithm for all parameters of our_classifier
     scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100], gamma=0.1)
 
 "set a loss function"
@@ -652,7 +652,7 @@ loss_function_L1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
 print('The loss function is SSIM')
-SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
+SSIM_function = pytorch_msssim_l1.MSSSIM().to(device)       #----- ssim loss
 
 # =============================================================================
 # print('The loss function is L1Loss')
@@ -671,10 +671,9 @@ SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
 "Train the ResNeXt34"
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
 
-"Set network to training mode"
-our_resnext.train()
-
 for epoch in range(EPOCH_NUM):
+    "Set training mode"
+    our_resnext.train()
 # =============================================================================
 #     print('This is the ', epoch, ' epoch')
 # =============================================================================
@@ -740,7 +739,7 @@ for epoch in range(EPOCH_NUM):
         ssim_loss = loss_function_L1(SSIM_function(labels,labels),SSIM_function(outputs, labels))
 #        print("ssim_loss: ", ssim_loss)
 
-        gradient_map_loss = 10*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
+        gradient_map_loss = 100*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
         print('gradient_loss: ', gradient_map_loss)
         
 #        loss = pixel_wise_loss + ssim_loss
@@ -798,7 +797,51 @@ for epoch in range(EPOCH_NUM):
             k_space_freq_loss_for_current_epoch = k_space_freq_loss
             
             running_loss = 0.0
+    "Set evaluation Mode"    
+    our_resnext.eval()
+    for i, testing_data in enumerate(testloader, 0):
         
+        if i == 10:
+            LR_test, HR_test = testing_data
+            # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+            SR_test = our_resnext(Variable(LR_test).type(tc.FloatTensor).to(device))
+            
+            SR_test_copies = tc.cat((SR_test, SR_test, SR_test), 1)
+            # print(SR_copies.size())
+            SR_test_features = feature_extractor(SR_test_copies)
+            # print(SR_features.size())
+                    
+            HR_test_copies = tc.cat((HR_test, HR_test, HR_test), 1)
+            # print(HR_copies.size())
+            HR_test_features = feature_extractor(HR_test_copies)
+            # print(HR_features.size())
+        
+            SR_test_freq = fft_k_space(SR_test)
+            
+            HR_test_freq = fft_k_space(HR_test)
+        
+        
+            "calculate the gradients for all Variables during back prop"
+            "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
+            feature_map_loss_test = 0.01*loss_function_MSE(SR_test_features, HR_test_features)
+            print("feature_map_loss_test: ", feature_map_loss_test)
+            
+            pixel_wise_loss_test = 100*loss_function_L1(SR_test, HR_test)
+            print("pixel_wise_loss_test: ", pixel_wise_loss_test)
+            
+            k_space_freq_loss_test = 0.01*(loss_function_MSE(SR_test_freq[:,:,:,:,0], HR_test_freq[:,:,:,:,0])+loss_function_MSE(SR_test_freq[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))
+            print("k_space_freq_loss_test: ", k_space_freq_loss_test)
+            
+            ssim_loss_test = loss_function_L1(SSIM_function(HR_test,HR_test),SSIM_function(SR_test, HR_test))
+            print("ssim_loss_test: ", ssim_loss_test)
+            
+            gradient_map_loss_test = 100*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(HR_test))
+            print('gradient_loss_test: ', gradient_map_loss_test)
+        
+            loss_test = pixel_wise_loss_test + feature_map_loss_test + k_space_freq_loss_test + ssim_loss_test + gradient_map_loss_test
+            print('loss_test: ', loss_test)
+        
+                
     "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"    
 #    if tc.isnan(loss) == 1: #- loss == 'NaN':
 #        break
@@ -807,7 +850,9 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d.txt', 'w')
+        f = open('result_UResNeXt_l1_4msssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test.txt', 'w')
+    f.write('Training Loss:')
+    f.write('\n')    
     f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
     f.write('\n')
     f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
@@ -820,6 +865,22 @@ for epoch in range(EPOCH_NUM):
     f.write('\n')
     f.write('The training loss for epoch %d  is : %f' % (epoch, training_loss_for_current_epoch))
     f.write('\n')
+    f.write(' \n')
+    f.write('Test Loss:')
+    f.write('\n')    
+    f.write('The feature_map_loss_test for epoch %d  is : %f' % (epoch, feature_map_loss_test))
+    f.write('\n')
+    f.write('The pixel_wise_loss_test for epoch %d  is : %f' % (epoch, pixel_wise_loss_test))
+    f.write('\n')
+    f.write('The k_space_freq_loss_test for epoch %d  is : %f' % (epoch, k_space_freq_loss_test))
+    f.write('\n')
+    f.write('The ssim_loss_test for epoch %d  is : %f' % (epoch, ssim_loss_test))
+    f.write('\n')
+    f.write('The gradient_map_loss_test for epoch %d  is : %f' % (epoch, gradient_map_loss_test))
+    f.write('\n')
+    f.write('The training_loss_test for epoch %d  is : %f' % (epoch, loss_test))
+    f.write('\n')
+    f.write(' \n')
     f.write(' \n')
     if (epoch == EPOCH_NUM - 1):
         f.close()
@@ -917,8 +978,8 @@ print("training complete")
 
 
 
-
-
+"Set evaluation mode"
+our_resnext.eval()
 "Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
 new_batch_size_for_checking = 16
 trainloader = tc.utils.data.DataLoader(
@@ -933,9 +994,6 @@ testloader = tc.utils.data.DataLoader(
                     shuffle = True, 
                     num_workers = 0)
 
-
-"Set network to evaluation mode"
-our_resnext.eval()
 
 "exam the generated SR MRI image by using training LR image data and save them"
 # =============================================================================
@@ -952,6 +1010,11 @@ for i, training_data_2 in enumerate(trainloader, 0):
 # =============================================================================
     
     if (i == math.floor((torch_data_low_resolution_training_sequence.size(0)/new_batch_size_for_checking)/2)): 
+        
+        LR_images_training, HR_images_training = training_data_2
+        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        outputs = our_resnext(Variable(LR_images_training).type(tc.FloatTensor).to(device))
+        
         #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
         SR_images_tensor_training = outputs.data.cpu().squeeze(1)
         # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
@@ -963,9 +1026,9 @@ for i, training_data_2 in enumerate(trainloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR LR, HR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4msssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4msssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4msssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
         
         
     
@@ -999,6 +1062,11 @@ for i, testing_data_2 in enumerate(testloader, 0):
 # =============================================================================
     
     if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
+        
+        LR_images_test, HR_images_test = testing_data_2
+        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        outputs = our_resnext(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+        
         #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
         SR_images_tensor_test = outputs.data.cpu().squeeze(1)
         # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
@@ -1010,9 +1078,9 @@ for i, testing_data_2 in enumerate(testloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR, HR and LR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4msssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4msssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4msssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
         
     
 #        for j in range(new_batch_size_for_checking):
