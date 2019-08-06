@@ -263,7 +263,13 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 			SRFBN论文:https://arxiv.org/abs/1903.09814
 		
 			代码在这:https://github.com/chisyliu/SRFBN_CVPR19
+			
+			
+		2019. Gated Multiple Feedback Network for Image Super-Resolution
 		
+			GMFN论文:https://arxiv.org/pdf/1907.04253v2.pdf
+			
+			代码在这:https://github.com/chisyliu/GMFN
 		
 		
                 
