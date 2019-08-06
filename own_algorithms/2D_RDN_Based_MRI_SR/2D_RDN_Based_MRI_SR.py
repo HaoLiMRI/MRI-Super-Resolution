@@ -104,7 +104,8 @@ since = time.clock()
 
 
 batch_size = 32
-EPOCH_NUM = 150
+batch_size_test = 64
+EPOCH_NUM = 20
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
 Use_Lookahead_Optimizer = False
@@ -230,7 +231,7 @@ testset = tc.utils.data.TensorDataset(torch_data_low_resolution_test_sequence, t
 
 testloader = tc.utils.data.DataLoader(
                     testset, 
-                    batch_size = batch_size,
+                    batch_size = batch_size_test,
                     shuffle = True, 
                     num_workers = 0)
 
@@ -503,7 +504,7 @@ if (Use_Lookahead_Optimizer):
     optimizer = lookahead.Lookahead(base_opt, k=5, alpha=0.5) # Initialize Lookahead
 else:
     # optimizer = opt.SGD(our_resnext.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
-    optimizer = opt.Adam(our_rdn_mri_sr_2d.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-9)    #----- use Adam algorithm for all parameters of our_classifier
+    optimizer = opt.Adam(our_rdn_mri_sr_2d.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-5)    #----- use Adam algorithm for all parameters of our_classifier
     scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100], gamma=0.1)
 
 "set a loss function"
@@ -543,12 +544,17 @@ for epoch in range(EPOCH_NUM):
 # =============================================================================
 #     print('This is the ', epoch, ' epoch')
 # =============================================================================
+
+    "Set training mode"
+    our_rdn_mri_sr_2d.train()
+
     if (Use_Lookahead_Optimizer):
         optimizer.step()
     else:
         scheduler.step()
     
     running_loss = 0.0
+    
     for i, data in enumerate(trainloader, 0):
 # =============================================================================
 #         print('This is the ', i, ' batch for the ', epoch, ' epoch' )
@@ -663,7 +669,52 @@ for epoch in range(EPOCH_NUM):
             k_space_freq_loss_for_current_epoch = k_space_freq_loss
             
             running_loss = 0.0
+
+    
+    our_rdn_mri_sr_2d.eval()
+    for i, testing_data in enumerate(testloader, 0):
         
+        if i == 10:
+            LR_test, HR_test = testing_data
+            # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+            SR_test = our_rdn_mri_sr_2d(Variable(LR_test).type(tc.FloatTensor).to(device))
+            
+            SR_test_copies = tc.cat((SR_test, SR_test, SR_test), 1)
+            # print(SR_copies.size())
+            SR_test_features = feature_extractor(SR_test_copies)
+            # print(SR_features.size())
+                    
+            HR_test_copies = tc.cat((HR_test, HR_test, HR_test), 1)
+            # print(HR_copies.size())
+            HR_test_features = feature_extractor(HR_test_copies)
+            # print(HR_features.size())
+        
+            SR_test_freq = fft_k_space(SR_test)
+            
+            HR_test_freq = fft_k_space(HR_test)
+        
+        
+            "calculate the gradients for all Variables during back prop"
+            "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
+            feature_map_loss_test = 0.01*loss_function_MSE(SR_test_features, HR_test_features)
+            print("feature_map_loss_test: ", feature_map_loss_test)
+            
+            pixel_wise_loss_test = 100*loss_function_L1(SR_test, HR_test)
+            print("pixel_wise_loss_test: ", pixel_wise_loss_test)
+            
+            k_space_freq_loss_test = 0.01*(loss_function_MSE(SR_test_freq[:,:,:,:,0], HR_test_freq[:,:,:,:,0])+loss_function_MSE(SR_test_freq[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))
+            print("k_space_freq_loss_test: ", k_space_freq_loss_test)
+            
+            ssim_loss_test = loss_function_L1(SSIM_function(HR_test,HR_test),SSIM_function(SR_test, HR_test))
+            print("ssim_loss_test: ", ssim_loss_test)
+            
+            gradient_map_loss_test = 100*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(HR_test))
+            print('gradient_loss_test: ', gradient_map_loss_test)
+        
+            loss_test = pixel_wise_loss_test + feature_map_loss_test + k_space_freq_loss_test + ssim_loss_test + gradient_map_loss_test
+            print('loss_test: ', loss_test)
+        
+                
     "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"    
 #    if tc.isnan(loss) == 1: #- loss == 'NaN':
 #        break
@@ -672,7 +723,9 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d.txt', 'w')
+        f = open('result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test.txt', 'w')
+    f.write('Training Loss:')
+    f.write('\n')    
     f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
     f.write('\n')
     f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
@@ -685,6 +738,22 @@ for epoch in range(EPOCH_NUM):
     f.write('\n')
     f.write('The training loss for epoch %d  is : %f' % (epoch, training_loss_for_current_epoch))
     f.write('\n')
+    f.write(' \n')
+    f.write('Test Loss:')
+    f.write('\n')    
+    f.write('The feature_map_loss_test for epoch %d  is : %f' % (epoch, feature_map_loss_test))
+    f.write('\n')
+    f.write('The pixel_wise_loss_test for epoch %d  is : %f' % (epoch, pixel_wise_loss_test))
+    f.write('\n')
+    f.write('The k_space_freq_loss_test for epoch %d  is : %f' % (epoch, k_space_freq_loss_test))
+    f.write('\n')
+    f.write('The ssim_loss_test for epoch %d  is : %f' % (epoch, ssim_loss_test))
+    f.write('\n')
+    f.write('The gradient_map_loss_test for epoch %d  is : %f' % (epoch, gradient_map_loss_test))
+    f.write('\n')
+    f.write('The training_loss_test for epoch %d  is : %f' % (epoch, loss_test))
+    f.write('\n')
+    f.write(' \n')
     f.write(' \n')
     if (epoch == EPOCH_NUM - 1):
         f.close()
@@ -809,15 +878,17 @@ our_rdn_mri_sr_2d.eval()
 # =============================================================================
 for i, training_data_2 in enumerate(trainloader, 0):
     
-    LR_images_training, HR_images_training = training_data_2
     
-    # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-    outputs = our_rdn_mri_sr_2d(Variable(LR_images_training).type(tc.FloatTensor).to(device))
 # =============================================================================
 #     print(outputs.data.size())
 # =============================================================================
     
     if (i == math.floor((torch_data_low_resolution_training_sequence.size(0)/new_batch_size_for_checking)/2)): 
+        LR_images_training, HR_images_training = training_data_2
+    
+        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        outputs = our_rdn_mri_sr_2d(Variable(LR_images_training).type(tc.FloatTensor).to(device))
+        
         #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
         SR_images_tensor_training = outputs.data.cpu().squeeze(1)
         # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
@@ -829,9 +900,9 @@ for i, training_data_2 in enumerate(trainloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR LR, HR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
         
         
     
@@ -857,14 +928,17 @@ print("examination of generated SR image by using training samples complete")
 # =============================================================================
 for i, testing_data_2 in enumerate(testloader, 0):
     
-    LR_images_test, HR_images_test = testing_data_2
-    # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-    outputs = our_rdn_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+    
 # =============================================================================
 #     print(outputs.data.size())
 # =============================================================================
     
     if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
+        
+        LR_images_test, HR_images_test = testing_data_2
+        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        outputs = our_rdn_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+        
         #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
         SR_images_tensor_test = outputs.data.cpu().squeeze(1)
         # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
@@ -876,9 +950,9 @@ for i, testing_data_2 in enumerate(testloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR, HR and LR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
         
     
 #        for j in range(new_batch_size_for_checking):
