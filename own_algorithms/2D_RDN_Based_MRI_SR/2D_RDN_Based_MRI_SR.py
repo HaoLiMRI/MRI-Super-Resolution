@@ -246,7 +246,7 @@ the growth rate denotes as G for short.
 """
 
 """""""""""""""""""""""""""""""""""""""
-3. Define ResNeXt architecture part
+3. Define RDN architecture part
 """""""""""""""""""""""""""""""""""""""
 
 "calculate gradient map for any input image"
@@ -536,8 +536,6 @@ SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
 "Train the ResNeXt34"
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
 
-"Set training mode"
-our_rdn_mri_sr_2d.train()
 
 for epoch in range(EPOCH_NUM):
 # =============================================================================
