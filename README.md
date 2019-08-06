@@ -328,6 +328,15 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 
 
 
+
+**写作常见英文**
+1. SCI写作常用句式总结一(Introduction篇)
+
+	https://zhuanlan.zhihu.com/p/74664090
+
+
+
+
 **需要花时间阅读并且讨论总结的paper**
 1. 非常重要，非常好总结 https://medium.com/beyondminds/an-introduction-to-super-resolution-using-deep-learning-f60aff9a499d
 1. 2019. An overview of deep learning in medical imaging focusing on MRI https://www.sciencedirect.com/science/article/pii/S0939388918301181
