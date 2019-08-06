@@ -209,7 +209,12 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 
 -----
 ## 长期计划：
-1. 2D RDN MRI SR和2D DDBPN MRI SR
+1. 2D SR CNN各种网络
+	
+	参考这个ranking
+	 
+	https://paperswithcode.com/sota/image-super-resolution-on-set5-4x-upscaling
+	 
         阅读这几篇论文
 
         2017. Enhanced Deep Residual Networks for Single Image Super-Resolution
@@ -246,6 +251,21 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
                 PPON论文:https://arxiv.org/abs/1907.10399
                 
                 代码在这:https://github.com/chisyliu/PPON
+		
+	 	2018. Image Super-Resolution Using Very Deep Residual Channel Attention Networks
+		
+			RCAN论文:https://arxiv.org/pdf/1807.02758v2.pdf
+		
+			代码在这:https://github.com/chisyliu/RCAN
+		
+		2019. Feedback Network for Image Super-Resolution
+		
+			SRFBN论文:https://arxiv.org/abs/1903.09814
+		
+			代码在这:https://github.com/chisyliu/SRFBN_CVPR19
+		
+		
+		
                 
    这几个网络都可以直接用来做MRI SR重建(特别是第二个，实现起来应该比较简单)，不过应该是对LR和HR,SR的size不一样的场景的SR重建
    
