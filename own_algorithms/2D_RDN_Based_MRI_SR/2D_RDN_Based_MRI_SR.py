@@ -104,7 +104,6 @@ since = time.clock()
 
 
 batch_size = 32
-batch_size_test = 64
 EPOCH_NUM = 20
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
@@ -231,7 +230,7 @@ testset = tc.utils.data.TensorDataset(torch_data_low_resolution_test_sequence, t
 
 testloader = tc.utils.data.DataLoader(
                     testset, 
-                    batch_size = batch_size_test,
+                    batch_size = batch_size,
                     shuffle = True, 
                     num_workers = 0)
 
