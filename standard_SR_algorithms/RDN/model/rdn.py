@@ -169,7 +169,7 @@ class RDN(nn.Module):
         """
         implement the flow of Residual Dense Network as figure 2 of original RDN paper
         """
-        x = self.sub_mean(x)
+        x = self.sub_mean(x) # do NOT understand why need this, may NOT be useful for us
         f__1 = self.SFENet1(x)
         x  = self.SFENet2(f__1)
 
