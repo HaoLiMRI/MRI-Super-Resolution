@@ -151,7 +151,7 @@ import time
 import scipy.io
 from torchvision.models import vgg19
 
-import pytorch_msssim_l1
+import pytorch_ssim_l1
 from optimizer import lookahead
 
 "-------------------------------------------------------------------------------------------------"
@@ -652,7 +652,7 @@ loss_function_L1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
 print('The loss function is SSIM')
-SSIM_function = pytorch_msssim_l1.MSSSIM().to(device)       #----- ssim loss
+SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
 
 # =============================================================================
 # print('The loss function is L1Loss')
@@ -804,7 +804,9 @@ for epoch in range(EPOCH_NUM):
         if i == 10:
             LR_test, HR_test = testing_data
             # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-            SR_test = our_resnext(Variable(LR_test).type(tc.FloatTensor).to(device))
+            LR_test, HR_test = Variable(LR_test).type(tc.FloatTensor).to(device), Variable(HR_test).type(tc.FloatTensor).to(device)
+            
+            SR_test = our_resnext(LR_test)
             
             SR_test_copies = tc.cat((SR_test, SR_test, SR_test), 1)
             # print(SR_copies.size())
