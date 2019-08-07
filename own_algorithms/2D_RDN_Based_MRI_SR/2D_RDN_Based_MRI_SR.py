@@ -103,13 +103,12 @@ use_cuda = True #-- boolean to choose GPU
 since = time.clock()
 
 
-batch_size = 32
-EPOCH_NUM = 20
+batch_size = 16
+EPOCH_NUM = 15
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
 Use_Lookahead_Optimizer = False
 Maintain_Same_Size = True # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
-
 
 # --------------------------- configuration of parameters for RDN --------------------------- #
 args = {'RDN_architecture_config': 'B', 'scale': 2, 'G0': 64, 'RDNkSize': 3, 'n_colors': 1}
@@ -478,13 +477,12 @@ class RDN_MRI_SR_2D(nn.Module):
         return x
 
 
-        
 device=tc.device("cuda" if use_cuda else "cpu")
 our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
 if tc.cuda.device_count()>1:
     our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d)
 our_rdn_mri_sr_2d.to(device)
-
+   
 print('this is our RDN_MRI_SR_2D: ', our_rdn_mri_sr_2d)
 
 feature_extractor = FeatureExtractor().to(device)
@@ -535,7 +533,6 @@ SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
 """""""""""""""""""""""""""
 "Train the ResNeXt34"
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
-
 
 for epoch in range(EPOCH_NUM):
 # =============================================================================
@@ -674,7 +671,9 @@ for epoch in range(EPOCH_NUM):
         if i == 10:
             LR_test, HR_test = testing_data
             # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-            SR_test = our_rdn_mri_sr_2d(Variable(LR_test).type(tc.FloatTensor).to(device))
+            LR_test, HR_test = Variable(LR_test).type(tc.FloatTensor).to(device), Variable(HR_test).type(tc.FloatTensor).to(device)
+            
+            SR_test = our_rdn_mri_sr_2d(LR_test)
             
             SR_test_copies = tc.cat((SR_test, SR_test, SR_test), 1)
             # print(SR_copies.size())
@@ -720,7 +719,7 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test.txt', 'w')
+        f = open('result_RDN_l1_4ssim_gradient_laf_15_16_4folds_2d_test.txt', 'w')
     f.write('Training Loss:')
     f.write('\n')    
     f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
@@ -897,9 +896,9 @@ for i, training_data_2 in enumerate(trainloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR LR, HR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_15_16_4folds_2d_test/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_15_16_4folds_2d_test/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_15_16_4folds_2d_test/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
         
         
     
@@ -947,9 +946,9 @@ for i, testing_data_2 in enumerate(testloader, 0):
         # HR_images_test = HR_images_tensor.numpy()
         
         "save the .mat files for SR, HR and LR training images"
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
-        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_20_32_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_15_16_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_15_16_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
+        scipy.io.savemat('/home/HaoLi/SR/Results/result_RDN_l1_4ssim_gradient_laf_15_16_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
         
     
 #        for j in range(new_batch_size_for_checking):
