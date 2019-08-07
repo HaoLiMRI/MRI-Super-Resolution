@@ -109,7 +109,6 @@ SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
 Use_Lookahead_Optimizer = False
 Maintain_Same_Size = True # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
-Paralell_Training = True
 
 # --------------------------- configuration of parameters for RDN --------------------------- #
 args = {'RDN_architecture_config': 'B', 'scale': 2, 'G0': 64, 'RDNkSize': 3, 'n_colors': 1}
@@ -478,18 +477,11 @@ class RDN_MRI_SR_2D(nn.Module):
         return x
 
 if tc.cuda.device_count()>1:
-    if Paralell_Training:
-        device=tc.device("cuda" if use_cuda else "cpu")
-        our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
-        our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d)
-        our_rdn_mri_sr_2d.to(device)
-    else:
-        os.environ['CUDA_VISABLE_DEVICES'] = '1'
-        device=tc.device("cuda" if use_cuda else "cpu")
-        our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
-#        our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d,device_ids=[1],output_device=[1])
-        our_rdn_mri_sr_2d.to(device)
-    
+    device=tc.device("cuda" if use_cuda else "cpu")
+    our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
+    our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d)
+    our_rdn_mri_sr_2d.to(device)
+   
 print('this is our RDN_MRI_SR_2D: ', our_rdn_mri_sr_2d)
 
 feature_extractor = FeatureExtractor().to(device)
@@ -540,9 +532,6 @@ SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
 """""""""""""""""""""""""""
 "Train the ResNeXt34"
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
-
-"Set training mode"
-our_rdn_mri_sr_2d.train()
 
 for epoch in range(EPOCH_NUM):
 # =============================================================================
