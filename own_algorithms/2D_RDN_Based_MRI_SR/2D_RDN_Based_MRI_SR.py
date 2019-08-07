@@ -245,7 +245,7 @@ the growth rate denotes as G for short.
 """
 
 """""""""""""""""""""""""""""""""""""""
-3. Define ResNeXt architecture part
+3. Define RDN architecture part
 """""""""""""""""""""""""""""""""""""""
 
 "calculate gradient map for any input image"
