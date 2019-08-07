@@ -476,9 +476,10 @@ class RDN_MRI_SR_2D(nn.Module):
         """ x = self.add_mean(x) """
         return x
 
+
+device=tc.device("cuda" if use_cuda else "cpu")
+our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
 if tc.cuda.device_count()>1:
-    device=tc.device("cuda" if use_cuda else "cpu")
-    our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
     our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d)
     our_rdn_mri_sr_2d.to(device)
    
