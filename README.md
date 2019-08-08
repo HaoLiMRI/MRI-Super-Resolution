@@ -298,6 +298,8 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 		a. adopt a deeper model using Residual-in-Residual Dense Block (RRDB) without batch normalization layers.这个应该是指在generator内的修改
 		b. employ Relativistic average GAN instead of the vanilla GAN.这个应该是指在discriminator内的修改，使用了一种relativistic discriminator which uses relative probability than absolute probability。具体见这个文章 Relativistic GAN:https://ajolicoeur.wordpress.com/relativisticgan/
 		c. improve the perceptual loss by using the features before activation.
+		d. 这个文章提出了一种挺牛逼的想法。做一个PSNR导向的GAN模型和SR，再微调（怎么做？用什么数据微调？）得到一个GAN导向的GAN模型和SR，之后他们给了两种方案-1. 对两个网络的参数进行插值，得到一个新的模型的参数，用这个新的参数的模型来生成SR。2.对两个模型的SR进行插值，得到一个新SR。据他们说第一种方案好。 感觉我们可以参考这个思路，做两个网络一个PSNR+视觉导向，一个MRI细节（称之为fidelity）导向。但可能需要直接对两个生成SR进行插值生成一个新的SR。
+		
 		In contrast to SRGAN, which claimed that deeper models are increasingly difficult to train, our deeper ESRGAN model shows its superior performance with easy training.
         
 		original ESRGAN论文 https://arxiv.org/abs/1809.00219
