@@ -31,7 +31,7 @@
 	
 		减少网络的深度
 
-		减小batch size也可以一定程度防止overfitting。
+		减小batch size也可以一定程度防止overfitting。（原理详见下文，也可以看Goodfellow'的书中有说到: Small batches can oﬀer a regularizing eﬀect (Wilson and Martinez, 2003), perhaps due to the noise they add to the learning process. Generalization error is often best for a batch size of 1. Training with such a small batch size might require a small learning rate to maintain stability because of the high variance in the estimate of the gradient. The total runtime can be very high as a result of the need to make more steps, both because of the reduced learning rate and because it takes more steps to observe the entire training set.）
 		
 batch size和学习率如何影响网络的性能
 链接：https://www.zhihu.com/question/32673260/answer/675161450
