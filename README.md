@@ -296,6 +296,8 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 	
         original ESRGAN code is: https://github.com/chisyliu/ESRGAN
 	
+		ESRGAN作者的另一版code https://github.com/xinntao/BasicSR
+	
 	
 3. 3D U-ResNeXt MRI SR
 4. 3D 3DSRGAN(using U-ResNeXt) MRI SR
