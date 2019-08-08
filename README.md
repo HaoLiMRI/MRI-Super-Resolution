@@ -11,13 +11,7 @@
         
         已重新生成2D 1/4，1/6，1/8 LR图像。
 2. 解决过拟合
-        
-        现在已经在最后一层之后带dropout,可以调大dropout prob
-        
-        L2 regularization。但有论文说不应该只是weight decay实现L2 regularization，而应该改这个方式。https://arxiv.org/pdf/1711.05101.pdf
-	
-		early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss。之后需要在大概test data的loss不降却上升时候stop。
-        
+
         L1 regularization。好像需要手动加，见 https://zhuanlan.zhihu.com/p/69339955
         在PyTorch中还没有直接设置L1 范数的方法，可以在训练时Loss做BP之前（也就是.backward()之前）手动为Loss 加上L1范数：
 		# 为Loss添加L1正则化项
@@ -30,6 +24,12 @@
         多加几个dropout试下
 	
 		减少网络的深度
+		
+		现在已经在最后一层之后带dropout,可以调大dropout prob
+        
+        L2 regularization。但有论文说不应该只是weight decay实现L2 regularization，而应该改这个方式。https://arxiv.org/pdf/1711.05101.pdf
+	
+		early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss。之后需要在大概test data的loss不降却上升时候stop。
 
 		减小batch size也可以一定程度防止overfitting。（原理详见下文，也可以看Goodfellow'的书中有说到: Small batches can oﬀer a regularizing eﬀect (Wilson and Martinez, 2003), perhaps due to the noise they add to the learning process. Generalization error is often best for a batch size of 1. Training with such a small batch size might require a small learning rate to maintain stability because of the high variance in the estimate of the gradient. The total runtime can be very high as a result of the need to make more steps, both because of the reduced learning rate and because it takes more steps to observe the entire training set.）
 		
