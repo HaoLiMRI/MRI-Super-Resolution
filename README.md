@@ -291,6 +291,14 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 		https://github.com/chisyliu/srMRI_SRGAN-2
 	 
 3. 2D 2DESRGAN(using other feature extractor based generator, e.g. RDN, DDBPN, etc, to replace the generator proposed in original paper: "Residual-in-Residual Dense Block (RRDB) without batch normalization layers".) MRI SR
+
+		根据ESRGAN作者描写，
+		We improve the SRGAN from three aspects:
+		
+		a. adopt a deeper model using Residual-in-Residual Dense Block (RRDB) without batch normalization layers.这个应该是指在generator内的修改
+		b. employ Relativistic average GAN instead of the vanilla GAN.这个应该是指在discriminator内的修改，使用了一种relativistic discriminator which uses relative probability than absolute probability。具体见这个文章 Relativistic GAN:https://ajolicoeur.wordpress.com/relativisticgan/
+		c. improve the perceptual loss by using the features before activation.
+		In contrast to SRGAN, which claimed that deeper models are increasingly difficult to train, our deeper ESRGAN model shows its superior performance with easy training.
         
 		original ESRGAN论文 https://arxiv.org/abs/1809.00219
 	
