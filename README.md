@@ -30,12 +30,10 @@
         多加几个dropout试下
 	
 		减少网络的深度
-		
-		增大batch size从而减小每个epoch内iteration的次数
-		
+
 		减小batch size也可以一定程度防止overfitting。
 		
-
+batch size和学习率如何影响网络的性能
 链接：https://www.zhihu.com/question/32673260/answer/675161450
 来源：知乎
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
