@@ -307,6 +307,8 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
         original ESRGAN code is: https://github.com/chisyliu/ESRGAN
 	
 		ESRGAN作者的另一版code https://github.com/xinntao/BasicSR
+		
+		我们考虑设计的网络要做的任务应该包括，将ESRGAN, WGAN-GP, 以及DAGAN for MRI SR的网络的优势都集合在一块
 	
 	
 3. 3D U-ResNeXt MRI SR
