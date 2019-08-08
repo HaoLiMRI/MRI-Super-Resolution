@@ -192,11 +192,11 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 >> 论文下载 https://arxiv.org/abs/1907.11341
 >> Comment or Question: 这个好像生成了一个比HR更牛逼更高分辨率的SR图像?为啥可以这么牛逼
 
-- 2019. Hybrid Residual Attention Network for Single Image Super Resolution
+- Hybrid Residual Attention Network for Single Image Super Resolution
 >> 论文下载 https://arxiv.org/abs/1907.05514
 >> Comment or Question: channel attention. 注意这篇论文作对比用的网络都是感觉比较弱的网络模型来做reference
 
-- 2018. ECCV. Deep Residual Attention Network for Spectral Image Super-Resolution
+- ECCV. Deep Residual Attention Network for Spectral Image Super-Resolution
 >> 论文下载 http://openaccess.thecvf.com/content_ECCVW_2018/papers/11133/Shi_Deep_Residual_Attention_Network_for_Spectral_Image_Super-Resolution_ECCVW_2018_paper.pdf
 >> Comment or Question: channel attention. 注意这篇论文作对比用的网络都是感觉比较弱的网络模型来做reference
 
