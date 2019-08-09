@@ -28,7 +28,7 @@
 		现在已经在最后一层之后带dropout,可以调大dropout prob
         
         L2 regularization。但有论文说不应该只是weight decay实现L2 regularization，而应该改这个方式。https://arxiv.org/pdf/1711.05101.pdf
-	 已用weight decay = e-5
+	已用weight decay = e-5
 	
 		early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss。之后需要在大概test data的loss不降却上升时候stop。
 		已经设计了每次training完一个epoch后就用test data看一下对于test data的loss情况，与之前的test loss进行比较，并在test loss最低时保留当前网络且输出SR
