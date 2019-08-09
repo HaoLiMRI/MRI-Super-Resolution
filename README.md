@@ -161,7 +161,7 @@ batch size和学习率如何影响网络的性能
 
 22. MRI Segmentation. 好像主流应该就是用U-Net来做MRI segmentation (U-Net见 U-Net: Convolutional Networks for Biomedical Image Segmentation https://arxiv.org/abs/1505.04597). 根据jianan现在的理解，如果有标注好的训练数据，完全可以直接用RDN和DDBPN的网络结构直接做training来做segmentation。如何设计一个好的loss function可能是重点。
 
-23. 我们有没有可能这样做，参考ESRGAN论文内提到的网络参数插值的方案，对我们的CNN的MRI SR网络也做两种导向的loss。其一是PSNR导向的比如只有图像L1或者MSE的loss，另一种loss可以比如SSIM,gradient的L1 MSE的loss，训练俩sets网络参数，然后对参数插值得到一个新set参数，生成SR。感觉这个就是channel attention的类似思路，只是插值所用的具体比例人工给定而不是网络训练得出
+23. 我们有没有可能这样做，参考ESRGAN论文内提到的网络参数插值的方案，对我们的CNN的MRI SR网络也做两种导向的loss。其一是PSNR导向的比如只有图像L1或者MSE的loss，另一种loss可以比如SSIM,gradient的L1 MSE的loss，训练俩sets网络参数，然后对参数插值得到一个新set参数，生成SR。感觉这个就是channel attention的类似思路，只是插值所用的具体比例人工给定而不是网络训练得出。现在看到的情况是当把各种loss求和加在一块做总loss时，gradient L1 loss降不下去，也许当只将gradient L1 loss作为目标loss时候更容易降低
 
 24. 那么有没有可能训练一个网络，自动求出对不同导向loss function训练的网络进行插值时的比例的具体数
 
