@@ -28,10 +28,13 @@
 		现在已经在最后一层之后带dropout,可以调大dropout prob
         
         L2 regularization。但有论文说不应该只是weight decay实现L2 regularization，而应该改这个方式。https://arxiv.org/pdf/1711.05101.pdf
+	 已用weight decay = e-5
 	
 		early stop。监测test data的loss的趋势，每次training之后都看一下test data的loss。之后需要在大概test data的loss不降却上升时候stop。
+		已经设计了每次training完一个epoch后就用test data看一下对于test data的loss情况，与之前的test loss进行比较，并在test loss最低时保留当前网络且输出SR
 
 		减小batch size也可以一定程度防止overfitting。（原理详见下文，也可以看Goodfellow'的书中有说到: Small batches can oﬀer a regularizing eﬀect (Wilson and Martinez, 2003), perhaps due to the noise they add to the learning process. Generalization error is often best for a batch size of 1. Training with such a small batch size might require a small learning rate to maintain stability because of the high variance in the estimate of the gradient. The total runtime can be very high as a result of the need to make more steps, both because of the reduced learning rate and because it takes more steps to observe the entire training set.）
+		实验证明batch size为16时候防止overfitting效果不错
 		
 batch size和学习率如何影响网络的性能
 链接：https://www.zhihu.com/question/32673260/answer/675161450
@@ -148,7 +151,7 @@ batch size和学习率如何影响网络的性能
 
 18. 调通2D_DDBPN_Based_MRI_SR，使其可以生成变大size或者不变size的SR。
 
-18. 调通2D_RCAN_Based_MRI_SR，使其可以生成变大size或者不变size的SR。
+18. ~~调通2D_RCAN_Based_MRI_SR，使其可以生成变大size或者不变size的SR。~~
 
 19. 基于2D_RDN_Based_MRI_SR,2D_DDBPN_Based_MRI_SRh跟2D_RCAN_Based_MRI_SR，用一样的size的LR图像和HR图像训练，尝试各种loss等方案领其生成足够好SR图像。
 
@@ -158,7 +161,9 @@ batch size和学习率如何影响网络的性能
 
 22. MRI Segmentation. 好像主流应该就是用U-Net来做MRI segmentation (U-Net见 U-Net: Convolutional Networks for Biomedical Image Segmentation https://arxiv.org/abs/1505.04597). 根据jianan现在的理解，如果有标注好的训练数据，完全可以直接用RDN和DDBPN的网络结构直接做training来做segmentation。如何设计一个好的loss function可能是重点。
 
-23. 我们有没有可能这样做，参考ESRGAN论文内提到的网络参数插值的方案，对我们的CNN的MRI SR网络也做两种导向的loss。其一是PSNR导向的比如只有图像L1或者L2的loss，另一种loss可以比如SSIM,gradient的L1的loss，训练俩sets网络参数，然后对参数插值得到一个新set参数，生成SR
+23. 我们有没有可能这样做，参考ESRGAN论文内提到的网络参数插值的方案，对我们的CNN的MRI SR网络也做两种导向的loss。其一是PSNR导向的比如只有图像L1或者MSE的loss，另一种loss可以比如SSIM,gradient的L1 MSE的loss，训练俩sets网络参数，然后对参数插值得到一个新set参数，生成SR。感觉这个就是channel attention的类似思路，只是插值所用的具体比例人工给定而不是网络训练得出
+
+24. 那么有没有可能训练一个网络，自动求出对不同导向loss function训练的网络进行插值时的比例的具体数
 
 
 
