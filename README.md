@@ -158,6 +158,8 @@ batch size和学习率如何影响网络的性能
 
 22. MRI Segmentation. 好像主流应该就是用U-Net来做MRI segmentation (U-Net见 U-Net: Convolutional Networks for Biomedical Image Segmentation https://arxiv.org/abs/1505.04597). 根据jianan现在的理解，如果有标注好的训练数据，完全可以直接用RDN和DDBPN的网络结构直接做training来做segmentation。如何设计一个好的loss function可能是重点。
 
+23. 我们有没有可能这样做，参考ESRGAN论文内提到的网络参数插值的方案，对我们的CNN的MRI SR网络也做两种导向的loss。其一是PSNR导向的比如只有图像L1或者L2的loss，另一种loss可以比如SSIM,gradient的L1的loss，训练俩sets网络参数，然后对参数插值得到一个新set参数，生成SR
+
 
 
 -----
