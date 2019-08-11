@@ -489,8 +489,8 @@ class RCAN_MRI_SR_2D(nn.Module):
         res = self.body(x) # data goes through RIR(Residual in Residual)
         res += x # long skip connection of RIR
         if (Maintain_Same_Size == True):
-            x = self.down_size_converter(res) # extra down_size_converter is needed to shtik size of image scale times if we expect same size as input LR for SR output
-        x = self.tail(x) # data goes through upsampling module and one more conv layer
+            res = self.down_size_converter(res) # extra down_size_converter is needed to shtik size of image scale times if we expect same size as input LR for SR output
+        x = self.tail(res) # data goes through upsampling module and one more conv layer
         # do NOT understand why need this, may NOT be useful for us
         """ x = self.add_mean(x) """
 
