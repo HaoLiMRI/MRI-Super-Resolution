@@ -162,7 +162,7 @@ use_cuda = True #-- boolean to choose GPU
 since = time.clock()
 
 
-batch_size = 32
+batch_size = 16
 EPOCH_NUM = 150
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
@@ -186,7 +186,7 @@ num_high_resolution_groundtruth_mat_file = 0
 
 for idx_file in file_names:
     print(idx_file)
-    if 'LR' in os.path.join(folder_log_path, idx_file):
+    if 'LR_training' in os.path.join(folder_log_path, idx_file):
         print('One more low resolution image set exist')
         num_low_resolution_mat_file = num_low_resolution_mat_file + 1
         print(os.path.join(folder_log_path, idx_file))
@@ -210,7 +210,7 @@ for idx_file in file_names:
             print(num_low_resolution_mat_file)
             torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
         print(np.shape(torch_data_low_resolution_sequence))
-    elif 'HRGT' in os.path.join(folder_log_path, idx_file):
+    elif 'HRGT_training' in os.path.join(folder_log_path, idx_file):
         print('One more high resolution groundtruth image set exist')
         num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
         print(os.path.join(folder_log_path, idx_file))
@@ -247,17 +247,17 @@ print(np.shape(torch_data_high_resolution_groundtruth_sequence))
 
 
 num_training_samples = math.floor(torch_data_low_resolution_sequence.size(0)*0.8)
-print(num_training_samples)
-torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
-torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
-print(np.shape(torch_data_low_resolution_training_sequence))
-print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
+#print(num_training_samples)
+#torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
+#torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
+#print(np.shape(torch_data_low_resolution_training_sequence))
+#print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
 
 
-torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
-torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
-print(np.shape(torch_data_low_resolution_test_sequence))
-print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
+#torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
+#torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
+#print(np.shape(torch_data_low_resolution_test_sequence))
+#print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
 
         
 print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
@@ -265,8 +265,8 @@ print('All mat files have been concatenated into one tensor for each type, data 
 """""""""""""""""""""""""""""""""""""""""""""
 2. Load MRI HR and LR Data pair part
 """""""""""""""""""""""""""""""""""""""""""""
-torch_data_low_resolution_training_sequence = torch_data_low_resolution_training_sequence.float()
-torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_training_sequence.float()
+torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence.float()
+torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence.float()
 
 trainset = tc.utils.data.TensorDataset(torch_data_low_resolution_training_sequence, torch_data_high_resolution_groundtruth_training_sequence)
 
@@ -278,13 +278,13 @@ trainloader = tc.utils.data.DataLoader(
 
 
 
-testset = tc.utils.data.TensorDataset(torch_data_low_resolution_test_sequence, torch_data_high_resolution_groundtruth_test_sequence)
+#testset = tc.utils.data.TensorDataset(torch_data_low_resolution_test_sequence, torch_data_high_resolution_groundtruth_test_sequence)
 
-testloader = tc.utils.data.DataLoader(
-                    testset, 
-                    batch_size = batch_size,
-                    shuffle = True, 
-                    num_workers = 0)
+#testloader = tc.utils.data.DataLoader(
+#                    testset, 
+#                    batch_size = batch_size,
+#                    shuffle = True, 
+#                    num_workers = 0)
 
 
 
@@ -683,187 +683,182 @@ for epoch in range(EPOCH_NUM):
         scheduler.step()
     
     running_loss = 0.0
+    
+    batch_number = 0
+    feature_map_loss_test = 0
+    pixel_wise_loss_test = 0
+    k_space_freq_loss_test = 0
+    ssim_loss_test = 0
+    gradient_map_loss_test = 0
+    test_loss_history = [0]
+    
     for i, data in enumerate(trainloader, 0):
 # =============================================================================
 #         print('This is the ', i, ' batch for the ', epoch, ' epoch' )
 # =============================================================================
-        
         "load input data"
         inputs, labels = data
         inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
         # print('The data have been loaded' )
+        if i<num_training_samples*0.95/batch_size:
+            
+            "clear all stored gradients if there exist"
+            optimizer.zero_grad()
+            # print('The optimizer has been cleared' )
+            
+            "forward prop"
+            # outputs = our_resnext(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
+            outputs = our_resnext(inputs) #-- or using default float as type, however remember to cast the input from Double to Float
+            # print(outputs.size())
+            # print('the forward pass has been went')
+            
+            SR_copies = tc.cat((outputs, outputs, outputs), 1)
+            # print(SR_copies.size())
+            SR_features = feature_extractor(SR_copies)
+            # print(SR_features.size())
+                    
+            HR_copies = tc.cat((labels, labels, labels), 1)
+            # print(HR_copies.size())
+            HR_features = feature_extractor(HR_copies)
+            # print(HR_features.size())
+            
+            SR_freq = fft_k_space(outputs)
+            
+            HR_freq = fft_k_space(labels)
         
-        "clear all stored gradients if there exist"
-        optimizer.zero_grad()
-        # print('The optimizer has been cleared' )
         
-        "forward prop"
-        # outputs = our_resnext(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
-        outputs = our_resnext(inputs) #-- or using default float as type, however remember to cast the input from Double to Float
-        # print(outputs.size())
-        # print('the forward pass has been went')
+            "calculate the gradients for all Variables during back prop"
+            "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
+            feature_map_loss = 0.01*loss_function_MSE(SR_features, HR_features)
+            # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
+#            print("feature_map_loss: ", feature_map_loss)
+        
+            # pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
+            pixel_wise_loss = 100*loss_function_L1(outputs, labels)
+#            print("pixel_wise_loss: ", pixel_wise_loss)
 
+            k_space_freq_loss = 0.01*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+#            print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
+#            print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+#            print("k_space_freq_loss: ", k_space_freq_loss)
+
+            ssim_loss = loss_function_L1(SSIM_function(labels,labels),SSIM_function(outputs, labels))
+#            print("ssim_loss: ", ssim_loss)
+
+            gradient_map_loss = 100*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
+#            print('gradient_loss: ', gradient_map_loss)
+        
+#            loss = pixel_wise_loss + ssim_loss
+            loss = pixel_wise_loss + feature_map_loss
+        
+#            if ssim_loss < 0.5:
+#                loss = ssim_loss + feature_map_loss + pixel_wise_loss
+#                print('ssim_loss')
+#            else:
+#                loss = pixel_wise_loss + feature_map_loss
+            
+            if tc.isnan(k_space_freq_loss) != 1:
+                loss = loss + k_space_freq_loss
+        
+            if tc.isnan(ssim_loss) != 1:
+                loss = loss + ssim_loss
+
+            if tc.isnan(gradient_map_loss) != 1:
+                loss = loss + gradient_map_loss
+        
+#            print('loss: ', loss)
+#            loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
+            # print('the loss has been checked')
 
         
-        SR_copies = tc.cat((outputs, outputs, outputs), 1)
-        # print(SR_copies.size())
-        SR_features = feature_extractor(SR_copies)
-        # print(SR_features.size())
+            "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"
+#            if tc.isnan(loss) == 1: #- loss == 'NaN':
+#                break
+            "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"
+            
+        
+            "back prop"
+            loss.backward()
+            # print('the backward pass has been went')
+        
+            "update all Variables by using newly fetched gradients"
+            optimizer.step()
+            # print('the all Variables have been updated')
+        
+            "print log info"
+            running_loss += loss.data
+            if i % 50 == 0: #----- print log info every 1000 batch
+                if i == 0:
+                    print('[%d, %5d] loss: %.3f' \
+                          % (epoch+1, i+1, running_loss))
+                else:
+                    print('[%d, %5d] loss: %.3f' \
+                          % (epoch+1, i+1, running_loss / 50))
+            
+                training_loss_for_current_epoch = running_loss / 50
+                feature_map_loss_for_current_epoch = feature_map_loss
+                pixel_wise_loss_for_current_epoch = pixel_wise_loss
+                ssim_loss_for_current_epoch = ssim_loss
+                gradient_map_loss_for_current_epoch = gradient_map_loss
+                k_space_freq_loss_for_current_epoch = k_space_freq_loss
+            
+                running_loss = 0.0
+        else:        
+            with tc.no_grad():
+                "Set evaluation Mode"    
+                our_resnext.eval()
                 
-        HR_copies = tc.cat((labels, labels, labels), 1)
-        # print(HR_copies.size())
-        HR_features = feature_extractor(HR_copies)
-        # print(HR_features.size())
-        
-        
-        
-        SR_freq = fft_k_space(outputs)
-        
-        HR_freq = fft_k_space(labels)
-        
-        
-        "calculate the gradients for all Variables during back prop"
-        "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
-        feature_map_loss = 0.01*loss_function_MSE(SR_features, HR_features)
-        # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
-#        print("feature_map_loss: ", feature_map_loss)
-        # pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
-        pixel_wise_loss = 100*loss_function_L1(outputs, labels)
-        
-#        print("pixel_wise_loss: ", pixel_wise_loss)
-        k_space_freq_loss = 0.01*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-#        print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
-#        print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-#        print("k_space_freq_loss: ", k_space_freq_loss)
-#        ssim_loss = 1-SSIM_function(outputs, labels)
-        ssim_loss = loss_function_L1(SSIM_function(labels,labels),SSIM_function(outputs, labels))
-#        print("ssim_loss: ", ssim_loss)
-
-        gradient_map_loss = 100*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
-#        print('gradient_loss: ', gradient_map_loss)
-        
-#        loss = pixel_wise_loss + ssim_loss
-        loss = pixel_wise_loss + feature_map_loss
-        
-#        if ssim_loss < 0.5:
-#            loss = ssim_loss + feature_map_loss + pixel_wise_loss
-#            print('ssim_loss')
-#        else:
-#            loss = pixel_wise_loss + feature_map_loss
-            
-        if tc.isnan(k_space_freq_loss) != 1:
-            loss = loss + k_space_freq_loss
-        
-        if tc.isnan(ssim_loss) != 1:
-            loss = loss + ssim_loss
-
-        if tc.isnan(gradient_map_loss) != 1:
-            loss = loss + gradient_map_loss
-        
-#        print('loss: ', loss)
-#        loss = feature_map_loss + pixel_wise_loss + k_space_freq_loss
-        # print('the loss has been checked')
-
-        
-        "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"
-#        if tc.isnan(loss) == 1: #- loss == 'NaN':
-#            break
-        "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"
-            
-        
-        "back prop"
-        loss.backward()
-        # print('the backward pass has been went')
-        
-        "update all Variables by using newly fetched gradients"
-        optimizer.step()
-        # print('the all Variables have been updated')
-        
-        "print log info"
-        running_loss += loss.data
-        if i % 50 == 0: #----- print log info every 1000 batch
-            if i == 0:
-                print('[%d, %5d] loss: %.3f' \
-                  % (epoch+1, i+1, running_loss))
-            else:
-                print('[%d, %5d] loss: %.3f' \
-                  % (epoch+1, i+1, running_loss / 50))
-            
-            training_loss_for_current_epoch = running_loss / 50
-            feature_map_loss_for_current_epoch = feature_map_loss
-            pixel_wise_loss_for_current_epoch = pixel_wise_loss
-            ssim_loss_for_current_epoch = ssim_loss
-            gradient_map_loss_for_current_epoch = gradient_map_loss
-            k_space_freq_loss_for_current_epoch = k_space_freq_loss
-            
-            running_loss = 0.0
-    with tc.no_grad():            
-        "Set evaluation Mode"    
-        our_resnext.eval()
-        batch_number = 0
-        feature_map_loss_test = 0
-        pixel_wise_loss_test = 0
-        k_space_freq_loss_test = 0
-        ssim_loss_test = 0
-        gradient_map_loss_test = 0
-        for i, testing_data in enumerate(testloader, 0):
-        
-            if i%5 == 0:
                 batch_number += 1
-                LR_test, HR_test = testing_data
-                # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-                LR_test, HR_test = Variable(LR_test).type(tc.FloatTensor).to(device), Variable(HR_test).type(tc.FloatTensor).to(device)
-                
-                SR_test = our_resnext(LR_test)
+                                
+                SR_test = our_resnext(inputs)
                 
                 SR_test_copies = tc.cat((SR_test, SR_test, SR_test), 1)
                 # print(SR_copies.size())
                 SR_test_features = feature_extractor(SR_test_copies)
                 # print(SR_features.size())
-                    
-                HR_test_copies = tc.cat((HR_test, HR_test, HR_test), 1)
+                
+                HR_test_copies = tc.cat((labels, labels, labels), 1)
                 # print(HR_copies.size())
                 HR_test_features = feature_extractor(HR_test_copies)
                 # print(HR_features.size())
-        
+            
                 SR_test_freq = fft_k_space(SR_test)
             
-                HR_test_freq = fft_k_space(HR_test)
-        
-        
+                HR_test_freq = fft_k_space(labels)
+            
+            
                 "calculate the gradients for all Variables during back prop"
                 "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
                 feature_map_loss_test += 0.01*loss_function_MSE(SR_test_features, HR_test_features)
-#                print("feature_map_loss_test: ", feature_map_loss_test)
-            
-                pixel_wise_loss_test += 100*loss_function_L1(SR_test, HR_test)
+#               print("feature_map_loss_test: ", feature_map_loss_test)
+                
+                pixel_wise_loss_test += 100*loss_function_L1(SR_test, labels)
 #                print("pixel_wise_loss_test: ", pixel_wise_loss_test)
-            
+                
                 k_space_freq_loss_test += 0.01*(loss_function_MSE(SR_test_freq[:,:,:,:,0], HR_test_freq[:,:,:,:,0])+loss_function_MSE(SR_test_freq[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))
 #                print("k_space_freq_loss_test: ", k_space_freq_loss_test)
-            
-                ssim_loss_test += loss_function_L1(SSIM_function(HR_test,HR_test),SSIM_function(SR_test, HR_test))
+                
+                ssim_loss_test += loss_function_L1(SSIM_function(labels,labels),SSIM_function(SR_test, labels))
 #                print("ssim_loss_test: ", ssim_loss_test)
                 
-                gradient_map_loss_test += 100*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(HR_test))
+                gradient_map_loss_test += 100*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
 #                print('gradient_loss_test: ', gradient_map_loss_test)
-        
+                
                 loss_test = pixel_wise_loss_test + feature_map_loss_test + k_space_freq_loss_test + ssim_loss_test + gradient_map_loss_test
 #                print('loss_test: ', loss_test)
-        
-        feature_map_loss_test = feature_map_loss_test/batch_number
-        print("feature_map_loss_test: ", feature_map_loss_test)
-        pixel_wise_loss_test = pixel_wise_loss_test/batch_number
-        print("pixel_wise_loss_test: ", pixel_wise_loss_test)
-        k_space_freq_loss_test = k_space_freq_loss_test/batch_number
-        print("k_space_freq_loss_test: ", k_space_freq_loss_test)
-        ssim_loss_test = ssim_loss_test/batch_number
-        print("ssim_loss_test: ", ssim_loss_test)
-        gradient_map_loss_test = gradient_map_loss_test/batch_number
-        print('gradient_loss_test: ', gradient_map_loss_test)
-        loss_test = loss_test/batch_number
-        print('loss_test: ', loss_test)
-
+                
+    feature_map_loss_test = feature_map_loss_test/batch_number
+    print("feature_map_loss_test: ", feature_map_loss_test)
+    pixel_wise_loss_test = pixel_wise_loss_test/batch_number
+    print("pixel_wise_loss_test: ", pixel_wise_loss_test)
+    k_space_freq_loss_test = k_space_freq_loss_test/batch_number
+    print("k_space_freq_loss_test: ", k_space_freq_loss_test)
+    ssim_loss_test = ssim_loss_test/batch_number
+    print("ssim_loss_test: ", ssim_loss_test)
+    gradient_map_loss_test = gradient_map_loss_test/batch_number
+    print('gradient_loss_test: ', gradient_map_loss_test)
+    loss_test = loss_test/batch_number
+    print('loss_test: ', loss_test)
 
     "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"    
 #    if tc.isnan(loss) == 1: #- loss == 'NaN':
@@ -873,7 +868,7 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test.txt', 'w')
+        f = open('result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_16_4folds_2d_test.txt', 'w')
     f.write('Training Loss:')
     f.write('\n')    
     f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
@@ -910,6 +905,197 @@ for epoch in range(EPOCH_NUM):
         f.close()
             
 print("training complete")
+
+
+
+
+
+
+"Evaluation"
+folder_log_path = '/home/HaoLi/SR/Data/'
+file_names = os.listdir(folder_log_path)
+
+num_low_resolution_mat_file = 0
+num_high_resolution_groundtruth_mat_file = 0
+
+for idx_file in file_names:
+    print(idx_file)
+    if 'LR_eval' in os.path.join(folder_log_path, idx_file):
+        print('One more low resolution image set exist')
+        num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+        print(os.path.join(folder_log_path, idx_file))
+        file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+        data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
+        print(np.shape(data_low_resolution))
+        torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+        torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
+        print(np.shape(torch_data_low_resolution))
+        if num_low_resolution_mat_file == 1:
+            torch_data_low_resolution_sequence = torch_data_low_resolution
+        elif num_low_resolution_mat_file > 1:
+            print(num_low_resolution_mat_file)
+            torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+        print(np.shape(torch_data_low_resolution_sequence))
+    elif 'HRGT_eval' in os.path.join(folder_log_path, idx_file):
+        print('One more high resolution groundtruth image set exist')
+        num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+        print(os.path.join(folder_log_path, idx_file))
+        file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+        data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
+        print(np.shape(data_high_resolution_groundtruth))
+        torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+        torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
+        print(np.shape(torch_data_high_resolution_groundtruth))
+        if num_high_resolution_groundtruth_mat_file == 1:
+            torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+        if num_high_resolution_groundtruth_mat_file > 1:
+            print(num_high_resolution_groundtruth_mat_file)
+            torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+        print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+    else:
+        print('other type NOT support for now')
+        
+torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
+print(np.shape(torch_data_low_resolution_sequence))
+torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
+print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+        
+torch_data_low_resolution_eval_sequence = torch_data_low_resolution_sequence.float()
+torch_data_high_resolution_groundtruth_eval_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+
+testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_high_resolution_groundtruth_eval_sequence)
+
+new_batch_size_for_checking = 16
+
+testloader = tc.utils.data.DataLoader(
+                    testset, 
+                    batch_size = batch_size,
+                    shuffle = False, 
+                    num_workers = 0)        
+
+
+"Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
+trainloader = tc.utils.data.DataLoader(
+                    trainset, 
+                    batch_size = new_batch_size_for_checking,
+                    shuffle = True, 
+                    num_workers = 0)
+
+with tc.no_grad():
+    our_resnext.eval()
+    "exam the generated SR MRI image by using training LR image data and save them"
+    # =============================================================================
+    # for data in testloader:
+    # =============================================================================
+    for i, training_data_2 in enumerate(trainloader, 0):
+        
+        #    LR_images_training, HR_images_training = training_data_2
+        
+        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        #    outputs = our_rcan_mri_sr_2d(Variable(LR_images_training).type(tc.FloatTensor).to(device))
+        # =============================================================================
+        #     print(outputs.data.size())
+        # =============================================================================
+        
+        if (i == math.floor((torch_data_low_resolution_training_sequence.size(0)/new_batch_size_for_checking)/2)): 
+            
+            LR_images_training, HR_images_training = training_data_2
+            # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+            outputs = our_resnext(Variable(LR_images_training).type(tc.FloatTensor).to(device))
+        
+            #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
+            SR_images_tensor_training = outputs.data.cpu().squeeze(1)
+            # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
+            # =============================================================================
+            #         print(SR_images_tensor.size())
+            # =============================================================================
+            # print(HR_images_tensor.size())    
+            SR_images_exam_train = SR_images_tensor_training.numpy()
+            # HR_images_test = HR_images_tensor.numpy()
+        
+            "save the .mat files for SR LR, HR training images"
+            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_16_4folds_2d_test/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_16_4folds_2d_test/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_16_4folds_2d_test/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+            
+            
+            
+        #        for j in range(new_batch_size_for_checking):
+        #            plt.imshow(SR_images_exam_train[j, :, :])
+        #            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_SR_image.png')
+        #            plt.show()
+        #            plt.imshow(HR_images_training[j, 0, :, :])
+        #            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_HR_image.png')
+        #            plt.show()
+        #            plt.imshow(LR_images_training[j, 0, :, :])
+        #            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_LR_image.png')
+        #            plt.show()
+            
+    print("examination of generated SR image by using training samples complete")
+
+
+
+
+    "predict the SR MRI image by using testing LR image data and save them"
+    # =============================================================================
+    # for data in testloader:
+    # =============================================================================
+    for i, testing_data_2 in enumerate(testloader, 0):
+        
+        #    LR_images_test, HR_images_test = testing_data_2
+        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        #    outputs = our_rcan_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+        # =============================================================================
+        #     print(outputs.data.size())
+        # =============================================================================
+        
+#        if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
+            
+        LR_images_test, HR_images_test = testing_data_2
+        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        outputs = our_resnext(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+            
+        #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
+        SR_images_tensor_test = outputs.data.cpu().squeeze(1)
+        # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
+        # =============================================================================
+        #         print(SR_images_tensor.size())
+        # =============================================================================
+        # print(HR_images_tensor.size())    
+        SR_images_test = SR_images_tensor_test.numpy()
+        # HR_images_test = HR_images_tensor.numpy()
+        if i==0:
+            SR_eval = SR_images_test
+        else:
+            SR_eval = tc.cat((SR_eval, SR_images_test), 0)
+
+    "save the .mat files for SR, HR and LR training images"
+    scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_16_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_eval})
+    scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_16_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
+    scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_16_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+        
+    
+    #        for j in range(new_batch_size_for_checking):
+    #            plt.imshow(SR_images_test[j, :, :])
+    #            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_SR_image.png')
+    #            plt.show()            
+    #            plt.imshow(HR_images_test[j, 0, :, :])
+    #            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_HR_image.png')
+    #            plt.show()            
+    #            plt.imshow(LR_images_test[j, 0, :, :])
+    #            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_LR_image.png')
+    #            plt.show()            
+    
+    print("the predicting of generated SR image by using testing samples complete")
+
+
+
+
+
+
+
 
 
 
@@ -1001,29 +1187,29 @@ print("training complete")
 
 
 
-with tc.no_grad():
-    "Set evaluation mode"
-    our_resnext.eval()
-    "Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
-    new_batch_size_for_checking = 16
-    trainloader = tc.utils.data.DataLoader(
-                        trainset, 
-                        batch_size = new_batch_size_for_checking,
-                        shuffle = True, 
-                        num_workers = 0)
+#with tc.no_grad():
+#    "Set evaluation mode"
+#    our_resnext.eval()
+#    "Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
+#    new_batch_size_for_checking = 16
+#    trainloader = tc.utils.data.DataLoader(
+#                        trainset, 
+#                        batch_size = new_batch_size_for_checking,
+#                        shuffle = True, 
+#                        num_workers = 0)
 
-    testloader = tc.utils.data.DataLoader(
-                        testset, 
-                        batch_size = new_batch_size_for_checking,
-                        shuffle = True, 
-                        num_workers = 0)
+#    testloader = tc.utils.data.DataLoader(
+#                        testset, 
+#                        batch_size = new_batch_size_for_checking,
+#                        shuffle = True, 
+#                        num_workers = 0)
 
 
-    "exam the generated SR MRI image by using training LR image data and save them"
+#    "exam the generated SR MRI image by using training LR image data and save them"
     # =============================================================================
     # for data in testloader:
     # =============================================================================
-    for i, training_data_2 in enumerate(trainloader, 0):
+#    for i, training_data_2 in enumerate(trainloader, 0):
     
         #    LR_images_training, HR_images_training = training_data_2
     
@@ -1033,26 +1219,26 @@ with tc.no_grad():
         #     print(outputs.data.size())
         # =============================================================================
     
-        if (i == math.floor((torch_data_low_resolution_training_sequence.size(0)/new_batch_size_for_checking)/2)): 
+#        if (i == math.floor((torch_data_low_resolution_training_sequence.size(0)/new_batch_size_for_checking)/2)): 
         
-            LR_images_training, HR_images_training = training_data_2
+#            LR_images_training, HR_images_training = training_data_2
             # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-            outputs = our_resnext(Variable(LR_images_training).type(tc.FloatTensor).to(device))
+#            outputs = our_resnext(Variable(LR_images_training).type(tc.FloatTensor).to(device))
         
             #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
-            SR_images_tensor_training = outputs.data.cpu().squeeze(1)
+#            SR_images_tensor_training = outputs.data.cpu().squeeze(1)
             # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
             # =============================================================================
             #         print(SR_images_tensor.size())
             # =============================================================================
             # print(HR_images_tensor.size())    
-            SR_images_exam_train = SR_images_tensor_training.numpy()
+#            SR_images_exam_train = SR_images_tensor_training.numpy()
             # HR_images_test = HR_images_tensor.numpy()
         
-            "save the .mat files for SR LR, HR training images"
-            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+#            "save the .mat files for SR LR, HR training images"
+#            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_200_32_4folds_2d_test/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+#            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_200_32_4folds_2d_test/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+#            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_200_32_4folds_2d_test/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
         
         
     
@@ -1067,16 +1253,16 @@ with tc.no_grad():
 #            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_LR_image.png')
 #            plt.show()
 
-    print("examination of generated SR image by using training samples complete")
+#    print("examination of generated SR image by using training samples complete")
     
 
 
 
-    "predict the SR MRI image by using testing LR image data and save them"
+#    "predict the SR MRI image by using testing LR image data and save them"
     # =============================================================================
     # for data in testloader:
     # =============================================================================
-    for i, testing_data_2 in enumerate(testloader, 0):
+#    for i, testing_data_2 in enumerate(testloader, 0):
     
         #    LR_images_test, HR_images_test = testing_data_2
         # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
@@ -1085,26 +1271,26 @@ with tc.no_grad():
         #     print(outputs.data.size())
         # =============================================================================
     
-        if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
+#        if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
             
-            LR_images_test, HR_images_test = testing_data_2
+#            LR_images_test, HR_images_test = testing_data_2
             # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-            outputs = our_resnext(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+#            outputs = our_resnext(Variable(LR_images_test).type(tc.FloatTensor).to(device))
         
             #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
-            SR_images_tensor_test = outputs.data.cpu().squeeze(1)
+#            SR_images_tensor_test = outputs.data.cpu().squeeze(1)
             # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
             # =============================================================================
             #         print(SR_images_tensor.size())
             # =============================================================================
             # print(HR_images_tensor.size())    
-            SR_images_test = SR_images_tensor_test.numpy()
+#            SR_images_test = SR_images_tensor_test.numpy()
             # HR_images_test = HR_images_tensor.numpy()
         
-            "save the .mat files for SR, HR and LR training images"
-            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
-            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_150_32_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+#            "save the .mat files for SR, HR and LR training images"
+#            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_200_32_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+#            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_200_32_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
+#            scipy.io.savemat('/home/HaoLi/SR/Results/result_UResNeXt_l1_4ssim_gradient_bnf_tcf_laf_200_32_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
         
     
 #        for j in range(new_batch_size_for_checking):
@@ -1118,7 +1304,7 @@ with tc.no_grad():
 #            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_LR_image.png')
 #            plt.show()            
 
-    print("the predicting of generated SR image by using testing samples complete")
+#    print("the predicting of generated SR image by using testing samples complete")
 
 
 
