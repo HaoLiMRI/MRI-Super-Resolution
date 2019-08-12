@@ -127,7 +127,7 @@ args = {'RDN_architecture_config': 'B', 'scale': 2, 'G0': 64, 'RDNkSize': 3, 'n_
 # h5py.version
 # =============================================================================
 
-"Note folder log path is changed for 2D_Gated_Dilated_ResNeXt_Based_MRI_SR_v2"
+"Note folder log path is changed for 2D_RDN_Based_MRI_SR_v2"
 folder_log_path = '/home/HaoLi/SR/Data/'
 file_names = os.listdir(folder_log_path)
 
@@ -246,7 +246,7 @@ the growth rate denotes as G for short.
 """
 
 """""""""""""""""""""""""""""""""""""""
-3. Define ResNeXt architecture part
+3. Define RDN architecture part
 """""""""""""""""""""""""""""""""""""""
 
 "calculate gradient map for any input image"
@@ -476,19 +476,13 @@ class RDN_MRI_SR_2D(nn.Module):
         # do NOT understand why need this, may NOT be useful for us
         """ x = self.add_mean(x) """
         return x
-
+    
+device=tc.device("cuda" if use_cuda else "cpu")
+our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
 if tc.cuda.device_count()>1:
-    if Paralell_Training:
-        device=tc.device("cuda" if use_cuda else "cpu")
-        our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
-        our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d)
-        our_rdn_mri_sr_2d.to(device)
-    else:
-        os.environ['CUDA_VISABLE_DEVICES'] = '1'
-        device=tc.device("cuda" if use_cuda else "cpu")
-        our_rdn_mri_sr_2d = RDN_MRI_SR_2D(args)
-#        our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d,device_ids=[1],output_device=[1])
-        our_rdn_mri_sr_2d.to(device)
+    our_rdn_mri_sr_2d=nn.DataParallel(our_rdn_mri_sr_2d)
+our_rdn_mri_sr_2d.to(device)
+
     
 print('this is our RDN_MRI_SR_2D: ', our_rdn_mri_sr_2d)
 
@@ -507,7 +501,7 @@ if (Use_Lookahead_Optimizer):
     base_opt = opt.Adam(our_rdn_mri_sr_2d.parameters(), lr=1e-3, betas=(0.9, 0.999)) #----- use Adam algorithm as based optimizer A
     optimizer = lookahead.Lookahead(base_opt, k=5, alpha=0.5) # Initialize Lookahead
 else:
-    # optimizer = opt.SGD(our_resnext.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
+    # optimizer = opt.SGD(our_rdn_mri_sr_2d.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
     optimizer = opt.Adam(our_rdn_mri_sr_2d.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-5)    #----- use Adam algorithm for all parameters of our_classifier
     scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100], gamma=0.1)
 
@@ -538,7 +532,7 @@ SSIM_function = pytorch_ssim_l1.SSIM().to(device)       #----- ssim loss
 """""""""""""""""""""""""""
 5. Train the RDN part
 """""""""""""""""""""""""""
-"Train the ResNeXt34"
+"Train the RDN"
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
 
 for epoch in range(EPOCH_NUM):
@@ -571,7 +565,7 @@ for epoch in range(EPOCH_NUM):
         # print('The optimizer has been cleared' )
         
         "forward prop"
-        # outputs = our_resnext(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
+        # outputs = our_rdn_mri_sr_2d(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
         outputs = our_rdn_mri_sr_2d(inputs) #-- or using default float as type, however remember to cast the input from Double to Float
         # print(outputs.size())
         # print('the forward pass has been went')
@@ -686,7 +680,7 @@ for epoch in range(EPOCH_NUM):
         test_loss_history = [0]
         for i, testing_data in enumerate(testloader, 0):
             
-            if i%10 == 0:
+            if i%3 == 0:
                 batch_number += 1
                 LR_test, HR_test = testing_data
                 # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
@@ -809,7 +803,7 @@ print("training complete")
 #         print(LR_images_training_i.size())
 #         print(HR_images_training_i.size())
 #         
-#         outputs = our_resnext(Variable(LR_images_training_i).type(tc.FloatTensor).to(device))
+#         outputs = our_rdn_mri_sr_2d(Variable(LR_images_training_i).type(tc.FloatTensor).to(device))
 #         print(outputs.size())
 #         
 #         SR_images_tensor_training_i = outputs.data.cpu().squeeze(1)
@@ -847,7 +841,7 @@ print("training complete")
 #         print(LR_images_test_i.size())
 #         print(HR_images_test_i.size())
 #         
-#         outputs = our_resnext(Variable(LR_images_test_i).type(tc.FloatTensor).to(device))
+#         outputs = our_rdn_mri_sr_2d(Variable(LR_images_test_i).type(tc.FloatTensor).to(device))
 #         print(outputs.size())
 #         
 #         SR_images_tensor_test_i = outputs.data.cpu().squeeze(1)
