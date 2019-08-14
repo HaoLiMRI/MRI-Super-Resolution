@@ -1,7 +1,7 @@
 function [HRGT,LR,IMG1,IMG2] = LR_generate(IMG,num,scale_factor,test_data,zerofilling_cut_switch,fillingmode,calibration_lines,x_downsampling,switch_2d_3d)
 %LR_GENERATE 此处显示有关此函数的摘要
 %   此处显示详细说明
-    IMG=IMG/max(max(max(IMG)));
+    
     
     
 %%
@@ -15,6 +15,7 @@ function [HRGT,LR,IMG1,IMG2] = LR_generate(IMG,num,scale_factor,test_data,zerofi
     IMG1=IMG(to(num):bo(num),le(num):ri(num),:);
     [dim1,dim2,dim3]=size(IMG1);
     kspace = zeros(dim1,dim2,dim3);
+    
 %    IMG4=IMG2(to(num):bo(num),le(num):ri(num),:);
 %     [a,b]=ssim(IMG4(:,:,slc),IMG3(:,:,slc));
 %     p = psnr(IMG4(:,:,slc),IMG3(:,:,slc));
@@ -25,6 +26,7 @@ function [HRGT,LR,IMG1,IMG2] = LR_generate(IMG,num,scale_factor,test_data,zerofi
 %%    
     if switch_2d_3d
         for slice=1:dim3
+            IMG1(:,:,slice)=IMG1(:,:,slice)/max(max(IMG1(:,:,slice)));
             kspace(:,:,slice)=fftn(IMG1(:,:,slice));
         end
         if zerofilling_cut_switch
@@ -44,24 +46,25 @@ function [HRGT,LR,IMG1,IMG2] = LR_generate(IMG,num,scale_factor,test_data,zerofi
                     end
                 end
             end
-%           figure;imagesc(fftshift(real(kspace(:,:,ceil(dim3/2)))),[0 100]),colormap(gray);axis image;
+            figure;imagesc(fftshift(real(kspace(:,:,ceil(dim3/2)))),[0 100]),colormap(gray);axis image;
             IMG2 = zeros(size(kspace));
             for slice=1:dim3
                 IMG2(:,:,slice)=ifftn(kspace(:,:,slice));
-            end
-            IMG2(:,:,:)=sqrt(real(IMG2(:,:,:)).^2+imag(IMG2(:,:,:)).^2);
-            IMG2=IMG2/max(max(max(IMG2)));
+                IMG2(:,:,slice)=sqrt(real(IMG2(:,:,slice)).^2+imag(IMG2(:,:,slice)).^2);
+                IMG2(:,:,slice)=IMG2(:,:,slice)/max(max(IMG2(:,:,slice)));
+            end 
         else
             kspace_0=fftshift(kspace);
             kspace_cut=kspace_0(dim1*0.5*(scale_factor-1)/scale_factor+1:dim1*0.5*(scale_factor+1)/scale_factor,dim2*0.5*(scale_factor-1)/scale_factor+1:dim2*0.5*(scale_factor+1)/scale_factor,:);
 %            figure;imagesc(abs(kspace_cut(:,:,ceil(dim3/2))),[0 100]),colormap(gray);axis image;
             for slice=1:dim3
                 IMG2=ifftn(fftshift(kspace_cut));
+                IMG2(:,:,slice)=sqrt(real(IMG2(:,:,slice)).^2+imag(IMG2(:,:,slice)).^2);
+                IMG2(:,:,slice)=IMG2(:,:,slice)/max(max(IMG2(:,:,slice)));
             end
-            IMG2(:,:,:)=sqrt(real(IMG2(:,:,:)).^2+imag(IMG2(:,:,:)).^2);
-            IMG2=IMG2/max(max(max(IMG2)));
         end
-    else    
+    else
+        IMG1=IMG1/max(max(max(IMG1)));
         kspace=fftn(IMG1);
         if zerofilling_cut_switch
             if fillingmode
