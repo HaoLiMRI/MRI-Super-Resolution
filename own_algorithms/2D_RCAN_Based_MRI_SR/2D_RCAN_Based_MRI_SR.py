@@ -934,38 +934,47 @@ with tc.no_grad():
     # for data in testloader:
     # =============================================================================
     for i, testing_data_2 in enumerate(testloader, 0):
-        
+    
         #    LR_images_test, HR_images_test = testing_data_2
         # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
         #    outputs = our_rcan_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
         # =============================================================================
         #     print(outputs.data.size())
         # =============================================================================
-        
-#        if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
-            
+    
+#       if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
+    
         LR_images_test, HR_images_test = testing_data_2
-        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        HR_images_test = HR_images_test.type(tc.FloatTensor)
         outputs = our_rcan_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
-            
+        
         #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
         SR_images_tensor_test = outputs.data.cpu().squeeze(1)
+        LR_images_tensor_test = LR_images_test.cpu().squeeze(1)
+        HR_images_tensor_test = HR_images_test.cpu().squeeze(1)
         # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
         # =============================================================================
         #         print(SR_images_tensor.size())
         # =============================================================================
         # print(HR_images_tensor.size())    
-        SR_images_test = SR_images_tensor_test.numpy()
+        
         # HR_images_test = HR_images_tensor.numpy()
         if i==0:
-            SR_eval = SR_images_test
+            SR_eval_tensor = SR_images_tensor_test
+            LR_eval_tensor = LR_images_tensor_test
+            HR_eval_tensor = HR_images_tensor_test
         else:
-            SR_eval = tc.cat((SR_eval, SR_images_test), 0)
-
+            SR_eval_tensor = tc.cat((SR_eval_tensor, SR_images_tensor_test), 0)
+            LR_eval_tensor = tc.cat((LR_eval_tensor, LR_images_tensor_test), 0)
+            HR_eval_tensor = tc.cat((HR_eval_tensor, HR_images_tensor_test), 0)
+        
+    SR_images_test = SR_eval_tensor.numpy()
+    LR_images_test = LR_eval_tensor.numpy()
+    HR_images_test = HR_eval_tensor.numpy()
     "save the .mat files for SR, HR and LR training images"
-    scipy.io.savemat('/home/HaoLi/SR/Results/result_RCAN_l1_4ssim_gradient_laf_100_16_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_eval})
-    scipy.io.savemat('/home/HaoLi/SR/Results/result_RCAN_l1_4ssim_gradient_laf_100_16_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test.numpy()})
-    scipy.io.savemat('/home/HaoLi/SR/Results/result_RCAN_l1_4ssim_gradient_laf_100_16_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test.numpy()})
+    scipy.io.savemat('/home/HaoLi/SR/Results/result_RCAN_l1_4ssim_gradient_laf_100_16_4folds_2d_test/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+    scipy.io.savemat('/home/HaoLi/SR/Results/result_RCAN_l1_4ssim_gradient_laf_100_16_4folds_2d_test/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
+    scipy.io.savemat('/home/HaoLi/SR/Results/result_RCAN_l1_4ssim_gradient_laf_100_16_4folds_2d_test/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
         
     
     #        for j in range(new_batch_size_for_checking):
