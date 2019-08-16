@@ -163,7 +163,7 @@ batch size和学习率如何影响网络的性能
 
 23. 我们有没有可能这样做，参考ESRGAN论文内提到的网络参数插值的方案，对我们的CNN的MRI SR网络也做两种导向的loss。其一是PSNR导向的比如只有图像L1或者MSE的loss，另一种loss可以比如SSIM,gradient的L1 MSE的loss，训练俩sets网络参数，然后对参数插值得到一个新set参数，生成SR。感觉这个就是channel attention的类似思路，只是插值所用的具体比例人工给定而不是网络训练得出。现在看到的情况是当把各种loss求和加在一块做总loss时，gradient L1 loss降不下去，也许当只将gradient L1 loss作为目标loss时候更容易降低
 
-24. 还有另外一种思路，我们设计了3种不同方案来实现multi-task&loss orientation networks。先搞方案2，再弄1，之后3（1+2的comb network）
+24. Ensemble assisted deep learning。还有另外一种思路，我们设计了3种不同方案来实现multi-task&loss orientation networks。先搞方案2，再弄1，之后3（1+2的comb network）
 
 25. 几个月前的新optimizer,AdaBound，据说很不错。可以试一试。文章在这 https://www.luolc.com/publications/adabound/ 代码在这 https://github.com/Luolc/AdaBound
 
