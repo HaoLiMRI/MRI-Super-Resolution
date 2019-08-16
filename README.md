@@ -165,6 +165,11 @@ batch size和学习率如何影响网络的性能
 
 24. 还有另外一种思路，我们设计了3种不同方案来实现multi-task&loss orientation networks。先搞方案2，再弄1，之后3（1+2的comb network）
 
+25. 几个月前的新optimizer,AdaBound，据说很不错。可以试一试。文章在这 https://www.luolc.com/publications/adabound/ 代码在这 https://github.com/Luolc/AdaBound
+
+
+26. 最新optimizer,，据说很不错。可以试一试。文章在这 https://arxiv.org/abs/1908.03265v1 代码在这 https://github.com/LiyuanLucasLiu/RAdam
+
 
 
 -----
