@@ -5,7 +5,8 @@ from torch.optim import Optimizer
 
 class AdaBound(Optimizer):
     """Implements AdaBound algorithm.
-    It has been proposed in `Adaptive Gradient Methods with Dynamic Bound of Learning Rate`_.
+    It has been proposed in paper `2019.Adaptive Gradient Methods with Dynamic Bound of Learning Rate`,
+    paper could be found in: https://arxiv.org/pdf/1902.09843.pdf
     Arguments:
         params (iterable): iterable of parameters to optimize or dicts defining
             parameter groups
@@ -18,8 +19,6 @@ class AdaBound(Optimizer):
             numerical stability (default: 1e-8)
         weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
         amsbound (boolean, optional): whether to use the AMSBound variant of this algorithm
-    .. Adaptive Gradient Methods with Dynamic Bound of Learning Rate:
-        https://openreview.net/forum?id=Bkg3g2R9FX
     """
 
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), final_lr=0.1, gamma=1e-3,
@@ -63,8 +62,7 @@ class AdaBound(Optimizer):
                     continue
                 grad = p.grad.data
                 if grad.is_sparse:
-                    raise RuntimeError(
-                        'Adam does not support sparse gradients, please consider SparseAdam instead')
+                    raise RuntimeError('Adam does not support sparse gradients, please consider SparseAdam instead')
                 amsbound = group['amsbound']
 
                 state = self.state[p]
@@ -105,6 +103,8 @@ class AdaBound(Optimizer):
                 bias_correction2 = 1 - beta2 ** state['step']
                 step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
 
+                # The following part is the only change compared to existing Adam optimizer from Pytorch lib
+
                 # Applies bounds on actual learning rate
                 # lr_scheduler cannot affect final_lr, this is a workaround to apply lr decay
                 final_lr = group['final_lr'] * group['lr'] / base_lr
@@ -112,14 +112,14 @@ class AdaBound(Optimizer):
                 upper_bound = final_lr * (1 + 1 / (group['gamma'] * state['step']))
                 step_size = torch.full_like(denom, step_size)
                 step_size.div_(denom).clamp_(lower_bound, upper_bound).mul_(exp_avg)
-
                 p.data.add_(-step_size)
 
         return loss
 
 class AdaBoundW(Optimizer):
-    """Implements AdaBound algorithm with Decoupled Weight Decay (arxiv.org/abs/1711.05101)
-    It has been proposed in `Adaptive Gradient Methods with Dynamic Bound of Learning Rate`_.
+    """Implements AdaBound algorithm with decoupled weight decay regularization(https://arxiv.org/pdf/1711.05101.pdf)
+    It has been proposed in paper `2019.Adaptive Gradient Methods with Dynamic Bound of Learning Rate`,
+    paper could be found in: https://arxiv.org/pdf/1902.09843.pdf
     Arguments:
         params (iterable): iterable of parameters to optimize or dicts defining
             parameter groups
@@ -130,10 +130,8 @@ class AdaBoundW(Optimizer):
         gamma (float, optional): convergence speed of the bound functions (default: 1e-3)
         eps (float, optional): term added to the denominator to improve
             numerical stability (default: 1e-8)
-        weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
+        weight_decay (float, optional): weight decay (default: 0)
         amsbound (boolean, optional): whether to use the AMSBound variant of this algorithm
-    .. Adaptive Gradient Methods with Dynamic Bound of Learning Rate:
-        https://openreview.net/forum?id=Bkg3g2R9FX
     """
 
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), final_lr=0.1, gamma=1e-3,
@@ -216,6 +214,8 @@ class AdaBoundW(Optimizer):
                 bias_correction2 = 1 - beta2 ** state['step']
                 step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
 
+                # The following part is the only change compared to AdamW optimizer
+
                 # Applies bounds on actual learning rate
                 # lr_scheduler cannot affect final_lr, this is a workaround to apply lr decay
                 final_lr = group['final_lr'] * group['lr'] / base_lr
@@ -232,3 +232,14 @@ class AdaBoundW(Optimizer):
                     p.data.add_(-step_size)
 
         return loss
+
+
+
+
+
+"""
+Example of using adamw optimizer
+"""
+"""
+optimizer = adabound.AdaBound(model.parameters(), lr=1e-3, final_lr=0.1)
+"""
