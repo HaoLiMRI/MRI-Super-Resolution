@@ -165,10 +165,13 @@ batch size和学习率如何影响网络的性能
 
 24. Ensemble assisted deep learning。还有另外一种思路，我们设计了3种不同方案来实现multi-task&loss orientation networks。先搞方案2，再弄1，之后3（1+2的comb network）
 
-25. 几个月前的新optimizer,AdaBound，据说很不错。可以试一试。文章在这 https://www.luolc.com/publications/adabound/ 代码在这 https://github.com/Luolc/AdaBound
-
-
-26. 最新optimizer,，据说很不错。可以试一试。文章在这 https://arxiv.org/abs/1908.03265v1 代码在这 https://github.com/LiyuanLucasLiu/RAdam
+25. AdaBound. 几个月前的新optimizer，据说很不错。可以试一试。文章在这 https://www.luolc.com/publications/adabound/ 代码在这 https://github.com/Luolc/AdaBound
+	
+		An optimizer that trains as fast as Adam and as good as SGD, for developing state-of-the-art deep learning models on a wide variety of popular tasks in the field of CV, NLP, and etc.
+		用法: optimizer = adabound.AdaBound(model.parameters(), lr=1e-3, final_lr=0.1)
+		AdaBound is an optimizer that behaves like Adam at the beginning of training, and gradually transforms to SGD at the end. The final_lr parameter indicates AdaBound would transforms to an SGD with this learning rate. In common cases, a default final learning rate of 0.1 can achieve relatively good and stable results on unseen data. It is not very sensitive to its hyperparameters. See Appendix G of the paper for more details.
+		
+26. RAdam. 最新optimizer,，据说很不错。可以试一试。文章在这 https://arxiv.org/abs/1908.03265v1 代码在这 https://github.com/LiyuanLucasLiu/RAdam
 
 
 
