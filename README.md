@@ -165,6 +165,27 @@ batch size和学习率如何影响网络的性能
 
 24. Ensemble assisted deep learning。还有另外一种思路，我们设计了3种不同方案来实现multi-task&loss orientation networks。先搞方案2，再弄1，之后3（1+2的comb network）
 
+25. AdamW.据说应该是把pytorch中原版的Adam的bug修复了，将learning rate和weight decay解耦合。pytorch中目前在Adam下的L2 regularization的实现方法如下:在optimizer之前加上L2 regularization项来通过weight decay实现L2正则, 这样L2正则的作用就受到了优化器和learning rate(alpha)的影响. Adam的自适应归一化, 将梯度大的weight也进行了归一化, 于是抵消了L2带来的weight decay的作用. 使梯度值较大的weight, 下降的比预想的要少. 换句话说, 两个weight一样大, weight decay对他们应该起到的作用是一样的. 但是其中梯度比较大的那个因为Adam的归一化, 反而下降的比较小. 也就表明当learning rate和weight decay耦合情况下，L2正则和weight decay并非完全等价. 而AdamW optimizer将learning rate和weight decay解耦合，从而令weight decay的regularization效用不会被learning rate影响所减小，于是正确的实现L2 regularization。
+
+文章在这 https://arxiv.org/pdf/1711.05101.pdf  代码在这  https://github.com/mpyrozhok/adamwr/blob/master/adamw.py
+
+		用法:
+		    batch_size = 32
+		    epoch_size = 1024
+		    model = resnet()
+		    optimizer = AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
+		    for epoch in range(100):
+			optimizer.step()
+			train_for_every_batch(...)
+			    ...
+			    optimizer.zero_grad()
+			    loss.backward()
+			    optimizer.step()
+			    optimizer.batch_step()
+			validate(...)
+
+
+
 25. AdaBound. 几个月前的新optimizer，据说很不错。可以试一试。文章在这 https://www.luolc.com/publications/adabound/ 代码在这 https://github.com/Luolc/AdaBound
 	
 		An optimizer that trains as fast as Adam and as good as SGD, for developing state-of-the-art deep learning models on a wide variety of popular tasks in the field of CV, NLP, and etc.
