@@ -4,7 +4,14 @@ from torch.optim import Optimizer
 
 
 class AdamW(Optimizer):
-    """Implements Adam algorithm.
+    """
+    AdamW, Adam with decoupled Weight decay regularization, "2017. Decoupled Weight Decay Regularization 
+    (https://arxiv.org/pdf/1711.05101.pdf), implements actual Adam with weight decay regularization algorithm which 
+    decouples "learning rate" and "weight decay". It means this is the "Adam with actual weight decay regularization".
+    - The normal existing Adam optimizer in Pyotrch has coupling between "learning rate" and "weight decay", 
+    that somehow cancels the "regularization" effect from "weight decay".
+    - AdamW implementation is straightforward and does not differ much from existing Adam implementation for PyTorch, 
+    except that it separates weight decaying from batch gradient calculations,
 
     Arguments:
         params (iterable): iterable of parameters to optimize or dicts defining
@@ -14,7 +21,7 @@ class AdamW(Optimizer):
             running averages of gradient and its square (default: (0.9, 0.999))
         eps (float, optional): term added to the denominator to improve
             numerical stability (default: 1e-8)
-        weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
+        weight_decay (float, optional): weight decay (default: 0)
         amsgrad (boolean, optional): whether to use the AMSGrad variant of this
             algorithm from the paper `On the Convergence of Adam and Beyond`_
 
@@ -71,6 +78,13 @@ class AdamW(Optimizer):
 
                 state['step'] += 1
 
+                # The 1st change compared to existing Adam optimizer from Pytorch lib
+                # Delete the following code:
+                # if group['weight_decay'] != 0:
+                #     # It means "grad + group['weight_decay']*p.data"
+                #     grad.add_(group['weight_decay'], p.data)
+                # in existing Adam optimizer from Pytorch lib
+
                 # Decay the first and second moment running average coefficient
                 exp_avg.mul_(beta1).add_(1 - beta1, grad)
                 exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
@@ -85,7 +99,38 @@ class AdamW(Optimizer):
                 bias_correction1 = 1 - beta1 ** state['step']
                 bias_correction2 = 1 - beta2 ** state['step']
                 step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
+                
+                # # The 2nd change compared to existing Adam optimizer from Pytorch lib
+                # Change the code 
+                # # It means "p.data + (-step_size)*(exp_avg/denom)"
+                # p.data.addcdiv_(-step_size, exp_avg, denom)
+                # in existing Adam optimizer in Pytorch lib to the following code
 
+                # It means "p.data(1 - group['weight_decay']) + (-step_size)*(exp_avg/denom)", on the other word, is,
+                # "p.data + (-step_size)*(exp_avg/denom) - group['weight_decay']*p.data"
                 p.data.mul_(1 - group['weight_decay']).addcdiv_(-step_size, exp_avg, denom)
 
         return loss
+
+
+
+
+
+"""
+Example of using adamw optimizer
+"""
+"""
+    batch_size = 32
+    epoch_size = 1024
+    model = resnet()
+    optimizer = AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
+    for epoch in range(100):
+        optimizer.step()
+        train_for_every_batch(...)
+            ...
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            optimizer.batch_step()
+        validate(...)
+"""
