@@ -193,6 +193,11 @@ batch size和学习率如何影响网络的性能
 		
 26. RAdam. 最新optimizer,，据说很不错。可以试一试。文章在这 https://arxiv.org/abs/1908.03265v1 代码在这 https://github.com/LiyuanLucasLiu/RAdam
 
+27. Rank loss. To address the problem, we propose Super-Resolution Generative Adversarial Networks with Ranker (RankSRGAN) to optimize generator in the direction of perceptual metrics. Specifically, we first train a Ranker which can learn the behavior of perceptual metrics and then introduce a novel rank-content loss to optimize the perceptual quality. The most appealing part is that the proposed method can combine the strengths of different SR methods to generate better results.
+		
+		论文 https://wenlongzhang0724.github.io/Projects/RankSRGAN#RankSRGAN
+		代码 https://github.com/chisyliu/RankSRGAN
+
 
 
 -----
