@@ -214,6 +214,18 @@ batch size和学习率如何影响网络的性能
 和 https://github.com/chisyliu/BasicSR/blob/master/codes/models/networks.py
 完全看不出来按照论文建议的方案这样做了。我们需要研究一下代码应该怎样写。
 
+33. 看下这俩篇paper，做一下这俩种方案
+
+		Some recently proposed advanced methods:
+			•SRNTT. 2019. Image Super-Resolution by Neural Texture Transfer
+				oPaper: https://arxiv.org/pdf/1903.00834.pdf
+				oComment: Amazing! It seems the reconstructed SR image from this approach has much better resolution than the SR image from SRGAN.
+			
+			•2019. ODE-inspired Network Design for Single Image Super-Resolution
+				oPaper: http://openaccess.thecvf.com/content_CVPR_2019/papers/He_ODE-Inspired_Network_Design_for_Single_Image_Super-Resolution_CVPR_2019_paper.pdf
+				oComment: It seems the approach proposed is somehow change in the ResNet block, it is NOT hard to implement and easy to be incorporated into any approaches we use.
+
+
 
 
 -----
