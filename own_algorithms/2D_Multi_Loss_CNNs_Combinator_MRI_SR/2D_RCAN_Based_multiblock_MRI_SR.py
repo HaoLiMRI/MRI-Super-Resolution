@@ -105,8 +105,8 @@ use_cuda = True #-- boolean to choose GPU
 since = time.clock()
 
 
-batch_size = 128
-EPOCH_NUM = 1
+batch_size = 32
+EPOCH_NUM = 200
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False
 Use_Lookahead_Optimizer = False
@@ -537,7 +537,7 @@ class Multi_Loss_CNNs_Combinator_MRI_SR_2D(nn.Module):
             x_3x3 = self.conv_3x3(x)
             x_5x5 = self.conv_5x5(x)
             x_7x7 = self.conv_7x7(x)
-            combined_x = tc.cat((x_3x3, x_5x5, x_7x7), 2)
+            combined_x = tc.cat((x_3x3, x_5x5, x_7x7), 1)
             y = self.conv_1x1(combined_x)
         elif self.combinator_type == 'channel_attention_based_combinator':
             z = self.avg_pool(x)
@@ -556,7 +556,7 @@ device=tc.device("cuda" if use_cuda else "cpu")
 our_rcan_mri_sr_2d_1 = RCAN_MRI_SR_2D(args)
 our_rcan_mri_sr_2d_2 = RCAN_MRI_SR_2D(args)
 our_rcan_mri_sr_2d_3 = RCAN_MRI_SR_2D(args)
-our_combinator = Multi_Loss_CNNs_Combinator_MRI_SR_2D(args)
+our_combinator = Multi_Loss_CNNs_Combinator_MRI_SR_2D(combinator_type = 'conv_layer_based_combinator')
 
 if tc.cuda.device_count()>1:
     our_rcan_mri_sr_2d_1=nn.DataParallel(our_rcan_mri_sr_2d_1)
@@ -799,7 +799,7 @@ for epoch in range(EPOCH_NUM):
                 ssim_loss_test += loss_function_L1(SSIM_function(SR_test,labels),SSIM_function(labels, labels))
 #                print("ssim_loss_test: ", ssim_loss_test)
                 
-                gradient_map_loss_test += loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
+                gradient_map_loss_test += 10*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
 #                print('gradient_loss_test: ', gradient_map_loss_test)
                 
     loss_test = pixel_wise_loss_test + feature_map_loss_test + k_space_freq_loss_test# + ssim_loss_test + gradient_map_loss_test
@@ -834,7 +834,7 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('/srv/DATA/NVME/HaoLi/SR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/log.txt', 'w')
+        f = open('/srv/DATA/NVME/HaoLi/SR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/log.txt', 'a')
     f.write('Block 1 Training Loss:')
     f.write('\n')    
     f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
@@ -935,7 +935,7 @@ for epoch in range(EPOCH_NUM):
 #            print("feature_map_loss: ", feature_map_loss)
         
             # pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
-#            pixel_wise_loss = 100*loss_function_L1(outputs, labels)
+            pixel_wise_loss = 100*loss_function_L1(outputs, labels)
 #            print("pixel_wise_loss: ", pixel_wise_loss)
 
 #            k_space_freq_loss = 0.01*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
@@ -951,7 +951,7 @@ for epoch in range(EPOCH_NUM):
         
 #            loss = pixel_wise_loss + ssim_loss
 #            loss = pixel_wise_loss + feature_map_loss
-            loss = 0
+            loss = pixel_wise_loss
 #            if ssim_loss < 0.5:
 #                loss = ssim_loss + feature_map_loss + pixel_wise_loss
 #                print('ssim_loss')
@@ -998,7 +998,7 @@ for epoch in range(EPOCH_NUM):
             
                 training_loss_for_current_epoch = running_loss / 50
 #                feature_map_loss_for_current_epoch = feature_map_loss
-#                pixel_wise_loss_for_current_epoch = pixel_wise_loss
+                pixel_wise_loss_for_current_epoch = pixel_wise_loss
                 ssim_loss_for_current_epoch = ssim_loss
 #                gradient_map_loss_for_current_epoch = gradient_map_loss
 #                k_space_freq_loss_for_current_epoch = k_space_freq_loss
@@ -1042,11 +1042,11 @@ for epoch in range(EPOCH_NUM):
                 ssim_loss_test += loss_function_L1(SSIM_function(SR_test,labels),SSIM_function(labels, labels))
 #                print("ssim_loss_test: ", ssim_loss_test)
                 
-                gradient_map_loss_test += loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
+                gradient_map_loss_test += 10*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
 #                print('gradient_loss_test: ', gradient_map_loss_test)
                 
 #                loss_test = pixel_wise_loss_test + feature_map_loss_test + k_space_freq_loss_test + ssim_loss_test + gradient_map_loss_test
-    loss_test = ssim_loss_test
+    loss_test = pixel_wise_loss + ssim_loss_test
 #                print('loss_test: ', loss_test)
                 
     feature_map_loss_test = feature_map_loss_test/batch_number
@@ -1078,13 +1078,13 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('/srv/DATA/NVME/HaoLi/SR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/log.txt', 'w')
+        f = open('/srv/DATA/NVME/HaoLi/SR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/log.txt', 'a')
     f.write('Block 2 Training Loss:')
     f.write('\n')    
 #    f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
 #    f.write('\n')
-#    f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
-#    f.write('\n')
+    f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
+    f.write('\n')
 #    f.write('The k_space_freq_loss for epoch %d  is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
 #    f.write('\n')
     f.write('The ssim_loss for epoch %d  is : %f' % (epoch, ssim_loss_for_current_epoch))
@@ -1179,7 +1179,7 @@ for epoch in range(EPOCH_NUM):
 #            print("feature_map_loss: ", feature_map_loss)
         
             # pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
-#            pixel_wise_loss = 100*loss_function_L1(outputs, labels)
+            pixel_wise_loss = 100*loss_function_L1(outputs, labels)
 #            print("pixel_wise_loss: ", pixel_wise_loss)
 
 #            k_space_freq_loss = 0.01*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0])+loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
@@ -1190,12 +1190,12 @@ for epoch in range(EPOCH_NUM):
 #            ssim_loss = loss_function_L1(SSIM_function(outputs, labels), SSIM_function(labels,labels))
 #            print("ssim_loss: ", ssim_loss)
 
-            gradient_map_loss = loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
+            gradient_map_loss = 10*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
 #            print('gradient_loss: ', gradient_map_loss)
         
 #            loss = pixel_wise_loss + ssim_loss
 #            loss = pixel_wise_loss + feature_map_loss
-            loss = 0
+            loss = pixel_wise_loss
 #            if ssim_loss < 0.5:
 #                loss = ssim_loss + feature_map_loss + pixel_wise_loss
 #                print('ssim_loss')
@@ -1242,7 +1242,7 @@ for epoch in range(EPOCH_NUM):
             
                 training_loss_for_current_epoch = running_loss / 50
 #                feature_map_loss_for_current_epoch = feature_map_loss
-#                pixel_wise_loss_for_current_epoch = pixel_wise_loss
+                pixel_wise_loss_for_current_epoch = pixel_wise_loss
 #                ssim_loss_for_current_epoch = ssim_loss
                 gradient_map_loss_for_current_epoch = gradient_map_loss
 #                k_space_freq_loss_for_current_epoch = k_space_freq_loss
@@ -1286,11 +1286,11 @@ for epoch in range(EPOCH_NUM):
                 ssim_loss_test += loss_function_L1(SSIM_function(SR_test,labels),SSIM_function(labels, labels))
 #                print("ssim_loss_test: ", ssim_loss_test)
                 
-                gradient_map_loss_test += loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
+                gradient_map_loss_test += 10*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
 #                print('gradient_loss_test: ', gradient_map_loss_test)
                 
 #                loss_test = pixel_wise_loss_test + feature_map_loss_test + k_space_freq_loss_test + ssim_loss_test + gradient_map_loss_test
-                loss = gradient_map_loss_test
+    loss = pixel_wise_loss + gradient_map_loss_test
 #                print('loss_test: ', loss_test)
                 
     feature_map_loss_test = feature_map_loss_test/batch_number
@@ -1322,13 +1322,13 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('/srv/DATA/NVME/HaoLi/SR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/log.txt', 'w')
+        f = open('/srv/DATA/NVME/HaoLi/SR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/log.txt', 'a')
     f.write('Block 3 Training Loss:')
     f.write('\n')    
 #    f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
 #    f.write('\n')
-#    f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
-#    f.write('\n')
+    f.write('The pixel_wise_loss for epoch %d  is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
+    f.write('\n')
 #    f.write('The k_space_freq_loss for epoch %d  is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
 #    f.write('\n')
 #    f.write('The ssim_loss for epoch %d  is : %f' % (epoch, ssim_loss_for_current_epoch))
@@ -1400,11 +1400,14 @@ for epoch in range(EPOCH_NUM):
             # print('The optimizer has been cleared' )
             with tc.no_grad():
                 outputs_1 = our_rcan_mri_sr_2d_1(inputs)
+#                print(np.shape(outputs_1))
                 outputs_2 = our_rcan_mri_sr_2d_2(inputs)
+#                print(np.shape(outputs_2))
                 outputs_3 = our_rcan_mri_sr_2d_3(inputs)
-            outputs_1 = outputs_1.unsqueeze(1)
-            outputs_2 = outputs_2.unsqueeze(1)
-            outputs_3 = outputs_3.unsqueeze(1)
+#                print(np.shape(outputs_3))
+#            outputs_1 = outputs_1.unsqueeze(1)
+#            outputs_2 = outputs_2.unsqueeze(1)
+#            outputs_3 = outputs_3.unsqueeze(1)
             inputs_c = tc.cat((outputs_1,outputs_2,outputs_3),1)
 #            print(np.shape(inputs_c))
             "forward prop"
@@ -1446,7 +1449,7 @@ for epoch in range(EPOCH_NUM):
             ssim_loss = loss_function_L1(SSIM_function(outputs, labels), SSIM_function(labels,labels))
 #            print("ssim_loss: ", ssim_loss)
 
-            gradient_map_loss = 5*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
+            gradient_map_loss = 10*loss_function_L1(calculate_gradient_map(outputs), calculate_gradient_map(labels))
 #            print('gradient_loss: ', gradient_map_loss)
         
 #            loss = pixel_wise_loss + ssim_loss
@@ -1515,7 +1518,7 @@ for epoch in range(EPOCH_NUM):
                 outputs_test_2 = our_rcan_mri_sr_2d_2(inputs)
                 outputs_test_3 = our_rcan_mri_sr_2d_3(inputs)
                 
-                inputs_test = tc.cat(outputs_test_1, outputs_test_2, outputs_test_3)
+                inputs_test = tc.cat((outputs_test_1, outputs_test_2, outputs_test_3),1)
                                 
                 SR_test = our_combinator(inputs_test)
                 
@@ -1548,7 +1551,7 @@ for epoch in range(EPOCH_NUM):
                 ssim_loss_test += loss_function_L1(SSIM_function(SR_test,labels),SSIM_function(labels, labels))
 #                print("ssim_loss_test: ", ssim_loss_test)
                 
-                gradient_map_loss_test += 5*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
+                gradient_map_loss_test += 10*loss_function_L1(calculate_gradient_map(SR_test), calculate_gradient_map(labels))
 #                print('gradient_loss_test: ', gradient_map_loss_test)
                 
     loss_test = pixel_wise_loss_test + feature_map_loss_test + k_space_freq_loss_test + ssim_loss_test + gradient_map_loss_test
@@ -1583,8 +1586,8 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('/srv/DATA/NVME/HaoLi/SR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/log.txt', 'w')
-    f.write('Block 1 Training Loss:')
+        f = open('/srv/DATA/NVME/HaoLi/SR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/log.txt', 'a')
+    f.write('Combinator Training Loss:')
     f.write('\n')    
     f.write('The feature_map_loss for epoch %d  is : %f' % (epoch, feature_map_loss_for_current_epoch))
     f.write('\n')
@@ -1728,9 +1731,9 @@ with tc.no_grad():
             outputs_1 = our_rcan_mri_sr_2d_1(LR_images_training)
             outputs_2 = our_rcan_mri_sr_2d_2(LR_images_training)
             outputs_3 = our_rcan_mri_sr_2d_3(LR_images_training)
-            outputs_1 = outputs_1.unsqueeze(1)
-            outputs_2 = outputs_2.unsqueeze(1)
-            outputs_3 = outputs_3.unsqueeze(1)
+#            outputs_1 = outputs_1.unsqueeze(1)
+#            outputs_2 = outputs_2.unsqueeze(1)
+#            outputs_3 = outputs_3.unsqueeze(1)
             inputs_c = tc.cat((outputs_1,outputs_2,outputs_3),1)
             
             outputs = our_combinator(inputs_c)
@@ -1746,9 +1749,9 @@ with tc.no_grad():
             # HR_images_test = HR_images_tensor.numpy()
         
             "save the .mat files for SR LR, HR training images"
-            scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-            scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-            scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+            scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
+            scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
+            scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
             
             
             
@@ -1790,9 +1793,9 @@ with tc.no_grad():
         outputs_1 = our_rcan_mri_sr_2d_1(LR_images_test)
         outputs_2 = our_rcan_mri_sr_2d_2(LR_images_test)
         outputs_3 = our_rcan_mri_sr_2d_3(LR_images_test)
-        outputs_1 = outputs_1.unsqueeze(1)
-        outputs_2 = outputs_2.unsqueeze(1)
-        outputs_3 = outputs_3.unsqueeze(1)
+#        outputs_1 = outputs_1.unsqueeze(1)
+#        outputs_2 = outputs_2.unsqueeze(1)
+#        outputs_3 = outputs_3.unsqueeze(1)
         inputs_c = tc.cat((outputs_1,outputs_2,outputs_3),1)
         
         outputs = our_combinator(inputs_c)
@@ -1821,9 +1824,9 @@ with tc.no_grad():
     LR_images_test = LR_eval_tensor.numpy()
     HR_images_test = HR_eval_tensor.numpy()
     "save the .mat files for SR, HR and LR training images"
-    scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-    scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
-    scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_grad_laf_200_32_2d_2fold_xy/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
+    scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+    scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
+    scipy.io.savemat('/srv/DATA/NVME/HaoLi/MAR/Results/result_combi_RCAN_l1_224ssim_10grad_laf_200_32_2d_2fold_xy/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
         
     
     #        for j in range(new_batch_size_for_checking):
