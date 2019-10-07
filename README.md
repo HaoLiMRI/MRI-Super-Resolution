@@ -227,11 +227,15 @@ batch size和学习率如何影响网络的性能
 
 34. 这个还没有published的论文设计的提高动画的resolution，据说是设计了一种专门针对图像中任务的边缘信息做优化提高resolution的算法。我们可以研究一下看看是否可以融合到我们的SR或者De-MotionArtifact任务。
 	
-	 论文 https://github.com/chisyliu/Anime4K/blob/master/Preprint.md
-	 代码 https://github.com/chisyliu/Anime4K
-	 Comment 1: https://kknews.cc/comic/5rzggal.html
-	 Comment 2: https://www.oschina.net/p/anime4k
-	 Comment 3: https://blog.csdn.net/hahabeibei123456789/article/details/100007662
+		 论文 https://github.com/chisyliu/Anime4K/blob/master/Preprint.md
+	 
+		 代码 https://github.com/chisyliu/Anime4K
+		 
+	 	Comment 1: https://kknews.cc/comic/5rzggal.html
+	 
+	 	Comment 2: https://www.oschina.net/p/anime4k
+	 
+	 	Comment 3: https://blog.csdn.net/hahabeibei123456789/article/details/100007662
 
 
 
