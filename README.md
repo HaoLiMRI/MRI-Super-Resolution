@@ -225,6 +225,13 @@ batch size和学习率如何影响网络的性能
 				oPaper: http://openaccess.thecvf.com/content_CVPR_2019/papers/He_ODE-Inspired_Network_Design_for_Single_Image_Super-Resolution_CVPR_2019_paper.pdf
 				oComment: It seems the approach proposed is somehow change in the ResNet block, it is NOT hard to implement and easy to be incorporated into any approaches we use.
 
+34. 这个还没有published的论文设计的提高动画的resolution，据说是设计了一种专门针对图像中任务的边缘信息做优化提高resolution的算法。我们可以研究一下看看是否可以融合到我们的SR或者De-MotionArtifact任务。
+	
+	 论文 https://github.com/bloc97/Anime4K/blob/master/Preprint.md
+	 代码 https://github.com/bloc97/Anime4K
+	 Comment 1: https://kknews.cc/comic/5rzggal.html
+	 Comment 2: https://www.oschina.net/p/anime4k
+	 Comment 3: https://blog.csdn.net/hahabeibei123456789/article/details/100007662
 
 
 
