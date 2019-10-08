@@ -237,11 +237,11 @@ batch size和学习率如何影响网络的性能
 	 
 	 	Comment 3: https://blog.csdn.net/hahabeibei123456789/article/details/100007662
 		
-35. 从这个34.动画super resolution项目得到的两个可能有助于我们MRI SR的edge信息恢复的idea，分别做一下
+35. 从这个34.动画super resolution项目得到的两个可能有助于我们MRI SR的edge信息恢复的idea，分别做一下。方案如下，定义Edge Quality Loss
 		 
-		1. Edge Quality Loss v1: FFT之后的k space loss应该可以分解成为low freq component loss(represents for texture information)与high freq component loss(represents for edge information)，我们可以考虑给high freq componenet loss更大的weight从而加强edge的恢复效果
+		1. Edge Quality Loss option1: FFT之后的k space loss应该可以分解成为low freq component loss(represents for texture information)与high freq component loss(represents for edge information)，我们可以考虑给high freq componenet loss更大的weight从而加强edge的恢复效果
 		
-		2. Edge Quality Loss v2: 根据34.动画super resolution项目的逻辑，假如图像resolution越大则该图像的high freq component对应的图像域表征的edge则应越细(根据我们的理解，除了细以外且应该越亮或者说其强度越强)，于是可以考虑将k space loss的high freq component loss做IFFT回到图像域，minimize其对应的edge information 所占的number of pixels并且同时maximize相应的总强度。这里的问题是，如果数学上定义这个minmax并且coding
+		2. Edge Quality Loss option2: 根据34.动画super resolution项目的逻辑，假如图像resolution越大则该图像的high freq component对应的图像域表征的edge则应越细(根据我们的理解，除了细以外且应该越亮或者说其强度越强)，于是可以考虑将k space loss的high freq component loss做IFFT回到图像域，minimize其对应的edge information 所占的number of pixels并且同时maximize相应的总强度。这里的问题是，如果数学上定义这个minmax并且coding
 	
 
 
