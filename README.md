@@ -225,7 +225,7 @@ batch size和学习率如何影响网络的性能
 				oPaper: http://openaccess.thecvf.com/content_CVPR_2019/papers/He_ODE-Inspired_Network_Design_for_Single_Image_Super-Resolution_CVPR_2019_paper.pdf
 				oComment: It seems the approach proposed is somehow change in the ResNet block, it is NOT hard to implement and easy to be incorporated into any approaches we use.
 
-34. 这个还没有published的论文设计的提高动画的resolution，据说是设计了一种专门针对图像中任务的边缘信息做优化提高resolution的算法。我们可以研究一下看看是否可以融合到我们的SR或者De-MotionArtifact任务。
+34. 这个还没有published的论文设计的提高动画的resolution，设计了一种专门针对图像中任务的边缘信息做优化提高resolution的算法，该算法逻辑如下:因为任意图像可以分解为low freq component(represents for texture information)与high freq component(represents for edge information)。当图像resolution越大时，分解后得出的high freq component对应的图像域表征的edge则应越细。于是该算法就是在minimize edge thickness。我们可以研究一下看看是否可以融合到我们的SR或者De-MotionArtifact任务。
 	
 		 论文 https://github.com/chisyliu/Anime4K/blob/master/Preprint.md
 	 
@@ -239,9 +239,9 @@ batch size和学习率如何影响网络的性能
 		
 35. 从这个34.动画super resolution项目得到的两个可能有助于我们MRI SR的edge信息恢复的idea，分别做一下
 		 
-		1. FFT之后的k space loss应该可以分解成为low freq component(represents for texture information)与high freq component(represents for edge information)，我们可以考虑给high freq componenet loss更大的weight从而加强edge的恢复效果
+		1. FFT之后的k space loss应该可以分解成为low freq component loss(represents for texture information)与high freq component loss(represents for edge information)，我们可以考虑给high freq componenet loss更大的weight从而加强edge的恢复效果
 		
-		2. 根据34.动画super resolution项目的逻辑，假如图像resolution越大则该图像的high freq component对应的图像域表征的edge则应越细(根据我们的理解，且应该越亮或者说其强度越强)，于是可以考虑将k space loss的high freq component loss做IFFT回到图像域，minimize其对应的edge information 所占的number of pixels并且同时maximize相应的总强度。这里的问题是，如果数学上定义这个minmax并且coding
+		2. 根据34.动画super resolution项目的逻辑，假如图像resolution越大则该图像的high freq component对应的图像域表征的edge则应越细(根据我们的理解，除了细以外且应该越亮或者说其强度越强)，于是可以考虑将k space loss的high freq component loss做IFFT回到图像域，minimize其对应的edge information 所占的number of pixels并且同时maximize相应的总强度。这里的问题是，如果数学上定义这个minmax并且coding
 	
 
 
