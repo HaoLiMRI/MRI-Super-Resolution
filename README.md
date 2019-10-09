@@ -241,7 +241,17 @@ batch size和学习率如何影响网络的性能
 		 
 		1. Edge Quality Loss option1: FFT之后的k space loss应该可以分解成为low freq component loss(represents for texture information)与high freq component loss(represents for edge information)，我们可以考虑给high freq componenet loss更大的weight从而加强edge的恢复效果
 		
-		2. Edge Quality Loss option2: 根据34.动画super resolution项目的逻辑，假如图像resolution越大则该图像的high freq component对应的图像域表征的edge则应越细(根据我们的理解，除了细以外且应该越亮或者说其强度越强)，于是可以考虑将k space loss的high freq component loss做IFFT回到图像域，minimize其对应的edge information 所占的number of pixels并且同时maximize相应的总强度。这里的问题是，如果数学上定义这个minmax并且coding
+		2. Edge Quality Loss option2: 根据34.动画super resolution项目的逻辑，假如图像resolution越大则该图像的high freq component对应的图像域表征的edge则应越细(根据我们的理解，除了细以外且应该越亮或者说其强度越强)，于是可以考虑将k space loss的high freq component loss做IFFT回到图像域，minimize其对应的edge information 所占的number of pixels并且同时maximize相应的总强度。这里的问题是，如果数学上定义这个minmax并且coding。
+		
+现阶段对Edge Quality Loss option 2有几种思路
+
+	2.1. 把SR和HR各自的k space高频部分做IFFT回image field后，强度过threshold的pixel(我们认为设定合理的强度threshold，超过该threshold的就是edge information)的总数求出来，之后用两个数量相减的L1或者之类的criteria作为loss。虽然逻辑上即使SR中表征edge informationd的所有pixel数量接近HR中表征edge informationd的所有pixel的数量也不能表示SR的edge information的图案分布和HR的edge information的图案分布接近，但是由于MRI SR问题中只有一个object，并且由于Input还有LR所以SR和HR即使在training的开始各自的edge information图案分布也不会差太远，所以这样简单的minimize"SR中表征edge informationd的所有pixel数量和HR中表征edge informationd的所有pixel的数量的差"其实有可能得到还可以的结果。
+	
+	2.2. 把SR和HR各自的k space高频部分做IFFT回image field后，强度过threshold的pixel(我们认为设定合理的强度threshold，超过该threshold的就是edge information)的所有坐标(image中的index信息)与总数求出来，理论上SR(特别是在training开始之时)的表征edge information的pixel应该数量比HR的表征edge information的pixel的数量多(因为LR的edge比HR的edge thick)。然后从HR的表征edge information的一个pixel开始，对其每一个pixel在所有的SR的的表征edge information的pixels中找到距离最近的pixel其求距离，并且在对SR的的表征edge information所有的pixels删掉该pixel。对HR的表征edge information所有的pixelx重复上述动作，直到HR的表征edge information所有的pixelx都找到了一个"match"的neighbor(这其实就是NN algorithm)。然后再把这些distance一起加上"剩下的SR的表征edge information的每个pixel和0的距离"作为loss。
+	
+	2.3. Wasserstein distance是否可能用在刻画SR的edge information与HR的edge information的距离？如果可以(比如可以描述这两个形状的相似程度)，怎样用？
+	
+	2.4. 是否有什么criteria能用于刻画两个形状的相似程度？如果有，怎样联系到pixel level的index(position information in image fiedl)
 	
 
 
