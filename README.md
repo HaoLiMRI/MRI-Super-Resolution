@@ -252,7 +252,19 @@ batch size和学习率如何影响网络的性能
 	2.3. Wasserstein distance是否可能用在刻画SR的edge information与HR的edge information的距离？如果可以(比如可以描述这两个形状的相似程度)，怎样用？
 	
 	2.4. 是否有什么criteria能用于刻画两个形状的相似程度？如果有，怎样联系到pixel level的index(position information in image fiedl)
-	
+
+
+36. 新Backbone可以替换ResNet主要的Residual block模块
+
+		Res2Net: A New Multi-scale Backbone Architecture
+		a.Paper: https://arxiv.org/abs/1904.01169
+		b.Code: https://github.com/chisyliu/Res2Net
+		c.Code: https://github.com/chisyliu/Res2Net-1
+		d.Comment 1: https://zhuanlan.zhihu.com/p/61407825
+		e.Comment 2: https://xueqiu.com/3426965578/124511338
+		f.Comment 3: https://www.chainnews.com/articles/735829732142.htm
+		g.Comment 4: https://www.jishuwen.com/d/pbYi
+
 
 
 
