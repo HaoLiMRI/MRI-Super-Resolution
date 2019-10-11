@@ -518,6 +518,14 @@ https://med.stanford.edu/bmrgroup/Publications/PublicationHighlights/super_resol
 3. 基于RDN，加上各种loss，实现的是LR和HR，SR的size不相同并且resize factor固定不任意的MRI SR重构
 4. 基于RDN based Meta-SR，加上各种loss，实现的是LR和HR，SR的size不相同并且resize factor任意的MRI SR重构
 5. 基于SRGAN，能否用RDN based Meta-SR来做generator或别的方案加入RDN based Meta-SR，加上各种loss，实现的是LR和HR，SR的size不相同并且resize factor任意的MRI SR重构
+6. Based on RCAN, discuss the effect of different loss function:
+   - MSE
+   - L1
+   - L1 + k-space
+   - L1 + k-space + VGG
+   - L1 + k-space + ssim (+ VGG)
+   - L1 + k-space + gradient (+ VGG)
+   - L1 + k-space + ssim + gradient (+ VGG)
 -----
 
 
