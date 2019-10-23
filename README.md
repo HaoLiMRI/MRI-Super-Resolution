@@ -266,6 +266,14 @@ batch size和学习率如何影响网络的性能
 		g.Comment 4: https://www.jishuwen.com/d/pbYi
 
 
+37. 也许multi-scale feature maps可以帮助我们生产效果更好的SR？但这只是一个猜测，需要找到合理的解释来给出某些直觉上的解释论证为什么multi-scale feature map可以生产效果更强的SR。
+
+如何生成multi-scale feature maps?可以借助FPN或者Dilated conv。可以参考的paper如下（注意，对于Dilated conv for MRI SR主要读paper看他怎么分析 为什么Dilated conv可以提高SR效果，如何提高的）
+
+		Compressed Sensing MRI via a Multi-scale Dilated Residual Convolution Network
+		a.Paper: https://arxiv.org/abs/1906.05251
+
+
 
 
 -----
