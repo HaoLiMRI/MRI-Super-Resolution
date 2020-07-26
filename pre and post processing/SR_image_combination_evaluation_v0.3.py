@@ -105,17 +105,6 @@ def runSrImageCombinationAndEvaluation():
             pass
     
     for i in range(10): # Only plot and calculate first 10 SR HR image pairs among all entire_hr_image_data.shape[0] pairs SR HR
-        # Plot SR HR image pair
-        plt.subplot(1, 2, 1)
-        plt.imshow(entire_hr_image_data[i])
-        plt.title("HR_test_image")
-        plt.subplot(1, 2, 2)
-        plt.title("SR_test_image")
-        plt.imshow(entire_sr_image_data[i])
-        plt.suptitle("The %d th pair of HR vs SR" %(i + 1))
-        plt.subplots_adjust()
-        plt.show()
-
         print("max_I of entire_sr_image_data is", np.amax(entire_sr_image_data))
         print("max_I of entire_hr_image_data is", np.amax(entire_hr_image_data))
         # Here calculate SSIM of SR HR image pair
@@ -125,6 +114,17 @@ def runSrImageCombinationAndEvaluation():
         # Here calculate PSNR of SR HR image pair
         psnr_between_sr_hr = calculatePSNR(entire_sr_image_data[i], entire_hr_image_data[i], max_I = 1.0)   # max_I的是表示图像点颜色的最大数值
         print("PSNR between %d th SR HR MRI image: " %(i + 1), psnr_between_sr_hr)
+
+        # Plot SR HR image pair
+        plt.subplot(1, 2, 1)
+        plt.imshow(entire_hr_image_data[i])
+        plt.title("HR_test_image")
+        plt.subplot(1, 2, 2)
+        plt.title("SR_test_image")
+        plt.imshow(entire_sr_image_data[i])
+        plt.suptitle("The %d th pair of HR vs SR, SSIM is %f, PSNR is %f" %((i + 1), ssim_between_sr_hr, psnr_between_sr_hr))
+        plt.subplots_adjust()
+        plt.show()
 
 
 if __name__ == '__main__':
