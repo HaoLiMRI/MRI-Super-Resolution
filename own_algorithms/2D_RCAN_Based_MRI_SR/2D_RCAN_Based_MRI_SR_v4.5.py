@@ -35,6 +35,10 @@ This is a demo code of 2D_RCAN_Based_MRI_SR. in this version we have following i
     1) deformable conv kernel size based attention
     2) spatial attention(additional to channel attention) for normal processing inside each branch
     3) "end to end spatial and channel attention in one 3D conv format" for normal processing inside each branch
+
+We also fixed bugs from previous versions, typical ones like:
+    1) After PyTorch version 1.1, optimizer.step() must be invoked before scheduler.step() to setup the learning rate as scheduler sets up.
+        so from this version we now call optimizer.step() before scheduler.step()
        
       
     In this 2D version, the data format has been changed. The input data is just 64 x 64 2D matrix rather than 64 x 64 x 64, we already collapse all the 64 layers into only one layer in the data tailing and noise filtering processing
@@ -81,6 +85,7 @@ Note:
     function_that_needs_strings(my_list) # error!
     answer: function_that_needs_strings(*my_list) # works!
     see more information: https://stackoverflow.com/questions/3480184/unpack-a-list-in-python
+    d) After PyTorch version 1.1, optimizer.step() must be invoked before scheduler.step() to setup the learning rate as scheduler sets up.
     
 """
 
