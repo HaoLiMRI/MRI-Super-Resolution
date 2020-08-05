@@ -150,7 +150,8 @@ def calculateKSpaceUsingPytorch(img):
 def runSrImageCombinationAndEvaluation(Amplify_Small_Value_In_Gradient_Map):
     # Set up the folder where the .mat files exist
     """ file_dir = "D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/result/20200723_result_data_RCAN_l1_gradssim_laf_100_32_2folds_2d_downsize" """
-    file_dir = "D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/result/20200728_result_data_RCAN_l1_laf_100_32_2folds_2d_downsize(without_gradssim_l1_loss)"
+    """ file_dir = "D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/result/20200728_result_data_RCAN_l1_laf_100_32_2folds_2d_downsize(without_gradssim_l1_loss)" """
+    file_dir = "D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/result/20200801_result_data_RCAN_l1_gradssim_laf_100_32_2folds_2d_downsize_CoordConv"
     # Load the .mat files and combine cropped images into entire image and return
     collection_of_entire_image, list_of_file_name_without_suffix = loadMatFileDataAndCombineCroppedImage(file_dir)
     print(type(collection_of_entire_image))
