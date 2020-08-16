@@ -176,8 +176,8 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'default_conv', \
-    'activation_function_type': 'ReLU', 'type_of_network': 'wavelets_transform_dual_domain', 'gradient_operator': 'sobel'}
+args = {'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'coord_conv', \
+    'activation_function_type': 'Sine', 'type_of_network': 'wavelets_transform_dual_domain', 'gradient_operator': 'sobel'}
 # args['n_resgroups'] = 3, stands for number of RGs in RIR/RCAN
 # args['n_rcablocks'] = 3, stands for number of RCABs in one RG
 # args['n_feats'] = 128, stands for how many "number of channels" for feature map going through model
@@ -1398,6 +1398,7 @@ for epoch in range(EPOCH_NUM):
     gradient_grad_loss_test = 0
     test_loss_history = [0]
     k_space_branch_k_space_loss_test = 0
+    wavelets_high_frequency_components_branch_high_frequency_loss_test = 0
     
     
     for i, data in enumerate(trainloader, 0):
