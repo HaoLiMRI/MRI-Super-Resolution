@@ -163,8 +163,8 @@ since = time.perf_counter()
 0. Configure all parameter
 """""""""""""""""""""""""""""""""""""""""""""
 # --------------------------- configuration of support parameters --------------------------- #
-batch_size = 64
-EPOCH_NUM = 2000
+batch_size = 32
+EPOCH_NUM = 1180
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
 Maintain_Same_Size = False # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
@@ -183,9 +183,9 @@ plot_the_wavelets_transform_data_of_input_image = False
 # --------------------------- configuration of parameters for RCAN --------------------------- #
 args = {'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'default_conv', \
     'activation_function_type': 'ReLU', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
-    'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_decay'}
-args_loss_weight = {'feature_map_weight': 0.2, 'pixel_wise_weight': 200, 'k_space_weight': 0.02, 'ssim_weight': 1, \
-                    'gradient_img_weight': 10, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
+    'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts'}
+args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
+                    'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
                     'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, \
                     'ssim_luminance_weight': 2, 'ssim_contrast_weight': 2, 'ssim_structure_weight': 4}
 # args['n_resgroups'] = 3, stands for number of RGs in RIR/RCAN
@@ -198,11 +198,11 @@ args_loss_weight = {'feature_map_weight': 0.2, 'pixel_wise_weight': 200, 'k_spac
 # arg['type_of_network'] == 'RCAN', stands for type of network, e.g. 'RCAN', 'gradient_map_dual_domain', 'k_space_dual_domain', 'wavelets_transform_dual_domain'
 # arg['gradient_operator'] = ['sobel'] # stand for which gradient operator we want use for calculating gradient map, e.g. 'sobel', 'canny'
 # arg['optimizer'] = ['Adam'] # stand for which optimizer we want use for training, e.g. 'Adam', 'SGD_with_momentum', 'look_ahead'
-# arg['learning_rate_decay_method'] = ['cosine_learning_rate_decay'] # stand for which learning rate decay method we want use for training, e.g. 'cosine_learning_rate_decay', 'multi_step_learning_rate'
+# arg['learning_rate_decay_method'] = ['cosine_learning_rate_decay'] # stand for which learning rate decay method we want use for training, e.g. 'cosine_learning_rate_decay', 'multi_step_learning_rate', 'step_learning_rate', 'cosine_learning_rate_warm_restarts'
 
 
 """""""""""""""""""""""""""""""""""""""""""""
-1.1 MRI HR and LR Data pair preprocessing part
+1.1 MRI HR and LR Data pair preprocessing training part
 """""""""""""""""""""""""""""""""""""""""""""
 # =============================================================================
 # h5py.version
@@ -293,7 +293,7 @@ num_training_samples = math.floor(torch_data_low_resolution_sequence.size(0))
 print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
 
 """""""""""""""""""""""""""""""""""""""""""""
-1.2 Load MRI HR and LR Data pair part
+1.2 Load MRI HR and LR Data pair training part
 """""""""""""""""""""""""""""""""""""""""""""
 torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence.float()
 torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence.float()
@@ -320,7 +320,7 @@ trainloader = tc.utils.data.DataLoader(
 
 
 """""""""""""""""""""""""""""""""""""""""""""
-2.1 MRI HR and LR Validation Data pair preprocessing part
+2.1 MRI HR and LR Validation Data pair preprocessing validation part
 """""""""""""""""""""""""""""""""""""""""""""
 num_low_resolution_mat_file = 0
 num_high_resolution_groundtruth_mat_file = 0
@@ -403,7 +403,7 @@ num_validation_samples = math.floor(torch_data_low_resolution_sequence.size(0))
 print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
 
 """""""""""""""""""""""""""""""""""""""""""""
-2.2 Load MRI HR and LR Validation Data pair part
+2.2 Load MRI HR and LR Validation Data pair validation part
 """""""""""""""""""""""""""""""""""""""""""""
 torch_data_low_resolution_validation_sequence = torch_data_low_resolution_sequence.float()
 torch_data_high_resolution_groundtruth_validation_sequence = torch_data_high_resolution_groundtruth_sequence.float()
@@ -1463,11 +1463,15 @@ elif args['optimizer'] == 'SGD_with_momentum':
 "set scheduler"
 if args['learning_rate_decay_method'] == 'multi_step_learning_rate':
     scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
+elif args['learning_rate_decay_method'] == 'step_learning_rate':
+    scheduler = opt.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 elif args['learning_rate_decay_method'] == 'exponential_learning_rate':
     scheduler = opt.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 elif args['learning_rate_decay_method'] == 'cosine_learning_rate_decay':
     # See https://blog.zhujian.life/posts/6eb7f24f.html for more info 
     scheduler = opt.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCH_NUM, eta_min = 1e-8, last_epoch = -1) # 该函数实现了一个周期的余弦退火，可用于平缓的下降学习率
+elif args['learning_rate_decay_method'] == 'cosine_learning_rate_warm_restarts':
+    scheduler = opt.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0 = 10, T_mult = 2, eta_min = 1e-8, last_epoch = -1)
 
 "set loss related item"
 loss_function_MSE = nn.MSELoss().to(device)        #----- MSE loss
@@ -1540,6 +1544,11 @@ for epoch in range(EPOCH_NUM):
         # when applying deformable_conv).
         batch_number_training = batch_number_training + 1
         
+        "clear all stored gradients if there exist"
+        optimizer.zero_grad()
+        # print('The optimizer has been cleared' )
+        
+        
         if args['conv_layer_type'] == 'deformable_conv':
             tc.cuda.empty_cache()
         
@@ -1548,10 +1557,6 @@ for epoch in range(EPOCH_NUM):
         inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
         # print('The data have been loaded' )
                     
-        "clear all stored gradients if there exist"
-        optimizer.zero_grad()
-        # print('The optimizer has been cleared' )
-        
         "forward prop"
         # outputs = our_resnext(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
         img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(inputs) #-- or using default float as type, however remember to cast the input from Double to Float            
@@ -1687,9 +1692,10 @@ for epoch in range(EPOCH_NUM):
             # print('the backward pass has gone')
         
         "update all Variables by using newly fetched gradients"
-        """ optimizer.step() """
-        optimizer.step()
+        optimizer.step() 
+        """optimizer.step()
         scheduler.step()
+        print('learning rate: %f' % (optimizer.param_groups[0]['lr']))"""
         # print('the all Variables have been updated')
         
         "print log info"
@@ -1718,8 +1724,12 @@ for epoch in range(EPOCH_NUM):
         if network_model_type == 'Secondary branch is wavelets high frequency components branch' and tc.isnan(wavelets_high_frequency_components_branch_high_frequency_loss) != 1:
             wavelets_high_frequency_components_branch_high_frequency_loss_for_current_epoch = wavelets_high_frequency_components_branch_high_frequency_loss
         """
-            
-            
+#    optimizer.step()
+    print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
+    learning_rate = optimizer.param_groups[0]['lr']
+    scheduler.step() 
+    print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
+       
     with tc.no_grad():
         "Set evaluation Mode"    
         our_rcan_mri_sr_2d.eval()
@@ -1862,7 +1872,7 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('/srv/DATA/RAID/HaoLi/Results/20201021_RCAN_l1_ssim_grad_laf_2000_64_2folds_2d_downsize_baseline/20201021_RCAN_l1_ssim_grad_laf_2000_64_2folds_2d_downsize_baseline.txt', 'w')
+        f = open('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline.txt', 'w')
         f.write('The configuration of parameters:\n')
         f.write('batch_size is: %d\n' % batch_size)
         f.write('EPOCH_NUM is: %d\n' % EPOCH_NUM)
@@ -1879,6 +1889,7 @@ for epoch in range(EPOCH_NUM):
         f.write(' \n')
 #    f.write('Training Loss:')
 #    f.write('\n')    
+    f.write('Learning rate for current epoch is : %f' % (learning_rate))
     f.write('The feature_map_loss for epoch %d is : %f' % (epoch, feature_map_loss_for_current_epoch))
     f.write('\n')
     f.write('The pixel_wise_loss for epoch %d is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
@@ -2124,11 +2135,11 @@ with tc.no_grad():
     LR_images_test = LR_eval_tensor.numpy()
     HR_images_test = HR_eval_tensor.numpy()
     "save the .mat files for SR, HR and LR training images"
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201021_RCAN_l1_ssim_grad_laf_2000_64_2folds_2d_downsize_baseline/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
     if network_model_type != 'Single Branch Network':
-        scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201021_RCAN_l1_ssim_grad_laf_2000_64_2folds_2d_downsize_baseline/SR_secondary_branch_test.mat', mdict = {'SR_secondary_branch_test' : SR_secondary_branch_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201021_RCAN_l1_ssim_grad_laf_2000_64_2folds_2d_downsize_baseline/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201021_RCAN_l1_ssim_grad_laf_2000_64_2folds_2d_downsize_baseline/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
+        scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/SR_secondary_branch_test.mat', mdict = {'SR_secondary_branch_test' : SR_secondary_branch_test})
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
         
     
     #        for j in range(new_batch_size_for_checking):
