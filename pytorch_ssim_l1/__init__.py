@@ -14,7 +14,7 @@ def create_window(window_size, channel):
     window = Variable(_2D_window.expand(channel, 1, window_size, window_size).contiguous())
     return window
 
-def _ssim(img1, img2, window, window_size, channel, size_average = True):
+def _ssim(img1, img2, window, window_size, channel, size_average = True, luminance_weight = 1, contrast_weight = 1, structure_weight = 1):
     mu1 = F.conv2d(img1, window, padding = window_size//2, groups = channel)
     mu2 = F.conv2d(img2, window, padding = window_size//2, groups = channel)
 
@@ -33,25 +33,28 @@ def _ssim(img1, img2, window, window_size, channel, size_average = True):
     luminance_factor = (2*mu1_mu2 + C1)/(mu1_sq + mu2_sq + C1)
     contrast_factor = (2*torch.sqrt(sigma1_sq)*torch.sqrt(sigma2_sq)+C2)/(sigma1_sq + sigma2_sq + C2)
     structure_factor = (sigma12 + C3)/(torch.sqrt(sigma1_sq)*torch.sqrt(sigma2_sq)+C3)
-    print('Luminance: ',luminance_factor.mean())
-    print('Contrast: ',contrast_factor.mean())
-    print('Structure: ',structure_factor.mean())
+#    print('Luminance: ',luminance_factor.mean())
+#    print('Contrast: ',contrast_factor.mean())
+#    print('Structure: ',structure_factor.mean())
     
 #    ssim_map = ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2))
-    ssim_map = luminance_factor * contrast_factor * (structure_factor**4)
-    print('ssim: ', ssim_map.mean())
+    ssim_map_weighted = (luminance_factor**luminance_weight) * (contrast_factor**contrast_weight) * (structure_factor**structure_weight)
+#    print('ssim: ', ssim_map.mean())
     if size_average:
-        return ssim_map
+        return ssim_map_weighted.mean()
     else:
-        return ssim_map.mean(1).mean(1).mean(1)
+        return ssim_map_weighted.mean(1).mean(1).mean(1)
 
 class SSIM(torch.nn.Module):
-    def __init__(self, window_size = 11, size_average = True):
+    def __init__(self, window_size = 11, size_average = True, luminance_weight = 1, contrast_weight = 1, structure_weight = 1):
         super(SSIM, self).__init__()
         self.window_size = window_size
         self.size_average = size_average
         self.channel = 1
         self.window = create_window(window_size, self.channel)
+        self.luminance_weight = luminance_weight
+        self.contrast_weight = contrast_weight
+        self.structure_weight = structure_weight
 
     def forward(self, img1, img2):
         (_, channel, _, _) = img1.size()
@@ -69,9 +72,9 @@ class SSIM(torch.nn.Module):
             self.channel = channel
 
 
-        return _ssim(img1, img2, window, self.window_size, channel, self.size_average)
+        return _ssim(img1, img2, window, self.window_size, channel, self.size_average, self.luminance_weight, self.contrast_weight, self.structure_weight)
 
-def ssim(img1, img2, window_size = 11, size_average = True):
+def ssim(img1, img2, window_size = 11, size_average = True, luminance_weight = 1, contrast_weight = 1, structure_weight = 1):
     (_, channel, _, _) = img1.size()
     window = create_window(window_size, channel)
     
@@ -79,4 +82,4 @@ def ssim(img1, img2, window_size = 11, size_average = True):
         window = window.cuda(img1.get_device())
     window = window.type_as(img1)
     
-    return _ssim(img1, img2, window, window_size, channel, size_average)
+    return _ssim(img1, img2, window, window_size, channel, size_average, luminance_weight, contrast_weight, structure_weight)
