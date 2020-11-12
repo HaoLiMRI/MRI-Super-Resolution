@@ -178,7 +178,7 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'coord_conv', \
+args = {'n_resgroups': 20, 'n_rcablocks': 10, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'coord_conv', \
     'activation_function_type': 'Sine', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
     'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_decay'}
 # args['n_resgroups'] = 3, stands for number of RGs in RIR/RCAN
