@@ -143,6 +143,7 @@ import scipy.io
 from torchvision.models import vgg19
 from pytorch_wavelets import DWT, IDWT # (or import DWTForward, DWTInverse)
 import copy
+import pickle
 
 import pytorch_ssim_l1
 from optimizer import lookahead
@@ -184,7 +185,7 @@ plot_the_wavelets_transform_data_of_input_image = False
 # --------------------------- configuration of parameters for RCAN --------------------------- #
 args = {'n_resgroups': 20, 'n_rcablocks': 10, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'default_conv', \
     'activation_function_type': 'ReLU', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
-    'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_decay'}
+    'optimizer': 'Adam', 'learning_rate_decay_method': 'step_learning_rate'}
 #args_loss_component = {'feature_map_loss': True, 'k_space_loss_img_branch': True, 'gradient_loss_img_branch': True, \
 #                       'ssim_loss': True, 'gram_matrix_loss': True}
 args_loss_weight = {'feature_map_weight': 0.2, 'pixel_wise_weight': 200, 'k_space_weight': 0.02, 'ssim_weight': 1, \
@@ -1447,6 +1448,13 @@ class RCAN_MRI_SR_2D(nn.Module):
 device=tc.device("cuda" if use_cuda else "cpu")
 our_rcan_mri_sr_2d = RCAN_MRI_SR_2D(args)
 """
+parameter_file = open('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/20201111_network_parameter.pkl', 'rb')
+best_model_wts = pickle.load(parameter_file)
+parameter_file.close()
+our_rcan_mri_sr_2d.load_state_dict(best_model_wts)
+print("Saved model loaded")
+"""
+"""
 for m in our_rcan_mri_sr_2d.modules():
     if isinstance(m,(nn.Conv2d,nn.Linear)):
         nn.init.kaiming_normal_(m.weight,mode='fan_in',nonlinearity='relu')
@@ -1481,7 +1489,7 @@ elif args['optimizer'] == 'SGD_with_momentum':
 if args['learning_rate_decay_method'] == 'multi_step_learning_rate':
     scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
 elif args['learning_rate_decay_method'] == 'step_learning_rate':
-    scheduler = opt.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    scheduler = opt.lr_scheduler.StepLR(optimizer, step_size=60, gamma=0.5)
 elif args['learning_rate_decay_method'] == 'exponential_learning_rate':
     scheduler = opt.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 elif args['learning_rate_decay_method'] == 'cosine_learning_rate_decay':
@@ -1546,7 +1554,7 @@ gradient_grad_loss_test = []
 wavelets_high_frequency_components_branch_high_frequency_loss_training = []
 wavelets_high_frequency_components_branch_high_frequency_loss_test = []
 
-best_acc = 0.0
+best_ssim = 0.0
 
 for epoch in range(EPOCH_NUM):
     "Set training mode"
@@ -1768,7 +1776,7 @@ for epoch in range(EPOCH_NUM):
             wavelets_high_frequency_components_branch_high_frequency_loss_for_current_epoch = wavelets_high_frequency_components_branch_high_frequency_loss
         """
 #    optimizer.step()
-    print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
+    print('learning rate for epoch %d is : %f' % (epoch+1, optimizer.param_groups[0]['lr']))
     learning_rate = optimizer.param_groups[0]['lr']
     scheduler.step() 
     print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
@@ -1847,12 +1855,17 @@ for epoch in range(EPOCH_NUM):
                 wavelets_high_frequency_components_branch_high_frequency_loss_test.append(args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 0, :, :], HR_high_frequency_components_test[:, :, 0, :, :]) + \
                     args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 1, :, :], HR_high_frequency_components_test[:, :, 1, :, :]) + args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 2, :, :], HR_high_frequency_components_test[:, :, 2, :, :]))
     
-    print("best_acc:", best_acc)
-    print("mean ssim:", tc.mean(tc.stack(ssim_test)))
-    if tc.mean(tc.stack(ssim_test))>best_acc:
-        best_acc = tc.mean(tc.stack(ssim_test))
+    "Save networks' parameters of best ssim"
+    print("best_ssim:", best_ssim)
+    print("mean_ssim:", tc.mean(tc.stack(ssim_test)))
+    if tc.mean(tc.stack(ssim_test))>best_ssim:
+        best_ssim = tc.mean(tc.stack(ssim_test))
         best_model_wts = copy.deepcopy(our_rcan_mri_sr_2d.state_dict())
-#        print(best_model_wts)
+        parameter_file = open('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/20201111_network_parameter.pkl', 'wb')
+        pickle.dump(best_model_wts, parameter_file)
+        parameter_file.close()
+        best_epoch = epoch
+#        print(type(best_model_wts))
     
     loss_test = pixel_wise_loss
     if Use_Feature_Map_Loss == True:
@@ -1948,6 +1961,8 @@ for epoch in range(EPOCH_NUM):
         f.write(' \n')
 #    f.write('Training Loss:')
 #    f.write('\n')    
+    f.write('Best epoch: %d' % (best_epoch))
+    f.write('\n')
     f.write('Learning rate for current epoch is : %f' % (learning_rate))
     f.write('\n')
     if Use_Feature_Map_Loss == True:
@@ -2011,9 +2026,72 @@ for epoch in range(EPOCH_NUM):
     if (epoch == EPOCH_NUM - 1):
         f.close()
 
+"Reload best parameters"
 our_rcan_mri_sr_2d.load_state_dict(best_model_wts)
 
 print("training complete")
+
+
+
+"Save validation results"
+our_rcan_mri_sr_2d.eval()
+with tc.no_grad():
+    "predict the SR MRI image by using testing LR image data and save them"
+    # =============================================================================
+    # for data in testloader:
+    # =============================================================================
+    for i, validation_data in enumerate(validationloader, 0):
+    
+        #    LR_images_test, HR_images_test = testing_data_2
+        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
+        #    outputs = our_rcan_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+        # =============================================================================
+        #     print(outputs.data.size())
+        # =============================================================================
+    
+#       if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
+    
+        LR_images_validation, HR_images_validation = validation_data
+        HR_images_validation = HR_images_validation.type(tc.FloatTensor)
+        img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(Variable(LR_images_validation).type(tc.FloatTensor).to(device))
+        
+        #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
+        SR_images_tensor_test = img_outputs.data.cpu().squeeze(1)
+        if secondary_branch_outputs != None:
+            SR_secondary_branch_tensor_test = secondary_branch_outputs.data.cpu().squeeze(1)
+        LR_images_tensor_test = LR_images_validation.cpu().squeeze(1)
+        HR_images_tensor_test = HR_images_validation.cpu().squeeze(1)
+        # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
+        # =============================================================================
+        #         print(SR_images_tensor.size())
+        # =============================================================================
+        # print(HR_images_tensor.size())    
+        
+        # HR_images_test = HR_images_tensor.numpy()
+        if i==0:
+            SR_img_eval_tensor = SR_images_tensor_test
+            if secondary_branch_outputs != None:
+                SR_secondary_branch_eval_tensor = SR_secondary_branch_tensor_test
+            LR_eval_tensor = LR_images_tensor_test
+            HR_eval_tensor = HR_images_tensor_test
+        else:
+            SR_img_eval_tensor = tc.cat((SR_img_eval_tensor, SR_images_tensor_test), 0)
+            if secondary_branch_outputs != None:
+                SR_secondary_branch_eval_tensor = tc.cat((SR_secondary_branch_eval_tensor, SR_secondary_branch_tensor_test), 0)
+            LR_eval_tensor = tc.cat((LR_eval_tensor, LR_images_tensor_test), 0)
+            HR_eval_tensor = tc.cat((HR_eval_tensor, HR_images_tensor_test), 0)
+        
+    SR_images_test = SR_img_eval_tensor.numpy()
+    if secondary_branch_outputs != None:
+        SR_secondary_branch_test = SR_secondary_branch_eval_tensor.numpy()
+    LR_images_test = LR_eval_tensor.numpy()
+    HR_images_test = HR_eval_tensor.numpy()
+    "save the .mat files for SR, HR and LR training images"
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/SR_validation_image.mat', mdict = {'SR_validation_image' : SR_images_test})
+    if secondary_branch_outputs != None:
+        scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/SR_secondary_branch_validation.mat', mdict = {'SR_secondary_branch_validation' : SR_secondary_branch_test})
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/HR_validation_image.mat', mdict = {'HR_validation_image' : HR_images_test})
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/LR_validation_image.mat', mdict = {'LR_validation_image' : LR_images_test})
 
 
 
@@ -2093,70 +2171,6 @@ testloader = tc.utils.data.DataLoader(
 #                    num_workers = 0)
 our_rcan_mri_sr_2d.eval()
 with tc.no_grad():
-    
-    
-    
-    
-    
-    
-    
-    
-    "predict the SR MRI image by using testing LR image data and save them"
-    # =============================================================================
-    # for data in testloader:
-    # =============================================================================
-    for i, validation_data in enumerate(validationloader, 0):
-    
-        #    LR_images_test, HR_images_test = testing_data_2
-        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-        #    outputs = our_rcan_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
-        # =============================================================================
-        #     print(outputs.data.size())
-        # =============================================================================
-    
-#       if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
-    
-        LR_images_validation, HR_images_validation = validation_data
-        HR_images_validation = HR_images_validation.type(tc.FloatTensor)
-        img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(Variable(LR_images_validation).type(tc.FloatTensor).to(device))
-        
-        #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
-        SR_images_tensor_test = img_outputs.data.cpu().squeeze(1)
-        if network_model_type != 'Single Branch Network':
-            SR_secondary_branch_tensor_test = secondary_branch_outputs.data.cpu().squeeze(1)
-        LR_images_tensor_test = LR_images_validation.cpu().squeeze(1)
-        HR_images_tensor_test = HR_images_validation.cpu().squeeze(1)
-        # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
-        # =============================================================================
-        #         print(SR_images_tensor.size())
-        # =============================================================================
-        # print(HR_images_tensor.size())    
-        
-        # HR_images_test = HR_images_tensor.numpy()
-        if i==0:
-            SR_img_eval_tensor = SR_images_tensor_test
-            if network_model_type != 'Single Branch Network':
-                SR_secondary_branch_eval_tensor = SR_secondary_branch_tensor_test
-            LR_eval_tensor = LR_images_tensor_test
-            HR_eval_tensor = HR_images_tensor_test
-        else:
-            SR_img_eval_tensor = tc.cat((SR_img_eval_tensor, SR_images_tensor_test), 0)
-            if network_model_type != 'Single Branch Network':
-                SR_secondary_branch_eval_tensor = tc.cat((SR_secondary_branch_eval_tensor, SR_secondary_branch_tensor_test), 0)
-            LR_eval_tensor = tc.cat((LR_eval_tensor, LR_images_tensor_test), 0)
-            HR_eval_tensor = tc.cat((HR_eval_tensor, HR_images_tensor_test), 0)
-        
-    SR_images_test = SR_img_eval_tensor.numpy()
-    if network_model_type != 'Single Branch Network':
-        SR_secondary_branch_test = SR_secondary_branch_eval_tensor.numpy()
-    LR_images_test = LR_eval_tensor.numpy()
-    HR_images_test = HR_eval_tensor.numpy()
-    "save the .mat files for SR, HR and LR training images"
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/SR_validation_image.mat', mdict = {'SR_validation_image' : SR_images_test})
-    if network_model_type != 'Single Branch Network':
-        scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/SR_secondary_branch_validation.mat', mdict = {'SR_secondary_branch_validation' : SR_secondary_branch_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/HR_validation_image.mat', mdict = {'HR_validation_image' : HR_images_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/LR_validation_image.mat', mdict = {'LR_validation_image' : LR_images_test})
 
 #    "exam the generated SR MRI image by using training LR image data and save them"
     # =============================================================================
@@ -2233,7 +2247,7 @@ with tc.no_grad():
         
         #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
         SR_images_tensor_test = img_outputs.data.cpu().squeeze(1)
-        if network_model_type != 'Single Branch Network':
+        if secondary_branch_outputs != None:
             SR_secondary_branch_tensor_test = secondary_branch_outputs.data.cpu().squeeze(1)
         LR_images_tensor_test = LR_images_test.cpu().squeeze(1)
         HR_images_tensor_test = HR_images_test.cpu().squeeze(1)
@@ -2246,25 +2260,25 @@ with tc.no_grad():
         # HR_images_test = HR_images_tensor.numpy()
         if i==0:
             SR_img_eval_tensor = SR_images_tensor_test
-            if network_model_type != 'Single Branch Network':
+            if secondary_branch_outputs != None:
                 SR_secondary_branch_eval_tensor = SR_secondary_branch_tensor_test
             LR_eval_tensor = LR_images_tensor_test
             HR_eval_tensor = HR_images_tensor_test
         else:
             SR_img_eval_tensor = tc.cat((SR_img_eval_tensor, SR_images_tensor_test), 0)
-            if network_model_type != 'Single Branch Network':
+            if secondary_branch_outputs != None:
                 SR_secondary_branch_eval_tensor = tc.cat((SR_secondary_branch_eval_tensor, SR_secondary_branch_tensor_test), 0)
             LR_eval_tensor = tc.cat((LR_eval_tensor, LR_images_tensor_test), 0)
             HR_eval_tensor = tc.cat((HR_eval_tensor, HR_images_tensor_test), 0)
         
     SR_images_test = SR_img_eval_tensor.numpy()
-    if network_model_type != 'Single Branch Network':
+    if secondary_branch_outputs != None:
         SR_secondary_branch_test = SR_secondary_branch_eval_tensor.numpy()
     LR_images_test = LR_eval_tensor.numpy()
     HR_images_test = HR_eval_tensor.numpy()
     "save the .mat files for SR, HR and LR training images"
     scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-    if network_model_type != 'Single Branch Network':
+    if secondary_branch_outputs != None:
         scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/SR_secondary_branch_test.mat', mdict = {'SR_secondary_branch_test' : SR_secondary_branch_test})
     scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
     scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
