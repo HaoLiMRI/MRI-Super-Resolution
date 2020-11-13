@@ -144,7 +144,7 @@ from torchvision.models import vgg19
 from pytorch_wavelets import DWT, IDWT # (or import DWTForward, DWTInverse)
 
 
-import pytorch_ssim_l1
+import pytorch_ssim_l1_weighted
 from optimizer import lookahead
 
 "-------------------------------------------------------------------------------------------------"
@@ -164,7 +164,7 @@ since = time.perf_counter()
 """""""""""""""""""""""""""""""""""""""""""""
 # --------------------------- configuration of support parameters --------------------------- #
 batch_size = 32
-EPOCH_NUM = 1180
+EPOCH_NUM = 1000
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
 Maintain_Same_Size = False # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
@@ -181,9 +181,9 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'default_conv', \
+args = {'n_resgroups': 20, 'n_rcablocks': 10, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'default_conv', \
     'activation_function_type': 'ReLU', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
-    'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts'}
+    'optimizer': 'Adam', 'learning_rate_decay_method': 'step_learning_rate'}
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
                     'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
                     'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, \
@@ -1464,7 +1464,7 @@ elif args['optimizer'] == 'SGD_with_momentum':
 if args['learning_rate_decay_method'] == 'multi_step_learning_rate':
     scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
 elif args['learning_rate_decay_method'] == 'step_learning_rate':
-    scheduler = opt.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    scheduler = opt.lr_scheduler.StepLR(optimizer, step_size=60, gamma=0.5)
 elif args['learning_rate_decay_method'] == 'exponential_learning_rate':
     scheduler = opt.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 elif args['learning_rate_decay_method'] == 'cosine_learning_rate_decay':
@@ -1480,7 +1480,7 @@ loss_function_L1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
 
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
-SSIM_function = pytorch_ssim_l1.SSIM(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
+SSIM_function = pytorch_ssim_l1_weighted.SSIM(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
 
 # =============================================================================
 # print('The loss function is L1Loss')
@@ -1737,6 +1737,10 @@ for epoch in range(EPOCH_NUM):
             
             batch_number_test += 1
             
+            "load input data"
+            inputs, labels = data
+            inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
+            
             SR_img_test, SR_secondary_branch_outputs_test, network_model_type_test = our_rcan_mri_sr_2d(inputs)
             
             SR_test_copies = tc.cat((SR_img_test, SR_img_test, SR_img_test), 1)
@@ -1872,7 +1876,7 @@ for epoch in range(EPOCH_NUM):
     
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline.txt', 'w')
+        f = open('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline.txt', 'w')
         f.write('The configuration of parameters:\n')
         f.write('batch_size is: %d\n' % batch_size)
         f.write('EPOCH_NUM is: %d\n' % EPOCH_NUM)
@@ -2135,11 +2139,11 @@ with tc.no_grad():
     LR_images_test = LR_eval_tensor.numpy()
     HR_images_test = HR_eval_tensor.numpy()
     "save the .mat files for SR, HR and LR training images"
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
     if network_model_type != 'Single Branch Network':
-        scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/SR_secondary_branch_test.mat', mdict = {'SR_secondary_branch_test' : SR_secondary_branch_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
+        scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/SR_secondary_branch_test.mat', mdict = {'SR_secondary_branch_test' : SR_secondary_branch_test})
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
+    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201111_RCAN_l1_ssim_grad_cosine_1000_32_2folds_2d_downsize_new_baseline/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
         
     
     #        for j in range(new_batch_size_for_checking):
