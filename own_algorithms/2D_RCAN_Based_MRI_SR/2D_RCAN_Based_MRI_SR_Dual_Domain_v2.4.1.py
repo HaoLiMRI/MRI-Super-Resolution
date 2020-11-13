@@ -1466,6 +1466,7 @@ class LearningRateWarmUP(object):
             param_group['lr'] = warmup_lr
 
     def step(self, cur_iteration):
+	cur_iteration += 1
         if cur_iteration <= self.warmup_iteration:
             self.warmup_learning_rate(cur_iteration)
         else:
@@ -1564,7 +1565,7 @@ for epoch in range(EPOCH_NUM):
     if args['Use_Learning_Rate_Warm_Up'] == True:
         print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
         learning_rate = optimizer.param_groups[0]['lr']
-        scheduler.step() 
+        scheduler.step(epoch) 
         print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
         
     for i, data in enumerate(trainloader, 0):
