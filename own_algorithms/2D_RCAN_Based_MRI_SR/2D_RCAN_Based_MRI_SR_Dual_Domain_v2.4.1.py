@@ -181,9 +181,9 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 20, 'n_rcablocks': 10, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'default_conv', \
+args = {'n_resgroups': 10, 'n_rcablocks': 10, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'default_conv', \
     'activation_function_type': 'ReLU', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
-    'optimizer': 'Adam', 'learning_rate_decay_method': 'step_learning_rate'}
+    'optimizer': 'Adam', 'learning_rate_decay_method': 'step_learning_rate', 'Use_Learning_Rate_Warm_Up': True}
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
                     'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
                     'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, \
@@ -1452,6 +1452,25 @@ print('this is our FFT_K_SPACE: ', fft_k_space)
 """""""""""""""""""""""""""""""""""""""
 4. Setup optimization algorithm part
 """""""""""""""""""""""""""""""""""""""
+"Setup WarmUp Scheduler"
+class LearningRateWarmUP(object):
+    def __init__(self, optimizer, warmup_iteration, target_lr, after_scheduler=None):
+        self.optimizer = optimizer
+        self.warmup_iteration = warmup_iteration
+        self.target_lr = target_lr
+        self.after_scheduler = after_scheduler
+
+    def warmup_learning_rate(self, cur_iteration):
+        warmup_lr = self.target_lr*float(cur_iteration)/float(self.warmup_iteration)
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = warmup_lr
+
+    def step(self, cur_iteration):
+        if cur_iteration <= self.warmup_iteration:
+            self.warmup_learning_rate(cur_iteration)
+        else:
+            self.after_scheduler.step(cur_iteration-self.warmup_iteration)
+            
 "set an optimizer"
 if args['optimizer'] == 'look_ahead':
     base_opt = opt.Adam(our_rcan_mri_sr_2d.parameters(), lr=1e-3, betas=(0.9, 0.999)) #----- use Adam algorithm as based optimizer A
@@ -1472,6 +1491,14 @@ elif args['learning_rate_decay_method'] == 'cosine_learning_rate_decay':
     scheduler = opt.lr_scheduler.CosineAnnealingLR(optimizer, T_max = EPOCH_NUM, eta_min = 1e-8, last_epoch = -1) # 该函数实现了一个周期的余弦退火，可用于平缓的下降学习率
 elif args['learning_rate_decay_method'] == 'cosine_learning_rate_warm_restarts':
     scheduler = opt.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0 = 10, T_mult = 2, eta_min = 1e-8, last_epoch = -1)
+if args['Use_Learning_Rate_Warm_Up'] == True:
+    warmup_epoch = 10
+    lr = 0.0001
+    scheduler = LearningRateWarmUP(optimizer=optimizer,
+                                   warmup_iteration=warmup_epoch,
+                                   target_lr=lr,
+                                   after_scheduler=scheduler)
+
 
 "set loss related item"
 loss_function_MSE = nn.MSELoss().to(device)        #----- MSE loss
@@ -1534,7 +1561,12 @@ for epoch in range(EPOCH_NUM):
     wavelets_high_frequency_components_branch_high_frequency_loss_training = 0.0
     wavelets_high_frequency_components_branch_high_frequency_loss_test = 0.0
     
-    
+    if args['Use_Learning_Rate_Warm_Up'] == True:
+        print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
+        learning_rate = optimizer.param_groups[0]['lr']
+        scheduler.step() 
+        print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
+        
     for i, data in enumerate(trainloader, 0):
 # =============================================================================
 #         print('This is the ', i, ' batch for the ', epoch, ' epoch' )
@@ -1725,10 +1757,11 @@ for epoch in range(EPOCH_NUM):
             wavelets_high_frequency_components_branch_high_frequency_loss_for_current_epoch = wavelets_high_frequency_components_branch_high_frequency_loss
         """
 #    optimizer.step()
-    print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
-    learning_rate = optimizer.param_groups[0]['lr']
-    scheduler.step() 
-    print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
+    if args['Use_Learning_Rate_Warm_Up'] == False:
+        print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
+        learning_rate = optimizer.param_groups[0]['lr']
+        scheduler.step() 
+        print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
        
     with tc.no_grad():
         "Set evaluation Mode"    
