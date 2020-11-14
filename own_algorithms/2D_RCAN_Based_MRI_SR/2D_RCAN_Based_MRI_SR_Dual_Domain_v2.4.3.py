@@ -1566,8 +1566,8 @@ for epoch in range(EPOCH_NUM):
     wavelets_high_frequency_components_branch_high_frequency_loss_training = 0.0
     wavelets_high_frequency_components_branch_high_frequency_loss_test = 0.0
     if args['Use_Learning_Rate_Warm_Up'] == True:
-        learning_rate = optimizer.param_groups[0]['lr']
         scheduler.step(epoch)
+	learning_rate = optimizer.param_groups[0]['lr']
         print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
 
     
