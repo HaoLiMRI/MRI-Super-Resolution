@@ -1740,10 +1740,10 @@ for epoch in range(EPOCH_NUM):
         if i % 50 == 0: #----- print log info every 1000 batch
             if i == 0:
                 print('[%d, %5d] loss: %.3f' \
-                      % (epoch, i+1, running_loss))
+                      % (epoch, i, running_loss))
             else:
                 print('[%d, %5d] loss: %.3f' \
-                      % (epoch, i+1, running_loss / 50))
+                      % (epoch, i, running_loss / 50))
             running_loss = 0.0
         """
         training_loss_for_current_epoch = loss_training / 50
