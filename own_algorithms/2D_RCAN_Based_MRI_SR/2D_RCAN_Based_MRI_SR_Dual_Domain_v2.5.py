@@ -13,7 +13,7 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 2.3.0(Stable Version except deformable_conv, although already used tc.cuda.empty_cache() for deformable_conv)
+Version: 2.5.0(Stable Version except deformable_conv, although already used tc.cuda.empty_cache() for deformable_conv)
 """
 "-------------------------------------------------------------------------------------------------"
 """
