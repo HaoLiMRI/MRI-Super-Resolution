@@ -59,7 +59,8 @@ This is a demo code of 2D_RCAN_Based_MRI_SR_Dual_Domain. in this version we have
         such, thus avoid "unstable" training(e.g. The loss becomes very large suddenly in the first several epoch).
         Warm up指的是用一个小的学习率先训练几个epoch，这是因为网络的参数是随机初始化的，假如一开始就采用较大的学习率容易出现数值不稳定，这也是为什么要使用Warm up。
         然后等到训练过程基本上稳定了就可以使用原始的初始学习率进行训练了。
-    21) Re-implement deformable conv filter(search ConvOffset2D), to make it runnable now without memory problem. Tested with RCAN network.
+    21) Re-implement deformable conv filter(search ConvOffset2D), to make it runnable now without memory problem. Only tested with RCAN network, defaul conv, ReLU.
+    22) option to use Dynamic ReLU Type A and Type B activation function
     
     we will plan to support other features:
     1) multi-kernel size deformable conv in different paths and fuse together, see [26] for similar idea
@@ -201,8 +202,8 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 128, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'deformable_conv', \
-    'activation_function_type': 'ReLU', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
+args = {'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'deformable_conv', \
+    'activation_function_type': 'Dynamic_ReLU_Type_B', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
     'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
     'use_learning_rate_warm_up': True, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
@@ -215,7 +216,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # args['reduction'] = 16, stands for reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
 # args['scale'] = 4, stands for resize factor, e.g. 2, 4
 # args['conv_layer_type'] = 'default_conv', stands for type of conv layer, e.g. 'default_conv', 'coord_conv', 'deformable_conv', 'py_conv'
-# args['activation_function_type'] = 'ReLU', stands for type of activation function, e.g. 'ReLU'. 'Sine', 'FReLU'
+# args['activation_function_type'] = 'ReLU', stands for type of activation function, e.g. 'ReLU'. 'Sine', 'FReLU', 'Dynamic_ReLU_Type_A', 'Dynamic_ReLU_Type_B'
 # arg['type_of_network'] == 'RCAN', stands for type of network, e.g. 'RCAN', 'gradient_map_dual_domain', 'k_space_dual_domain', 'wavelets_transform_dual_domain'
 # arg['gradient_operator'] = ['sobel'] # stand for which gradient operator we want use for calculating gradient map, e.g. 'sobel', 'canny'
 # arg['optimizer'] = ['Adam'] # stand for which optimizer we want use for training, e.g. 'Adam', 'SGD_with_momentum', 'look_ahead'
@@ -961,6 +962,73 @@ class FReLU(nn.Module):
         return x
 
 
+"Dynamic ReLU Activation Function"
+"""
+2020.Dynamic ReLU. https://arxiv.org/abs/2003.10027
+"""
+class DyReLU(nn.Module):
+    def __init__(self, channels, reduction=4, k=2, conv_type='2d'):
+        super(DyReLU, self).__init__()
+        self.channels = channels
+        self.k = k
+        self.conv_type = conv_type
+        assert self.conv_type in ['1d', '2d']
+        self.fc1 = nn.Linear(channels, channels // reduction)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Linear(channels // reduction, 2*k)
+        self.sigmoid = nn.Sigmoid()
+        self.register_buffer('lambdas', tc.Tensor([1.]*k + [0.5]*k).float())
+        self.register_buffer('init_v', tc.Tensor([1.] + [0.]*(2*k - 1)).float())
+    def get_relu_coefs(self, x):
+        theta = tc.mean(x, axis=-1)
+        if self.conv_type == '2d':
+            theta = tc.mean(theta, axis=-1)
+        theta = self.fc1(theta)
+        theta = self.relu(theta)
+        theta = self.fc2(theta)
+        theta = 2 * self.sigmoid(theta) - 1
+        return theta
+    def forward(self, x):
+        raise NotImplementedError
+
+class DyReLUA(DyReLU):
+    def __init__(self, channels, reduction=4, k=2, conv_type='2d'):
+        super(DyReLUA, self).__init__(channels, reduction, k, conv_type)
+        self.fc2 = nn.Linear(channels // reduction, 2*k)
+    def forward(self, x):
+        assert x.shape[1] == self.channels
+        theta = self.get_relu_coefs(x)
+        relu_coefs = theta.view(-1, 2*self.k) * self.lambdas + self.init_v
+        # BxCxL -> LxCxBx1
+        x_perm = x.transpose(0, -1).unsqueeze(-1)
+        output = x_perm * relu_coefs[:, :self.k] + relu_coefs[:, self.k:]
+        # LxCxBx2 -> BxCxL
+        result = tc.max(output, dim=-1)[0].transpose(0, -1)
+        return result
+
+class DyReLUB(DyReLU):
+    def __init__(self, channels, reduction=4, k=2, conv_type='2d'):
+        super(DyReLUB, self).__init__(channels, reduction, k, conv_type)
+        self.fc2 = nn.Linear(channels // reduction, 2*k*channels)
+    def forward(self, x):
+        assert x.shape[1] == self.channels
+        theta = self.get_relu_coefs(x)
+        relu_coefs = theta.view(-1, self.channels, 2*self.k) * self.lambdas + self.init_v
+        if self.conv_type == '1d':
+            # BxCxL -> LxBxCx1
+            x_perm = x.permute(2, 0, 1).unsqueeze(-1)
+            output = x_perm * relu_coefs[:, :, :self.k] + relu_coefs[:, :, self.k:]
+            # LxBxCx2 -> BxCxL
+            result = tc.max(output, dim=-1)[0].permute(1, 2, 0)
+        elif self.conv_type == '2d':
+            # BxCxHxW -> HxWxBxCx1
+            x_perm = x.permute(2, 3, 0, 1).unsqueeze(-1)
+            output = x_perm * relu_coefs[:, :, :self.k] + relu_coefs[:, :, self.k:]
+            # HxWxBxCx2 -> BxCxHxW
+            result = tc.max(output, dim=-1)[0].permute(2, 3, 0, 1)
+        return result
+
+
 "FeatureExtractor"
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -1090,6 +1158,10 @@ class RCAB(nn.Module):
             if i == 0: 
                 if act == 'FReLU':
                     modules_body.append(FReLU(n_feat))
+                elif act == 'Dynamic_ReLU_Type_A':
+                    modules_body.append(DyReLUA(n_feat, conv_type='2d'))
+                elif act == 'Dynamic_ReLU_Type_B':
+                    modules_body.append(DyReLUB(n_feat, conv_type='2d'))
                 else:
                     modules_body.append(act)
         modules_body.append(CALayer(n_feat, reduction)) # CA
@@ -1346,6 +1418,10 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             act = Sine(w0 = 1.0)
         elif args['activation_function_type'] == 'FReLU':
             act = 'FReLU'
+        elif args['activation_function_type'] == 'Dynamic_ReLU_Type_A':
+            act = 'Dynamic_ReLU_Type_A'
+        elif args['activation_function_type'] == 'Dynamic_ReLU_Type_B':
+            act = 'Dynamic_ReLU_Type_B'
 
         n_resgroups = args['n_resgroups'] # number of RGs in RIR/RCAN
         n_rcablocks = args['n_rcablocks'] # number of RCABs in one RG
