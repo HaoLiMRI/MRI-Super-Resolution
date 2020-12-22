@@ -80,7 +80,9 @@ This is a demo code of 2D_RCAN_U-Net_Based_MRI_SR_Dual_Domain. in this version w
             both image branch and seconfary branch first, then append U-Net on the fused feature map. But both the 'gradient_map_dual_domain' and 'k_space_dual_domain' append 
             U-Net inside both image branch and secondary branch seperately, rather than append U-Net after fusion of the feature maps from image branch and secondary branch, 
             this may NOT the architecture we expect to set. Thus we should consider change the code of appending U-Net submodule for 'gradient_map_dual_domain' and 'k_space_dual_domain'.
-    22) Re-implement deformable conv filter(search ConvOffset2D), to make it runnable now without memory problem. Tested with RCAN + U-Net network.
+    22) Re-implement deformable conv filter(search ConvOffset2D), to make it runnable now without memory problem. Only tested with RCAN network, defaul conv, ReLU.
+    23) option to use Dynamic ReLU Type A and Type B activation function. However, beware we only apply Dynamic ReLU in the RCAN part in RCAN + U-Net based MRI SR Dual Domain Network.
+        It means regardless what type of activation function is set up, we only use ReLU in U-Net submodule. 
     
     we will plan to support other features:
     1) multi-kernel size deformable conv in different paths and fuse together, see [26] for similar idea
@@ -208,7 +210,7 @@ since = time.perf_counter()
 """""""""""""""""""""""""""""""""""""""""""""
 # --------------------------- configuration of support parameters --------------------------- #
 batch_size = 8
-EPOCH_NUM = 1
+EPOCH_NUM = 7
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
 Maintain_Same_Size = False # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
@@ -226,7 +228,7 @@ plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
 args = {'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 32, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'deformable_conv', \
-    'activation_function_type': 'ReLU', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
+    'activation_function_type': 'Dynamic_ReLU_Type_B', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
     'optimizer': 'Adam', 'learning_rate_decay_method': 'step_learning_rate', \
     'use_learning_rate_warm_up': True, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
@@ -239,7 +241,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # args['reduction'] = 16, stands for reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
 # args['scale'] = 4, stands for resize factor, e.g. 2, 4
 # args['conv_layer_type'] = 'default_conv', stands for type of conv layer, e.g. 'default_conv', 'coord_conv', 'deformable_conv', 'py_conv'
-# args['activation_function_type'] = 'ReLU', stands for type of activation function, e.g. 'ReLU'. 'Sine', 'FReLU'
+# args['activation_function_type'] = 'ReLU', stands for type of activation function, e.g. 'ReLU'. 'Sine', 'FReLU', 'Dynamic_ReLU_Type_A', 'Dynamic_ReLU_Type_B'
 # arg['type_of_network'] == 'RCAN', stands for type of network, e.g. 'RCAN', 'gradient_map_dual_domain', 'k_space_dual_domain', 'wavelets_transform_dual_domain'
 # arg['gradient_operator'] = ['sobel'] # stand for which gradient operator we want use for calculating gradient map, e.g. 'sobel', 'canny'
 # arg['optimizer'] = ['Adam'] # stand for which optimizer we want use for training, e.g. 'Adam', 'SGD_with_momentum', 'look_ahead'
@@ -992,6 +994,73 @@ class FReLU(nn.Module):
         return x
 
 
+"Dynamic ReLU Activation Function"
+"""
+2020.Dynamic ReLU. https://arxiv.org/abs/2003.10027
+"""
+class DyReLU(nn.Module):
+    def __init__(self, channels, reduction=4, k=2, conv_type='2d'):
+        super(DyReLU, self).__init__()
+        self.channels = channels
+        self.k = k
+        self.conv_type = conv_type
+        assert self.conv_type in ['1d', '2d']
+        self.fc1 = nn.Linear(channels, channels // reduction)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Linear(channels // reduction, 2*k)
+        self.sigmoid = nn.Sigmoid()
+        self.register_buffer('lambdas', tc.Tensor([1.]*k + [0.5]*k).float())
+        self.register_buffer('init_v', tc.Tensor([1.] + [0.]*(2*k - 1)).float())
+    def get_relu_coefs(self, x):
+        theta = tc.mean(x, axis=-1)
+        if self.conv_type == '2d':
+            theta = tc.mean(theta, axis=-1)
+        theta = self.fc1(theta)
+        theta = self.relu(theta)
+        theta = self.fc2(theta)
+        theta = 2 * self.sigmoid(theta) - 1
+        return theta
+    def forward(self, x):
+        raise NotImplementedError
+
+class DyReLUA(DyReLU):
+    def __init__(self, channels, reduction=4, k=2, conv_type='2d'):
+        super(DyReLUA, self).__init__(channels, reduction, k, conv_type)
+        self.fc2 = nn.Linear(channels // reduction, 2*k)
+    def forward(self, x):
+        assert x.shape[1] == self.channels
+        theta = self.get_relu_coefs(x)
+        relu_coefs = theta.view(-1, 2*self.k) * self.lambdas + self.init_v
+        # BxCxL -> LxCxBx1
+        x_perm = x.transpose(0, -1).unsqueeze(-1)
+        output = x_perm * relu_coefs[:, :self.k] + relu_coefs[:, self.k:]
+        # LxCxBx2 -> BxCxL
+        result = tc.max(output, dim=-1)[0].transpose(0, -1)
+        return result
+
+class DyReLUB(DyReLU):
+    def __init__(self, channels, reduction=4, k=2, conv_type='2d'):
+        super(DyReLUB, self).__init__(channels, reduction, k, conv_type)
+        self.fc2 = nn.Linear(channels // reduction, 2*k*channels)
+    def forward(self, x):
+        assert x.shape[1] == self.channels
+        theta = self.get_relu_coefs(x)
+        relu_coefs = theta.view(-1, self.channels, 2*self.k) * self.lambdas + self.init_v
+        if self.conv_type == '1d':
+            # BxCxL -> LxBxCx1
+            x_perm = x.permute(2, 0, 1).unsqueeze(-1)
+            output = x_perm * relu_coefs[:, :, :self.k] + relu_coefs[:, :, self.k:]
+            # LxBxCx2 -> BxCxL
+            result = tc.max(output, dim=-1)[0].permute(1, 2, 0)
+        elif self.conv_type == '2d':
+            # BxCxHxW -> HxWxBxCx1
+            x_perm = x.permute(2, 3, 0, 1).unsqueeze(-1)
+            output = x_perm * relu_coefs[:, :, :self.k] + relu_coefs[:, :, self.k:]
+            # HxWxBxCx2 -> BxCxHxW
+            result = tc.max(output, dim=-1)[0].permute(2, 3, 0, 1)
+        return result
+
+
 "FeatureExtractor"
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -1121,6 +1190,10 @@ class RCAB(nn.Module):
             if i == 0: 
                 if act == 'FReLU':
                     modules_body.append(FReLU(n_feat))
+                elif act == 'Dynamic_ReLU_Type_A':
+                    modules_body.append(DyReLUA(n_feat, conv_type='2d'))
+                elif act == 'Dynamic_ReLU_Type_B':
+                    modules_body.append(DyReLUB(n_feat, conv_type='2d'))
                 else:
                     modules_body.append(act)
         modules_body.append(CALayer(n_feat, reduction)) # CA
@@ -1387,6 +1460,15 @@ class DownsamplingResBlock(nn.Module):
 class U_Net_Submodule(nn.Module):
     def __init__(self, conv, act, number_of_channels, scale):
         super(U_Net_Submodule, self).__init__()
+
+        # We always use ReLU as activation function in U-Net submodule, regardless which act is set up.
+        if act == 'FReLU':
+            act = nn.ReLU(True)
+        elif act == 'Dynamic_ReLU_Type_A':
+            act = nn.ReLU(True)
+        elif act == 'Dynamic_ReLU_Type_B':
+            act = nn.ReLU(True)
+            
         self.u_net_down_layer_1 = DownsamplingResBlock(conv = conv, act =act, in_channels = number_of_channels, out_channels = 2*number_of_channels, scale = scale)
         self.u_net_down_layer_2 = DownsamplingResBlock(conv = conv, act =act, in_channels = 2*number_of_channels, out_channels = 4*number_of_channels, scale = scale)
         self.u_net_down_layer_3 = DownsamplingResBlock(conv = conv, act =act, in_channels = 4*number_of_channels, out_channels = 8*number_of_channels, scale = scale)
@@ -1473,6 +1555,10 @@ class RCAN_U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             act = Sine(w0 = 1.0)
         elif args['activation_function_type'] == 'FReLU':
             act = 'FReLU'
+        elif args['activation_function_type'] == 'Dynamic_ReLU_Type_A':
+            act = 'Dynamic_ReLU_Type_A'
+        elif args['activation_function_type'] == 'Dynamic_ReLU_Type_B':
+            act = 'Dynamic_ReLU_Type_B'
 
         n_resgroups = args['n_resgroups'] # number of RGs in RIR/RCAN
         n_rcablocks = args['n_rcablocks'] # number of RCABs in one RG
