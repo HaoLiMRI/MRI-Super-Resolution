@@ -76,7 +76,7 @@ This is a demo code of 2D_RCAN_U-Net_Based_MRI_SR_Dual_Domain. in this version w
         of several upsampling modules) to generate final SR image. Thus this new model is basically a 2D_RCAN_U-Net_Based_MRI_SR_Dual_Domain(without unsampling model) + U-Net(firstly
         downsampling several times then upsampling several times, plus FPN framework) model.
         ** Beware:
-            In the current version(v1.1.0) of "2D_RCAN_U-Net_Based_MRI_SR_Dual_Domain + U-Net" framework code, only 'wavelets_transform_dual_domain' fuse the feature maps from 
+            In the current version(v1.2.1) of "2D_RCAN_U-Net_Based_MRI_SR_Dual_Domain + U-Net" framework code, only 'wavelets_transform_dual_domain' fuse the feature maps from 
             both image branch and seconfary branch first, then append U-Net on the fused feature map. But both the 'gradient_map_dual_domain' and 'k_space_dual_domain' append 
             U-Net inside both image branch and secondary branch seperately, rather than append U-Net after fusion of the feature maps from image branch and secondary branch, 
             this may NOT the architecture we expect to set. Thus we should consider change the code of appending U-Net submodule for 'gradient_map_dual_domain' and 'k_space_dual_domain'.
@@ -98,8 +98,8 @@ This is a demo code of 2D_RCAN_U-Net_Based_MRI_SR_Dual_Domain. in this version w
         closer the pixels are the larger threshold_low should be, doing like this lead the contrast between two pixels which
         are close to each other large enough, so they will NOT be samiliar and the super resolution result will NOT be too
         smooth in texture wise.)
-    9) consider using upsmaler module which is commonly used for high resolution task together with channel attenion to assign different 
-        weights for different channel for upscaling. We could see similar idea in paper: 2020.Detecting Small Objects Using a Channel-Aware Deconvolutional Network.
+    9) consider using channel attenion to assign different weights for different channel for upscaling, for upsmaler module which is commonly used for high resolution task together with . 
+        We could see similar idea in paper: 2020.Detecting Small Objects Using a Channel-Aware Deconvolutional Network.
     10) option to use dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution) for decoder part in the last "U-Net" submodule.
         By doing this, we should expect to train model to reconstruct super resolution MR image with more guided constraints.
     11) option to use channel attention for feature maps from encoder in U-Net, when concatenate the feature maps from encoder in U-Net to the corresponding upsampled feature maps in
@@ -113,6 +113,8 @@ We also fixed bugs from previous versions, typical ones like:
         might not be really used since it is NOT common to use weight initialization for super resolution task).
     4) Add the code to always select the weights of network which provides the best value in average SSIM over all batches for validation
         in one epoch, and save the selected weights of network and corresponding LR and SR data.
+    5) When accumulate the loss in the training step, only add the value of loss into by using loss_bullet.item(), e.g. ssim_loss_training += ssim_loss.item(), rather than adding the entire
+        computational graph into(e.g. ssim_loss_training += ssim_loss). Thus avoid using too much GPU memory which is not necessary.
        
     
     In this 2D version, the data format has been changed. The input data is just 64 x 64 2D matrix rather than 64 x 64 x 64, we already 
@@ -189,6 +191,7 @@ import copy
 import pickle
 
 from ultility import pytorch_ssim_l1
+from ultility import pytorch_ssim_map
 from ultility.optimizer import lookahead
 
 from ultility.deform_conv import th_batch_map_offsets, th_generate_grid # For supporting deformable conv filter
@@ -227,7 +230,7 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 32, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'deformable_conv', \
+args = {'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'conv_layer_type': 'deformable_conv', \
     'activation_function_type': 'Dynamic_ReLU_Type_B', 'type_of_network': 'RCAN', 'gradient_operator': 'sobel', \
     'optimizer': 'Adam', 'learning_rate_decay_method': 'step_learning_rate', \
     'use_learning_rate_warm_up': True, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
@@ -1870,6 +1873,8 @@ loss_function_L1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
 
 SSIM_function = pytorch_ssim_l1.SSIM(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
 
+SSIM_map = pytorch_ssim_map.SSIMMap(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
+
 # =============================================================================
 # print('The loss function is L1Loss')
 # loss_function = nn.L1Loss(size_average = False).to(device) 
@@ -1982,13 +1987,13 @@ for epoch in range(EPOCH_NUM):
         "calculate the gradients for all Variables during back prop"
         "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
         feature_map_loss = args_loss_weight['feature_map_weight']*loss_function_MSE(SR_features, HR_features)
-        feature_map_loss_training += feature_map_loss
+        feature_map_loss_training += feature_map_loss.item()    # Only save the value of feature_map_loss(rather than saving the entire computational graph), otherwise the GPU memory may not be enough for usage
         # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
 #           print("feature_map_loss: ", feature_map_loss)
 
 #       pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
         pixel_wise_loss = args_loss_weight['pixel_wise_weight']*loss_function_L1(img_outputs, labels)
-        pixel_wise_loss_training += pixel_wise_loss
+        pixel_wise_loss_training += pixel_wise_loss.item()
 #            print("pixel_wise_loss: ", pixel_wise_loss)
 
         if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
@@ -2000,26 +2005,28 @@ for epoch in range(EPOCH_NUM):
                     create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,1]))
         else:
             k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]) + loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-        k_space_freq_loss_training += k_space_freq_loss
+        k_space_freq_loss_training += k_space_freq_loss.item()
 #            print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
 #            print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
 #            print("k_space_freq_loss: ", k_space_freq_loss)
 
         HR_ssim_weighted, HR_ssim = SSIM_function(labels, labels)
         SR_ssim_weighted, SR_ssim = SSIM_function(img_outputs, labels)
+        HR_ssim_map_weighted, HR_ssim_map = SSIM_map(labels, labels)
+        SR_ssim_map_weighted, SR_ssim_map = SSIM_map(img_outputs, labels)
 
-        ssim_loss = args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_weighted, HR_ssim_weighted)
-        ssim_loss_training += ssim_loss
-        ssim_training += SR_ssim    # Accumulation of SR_ssim in training over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
+        ssim_loss = args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_map_weighted, HR_ssim_map_weighted)
+        ssim_loss_training += ssim_loss.item()
+        ssim_training += SR_ssim.item()    # Accumulation of SR_ssim in training over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
 #            print("ssim_loss: ", ssim_loss)
 
         gradient_img_loss = args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(img_outputs), calculate_gradient_map(labels))
-        gradient_img_loss_training += gradient_img_loss
+        gradient_img_loss_training += gradient_img_loss.item()
 
         "TODO: The coefficient of this loss function needs to be adjusted"
         if Use_Gram_Matrix_L1_Loss == True:
             gram_similarity_between_img_loss = args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(img_outputs), calculate_gram_matrix(labels))
-            gram_similarity_between_img_loss_training += gram_similarity_between_img_loss
+            gram_similarity_between_img_loss_training += gram_similarity_between_img_loss.item()
 
         if network_model_type == 'Secondary branch is k space branch':
             if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
@@ -2031,15 +2038,15 @@ for epoch in range(EPOCH_NUM):
                         create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,1]))
             else:
                 k_space_branch_k_space_loss = args_loss_weight['k_space_branch_weight']*(loss_function_MSE(secondary_branch_outputs[:,:,:,:,0], HR_freq[:,:,:,:,0]) + loss_function_MSE(secondary_branch_outputs[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-            k_space_branch_k_space_loss_training += k_space_branch_k_space_loss
+            k_space_branch_k_space_loss_training += k_space_branch_k_space_loss.item()
         elif network_model_type == 'Secondary branch is gradient map branch':
             gradient_grad_loss = args_loss_weight['gradient_grd_weight']*loss_function_L1(secondary_branch_outputs, calculate_gradient_map(labels))
-            gradient_grad_loss_training += gradient_grad_loss
+            gradient_grad_loss_training += gradient_grad_loss.item()
         elif network_model_type == 'Secondary branch is wavelets high frequency components branch':
             _, HR_high_frequency_components = calculate_wavelet_transform(labels)
             wavelets_high_frequency_components_branch_high_frequency_loss = args_loss_weight['wavelets_branch_weight']*loss_function_L1(secondary_branch_outputs[:, :, 0, :, :], HR_high_frequency_components[:, :, 0, :, :]) + \
                 args_loss_weight['wavelets_branch_weight']*loss_function_L1(secondary_branch_outputs[:, :, 1, :, :], HR_high_frequency_components[:, :, 1, :, :]) + args_loss_weight['wavelets_branch_weight']*loss_function_L1(secondary_branch_outputs[:, :, 2, :, :], HR_high_frequency_components[:, :, 2, :, :])
-            wavelets_high_frequency_components_branch_high_frequency_loss_training += wavelets_high_frequency_components_branch_high_frequency_loss
+            wavelets_high_frequency_components_branch_high_frequency_loss_training += wavelets_high_frequency_components_branch_high_frequency_loss.item()
 
 
 
@@ -2086,7 +2093,7 @@ for epoch in range(EPOCH_NUM):
 #                break
             "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"
 
-        loss_training += loss    
+        loss_training += loss.item()    
 
         "back prop"
         loss.backward()
@@ -2182,7 +2189,9 @@ for epoch in range(EPOCH_NUM):
 
             HR_ssim_test_weighted, HR_ssim_test = SSIM_function(labels,labels)
             SR_ssim_test_weighted, SR_ssim_test = SSIM_function(SR_img_test, labels)
-            ssim_loss_test += args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_test_weighted, HR_ssim_test_weighted)
+            HR_ssim_map_test_weighted, HR_ssim_map_test = SSIM_map(labels, labels)
+            SR_ssim_map_test_weighted, SR_ssim_map_test = SSIM_map(SR_img_test, labels)
+            ssim_loss_test += args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_map_test_weighted, HR_ssim_map_test_weighted)
             ssim_test += SR_ssim_test   # Accumulation of SR_ssim in testing over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
 #                print("ssim_loss_test: ", ssim_loss_test)
 
