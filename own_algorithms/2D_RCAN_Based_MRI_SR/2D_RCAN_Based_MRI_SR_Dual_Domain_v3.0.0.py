@@ -208,7 +208,7 @@ Maintain_Same_Size = False # stand for whether we want the output SR Simage has 
 Use_SSIM_L1_Loss = True # stand for whether we want use SSIM L1 loss in the total loss function
 Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
-Use_Channel_Attention_For_Cross_Branch_Fusion = False # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
+Use_Channel_Attention_For_Cross_Branch_Fusion = True # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
 Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
 Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
 
@@ -218,7 +218,7 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 2, 'n_rcablocks': 2, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
+args = {'n_resgroups': 3, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
     'use_channel_and_spatial_attention_inside_upsampler': True, 'channel_and_spatial_attention_mode': 'parallel_mode',\
     'conv_layer_type': 'default_conv', 'activation_function_type': 'Dynamic_ReLU_Type_B', 'type_of_network': 'RCAN', \
     'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
