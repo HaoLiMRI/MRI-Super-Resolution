@@ -17,7 +17,7 @@ Version: 3.0.0(Stable Version, even deformable conv works at least for RCAN netw
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20201217
+This is the current version we are working on, in 20201228
 This is a demo code of 2D_RCAN_Based_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) RCAN as single branch
@@ -61,7 +61,10 @@ This is a demo code of 2D_RCAN_Based_MRI_SR_Dual_Domain. in this version we have
         然后等到训练过程基本上稳定了就可以使用原始的初始学习率进行训练了。
     21) Re-implement deformable conv filter(search ConvOffset2D), to make it runnable now without memory problem. Only tested with RCAN network, defaul conv, ReLU.
     22) option to use Dynamic ReLU Type A and Type B activation function.
+    
     23) option to set up args['number_of_progressive_stage'] as 1, 2, 3, to support args['scale']^args['number_of_progressive_stage'] progressive 4x and 8x upsampling reconstruction.
+    24) option to use "end to end channel and spatial attention block" for upsampler (inside upsampler, after first conv and before pixel shuffle).
+    25) For all the "end to end channel and spatial attention block", either "sequential_mode" or "parallel_mode" could be selected。
     
     we will plan to support other features:
     1) multi-kernel size deformable conv in different paths and fuse together, see [26] for similar idea
@@ -69,8 +72,13 @@ This is a demo code of 2D_RCAN_Based_MRI_SR_Dual_Domain. in this version we have
     3) multi-kernel size dilated conv in different paths and fuse together[26]
     4) kernel size wise attention[25] for multi-kernel size dilated conv
     5) feature scale wise attention for py_conv
-    6) spatial attention(additional to channel attention) for normal processing inside each branch
-    7) "end to end spatial and channel attention in one 3D conv format" for normal processing inside each branch
+    6) spatial attention(additional to channel attention) for normal processing inside each branch. One simple way of adding spatial attention is use SAM mechanism proposed in CBAM paper.
+    7) "end to end spatial and channel attention in one 3D conv format" for normal processing inside each branch.
+        Another simple way of ultilizing the "end to end spatial and channel attention" but NOT using 3D conv format, is, make spatial and channel attention in parallel. 
+        See BAM mechanism proposed in paper: 2018.BAM: Bottleneck Attention Module.
+        Another simple way of ultilizing the "end to end spatial and channel attention" but NOT using 3D conv format, is, also make spatial and channel attention in parallel.
+        See DANet mechanism proposed in paper: 2018.Dual Attention Network for Scene Segmentation.
+        类似的双重注意力模式还有scSE注意力，有兴趣的可以自行查看.
     8) set threshold_low and threshold_high for "contrast between each pixel and all the pixels around it", if contrast is
         lower than threshold_high, we have to limit the contrast to let it should be larger than threshold_low. The actual
         threshold_low for contrast between each pixel and all the pixels around it may follow Gaussian distribution(The 
@@ -78,7 +86,10 @@ This is a demo code of 2D_RCAN_Based_MRI_SR_Dual_Domain. in this version we have
         are close to each other large enough, so they will NOT be samiliar and the super resolution result will NOT be too
         smooth in texture wise.)
     9) consider using channel attenion to assign different weights for different channel for upscaling, for upsmaler module which is commonly used for high resolution task together with . 
-        We could see similar idea in paper: 2020.Detecting Small Objects Using a Channel-Aware Deconvolutional Network.
+        We could see similar idea in paper: 
+        2020.Detecting Small Objects Using a Channel-Aware Deconvolutional Network.
+        2020.Attention-based Image Upsampling
+        https://arxiv.org/abs/2012.09904
     10)consider adding FPN structure into the current framework, to concatenate the feature maps in different sizes from different layer of "encoder" to the 
         corresponding(feature map with same size as the feature map in particular layer if "encoder") layers in "decoder".
 We also fixed bugs from previous versions, typical ones like:
@@ -197,7 +208,7 @@ Maintain_Same_Size = False # stand for whether we want the output SR Simage has 
 Use_SSIM_L1_Loss = True # stand for whether we want use SSIM L1 loss in the total loss function
 Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
-Use_Channel_Attention_For_Cross_Branch_Fusion = True # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
+Use_Channel_Attention_For_Cross_Branch_Fusion = False # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
 Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
 Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
 
@@ -207,8 +218,9 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
-    'conv_layer_type': 'deformable_conv', 'activation_function_type': 'Dynamic_ReLU_Type_B', 'type_of_network': 'RCAN', \
+args = {'n_resgroups': 2, 'n_rcablocks': 2, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
+    'use_channel_and_spatial_attention_inside_upsampler': True, 'channel_and_spatial_attention_mode': 'parallel_mode',\
+    'conv_layer_type': 'default_conv', 'activation_function_type': 'Dynamic_ReLU_Type_B', 'type_of_network': 'RCAN', \
     'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
     'use_learning_rate_warm_up': True, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
@@ -221,6 +233,8 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # args['reduction'] = 16, stands for reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
 # args['scale'] = 2, stands for scale factor used in one upsampler, e.g. 2, 4
 # args['number_of_progressive_stage'] = 2, stands for number of stages(number of "MRI_SR_Dual_Domain_2D network"), e.g. 1, 2, 3, to ultilize progressive upsampling
+# args['use_channel_and_spatial_attention_inside_upsampler'] = True, stands for whether we use channel and spatial attention block inside upsampler, e.g. True, False
+# args['channel_and_spatial_attention_mode'] = 'sequential_mode', stands for which end to end channel and spatial block to use, e.g. 'sequential_mode', 'parallel_mode'
 # args['conv_layer_type'] = 'default_conv', stands for type of conv layer, e.g. 'default_conv', 'coord_conv', 'deformable_conv', 'py_conv'
 # args['activation_function_type'] = 'ReLU', stands for type of activation function, e.g. 'ReLU'. 'Sine', 'FReLU', 'Dynamic_ReLU_Type_A', 'Dynamic_ReLU_Type_B'
 # arg['type_of_network'] == 'RCAN', stands for type of network, e.g. 'RCAN', 'gradient_map_dual_domain', 'k_space_dual_domain', 'wavelets_transform_dual_domain'
@@ -1121,15 +1135,16 @@ class MeanShift(nn.Conv2d):
 class CALayer(nn.Module):
     """
     Channel Attention (CA) Layer, is basical block in RCAN. One CA forms one RCAB(Residual Channel Attention Block).
-    See figure 3 of original RCAN paper 
+    See figure 3 of original RCAN paper.
+    Beware the CA Layer used in RCAN is actually same as the channel attention mechanism propsed in SENet(Squeeze-and-Excitation Networks).
     """
     def __init__(self, channel, reduction=16):
         """
         reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
         """
         super(CALayer, self).__init__()
-        # global average pooling: feature --> point
-        self.avg_pool = nn.AdaptiveAvgPool2d(1) # global average pooling, output size is 1 for each channel
+        # global average pooling(GAP): feature --> point
+        self.avg_pool = nn.AdaptiveAvgPool2d(1) # global average pooling(GAP), output size is 1 for each channel
         # feature channel downscale and upscale --> channel weight
         self.conv_du = nn.Sequential(
                 nn.Conv2d(channel, channel // reduction, 1, padding=0, bias=True), # W_d in CA
@@ -1144,6 +1159,70 @@ class CALayer(nn.Module):
         # the x is the "feature maps over channels" in size C x H x W. The y now is actual the weights in size C x 1 x 1 which represents "channel statistics", 
         # it stands for how much "attention" expected to pay for each channel's feature map 
         return x * y
+
+
+"Channel Attention Module(CAM), is another approach to calculate channel attention. See more in CBAM paper: 2018.CBAM: Convolutional Block Attention Module"
+class ChannelAttention(nn.Module):
+    """
+    CAM is similar to CALayer block in RCAN, but also use max pooling rather than only average pooling for H x W field. 
+    """
+    def __init__(self, in_planes, reduction=16):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.fc1   = nn.Conv2d(in_planes, in_planes // reduction, 1, bias=False)
+        self.relu1 = nn.ReLU()
+        self.fc2   = nn.Conv2d(in_planes // reduction, in_planes, 1, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc2(self.relu1(self.fc1(self.avg_pool(x))))
+        max_out = self.fc2(self.relu1(self.fc1(self.max_pool(x))))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+
+
+"Spatial Attention Module(SAM). See more in CBAM paper: 2018.CBAM: Convolutional Block Attention Module"
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = tc.mean(x, dim=1, keepdim=True)   # average along all channels
+        max_out, _ = tc.max(x, dim=1, keepdim=True) # max along all channels
+        x = tc.cat([avg_out, max_out], dim=1)       
+        x = self.conv1(x)       # use conv with kernel size = 7 to "look around the pixels near every pixel"
+        return self.sigmoid(x)
+
+
+"End to End Channel and Spatial Attention Block, Either Sequential or Parallel for Channel and Spatial Attention"
+class ChannelAndSpatialAttention(nn.Module):
+    def __init__(self, in_channel, reduction=16, kernel_size=7, channel_and_spatial_attention_mode = 'sequential_mode'):
+        super(ChannelAndSpatialAttention, self).__init__()
+        self.channel_attention_weight_generator = ChannelAttention(in_channel, reduction)
+        self.spatial_attention_weight_generator = SpatialAttention(kernel_size)
+        self.channel_and_spatial_attention_mode = channel_and_spatial_attention_mode
+    
+    def forward(self, x):
+        if self.channel_and_spatial_attention_mode == 'sequential_mode':
+            channel_attention_weight = self.channel_attention_weight_generator(x)
+            x = channel_attention_weight*x
+            spatial_attention_weight = self.spatial_attention_weight_generator(x)
+            x = spatial_attention_weight*x
+            return x
+        elif self.channel_and_spatial_attention_mode == 'parallel_mode':
+            channel_attention_weight = self.channel_attention_weight_generator(x)
+            y = channel_attention_weight*x
+            spatial_attention_weight = self.spatial_attention_weight_generator(x)
+            z = spatial_attention_weight*x
+            return y + z
+        else:
+            raise ValueError("Not supported channel and spatial attention mode yet")
+
 
 
 "Residual Channel Attention Block (RCAB)"
@@ -1368,22 +1447,41 @@ class Upsampler(nn.Sequential):
     """
     Upsampling/Upscale module, used as last part of "SR reconstruction network model" if the network model employ the "post-upsampling mode".
     Beware the actual upsampling approach is "sub-pixel conv" (which is nn.PixelShuffle() in Pytorch) which was proposed in
-    paper: "2016. Real-Time single image and video super-resolution using an efficient sub-pixel convolutional neural network"
+    paper: "2016. Real-Time single image and video super-resolution using an efficient sub-pixel convolutional neural network".
+    Such sub-pixel conv actually constructs F ∗ S^2 feature maps of dimensions H ×W are reshaped into F feature maps of dimensions H ∗ S × W ∗ S, 
+    where S is the upsampling factor.
     """
-    def __init__(self, conv, scale, n_feats):
+    def __init__(self, conv, scale, n_feats, use_channel_and_spatial_attention_inside_upsampler = False, channel_and_spatial_attention_mode = 'sequential_mode'):
         super(Upsampler, self).__init__()
         if scale == 2:
-            self.upsampler = nn.Sequential(*[
-                nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
-                nn.PixelShuffle(scale)
-            ])
+            if use_channel_and_spatial_attention_inside_upsampler == False:
+                self.upsampler = nn.Sequential(*[
+                    nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                    nn.PixelShuffle(scale)
+                ])
+            else: # use_channel_and_spatial_attention_inside_upsampler == True
+                self.upsampler = nn.Sequential(*[
+                    nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                    ChannelAndSpatialAttention(in_channel = n_feats * 4, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                    nn.PixelShuffle(scale)
+                ])
         elif scale == 4:
-            self.upsampler = nn.Sequential(*[
-                nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
-                nn.PixelShuffle(2),
-                nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
-                nn.PixelShuffle(2),
-            ])
+            if use_channel_and_spatial_attention_inside_upsampler == False:
+                self.upsampler = nn.Sequential(*[
+                    nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                    nn.PixelShuffle(2),
+                    nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                    nn.PixelShuffle(2),
+                ])
+            else: # use_channel_and_spatial_attention_inside_upsampler == True
+                self.upsampler = nn.Sequential(*[
+                    nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                    ChannelAndSpatialAttention(in_channel = n_feats * 4, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                    nn.PixelShuffle(2),
+                    nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                    ChannelAndSpatialAttention(in_channel = n_feats * 4, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                    nn.PixelShuffle(2),
+                ])
         else:
             raise ValueError("scale must be 2 or 4.")
 
@@ -1436,6 +1534,8 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         kernel_size = 3 # conv filter size used for all conv in RCAN
         reduction = args['reduction'] # reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
         scale = args['scale'] # resize factor, e.g. 2, 4
+        use_channel_and_spatial_attention_inside_upsampler = args['use_channel_and_spatial_attention_inside_upsampler'] # whether we use channel and spatial attention block inside upsampler, e.g. True, False
+        channel_and_spatial_attention_mode = args['channel_and_spatial_attention_mode'] # which end to end channel and spatial block to use, e.g. 'sequential_mode', 'parallel_mode'
 
         # --------------------------------------we may NOT need this section------------------------------------------------------- #
         """ # don't know exactly what is doing here. However, it seems shifting the "rgb_range" to be somewhere in the mean
@@ -1474,7 +1574,8 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             modules_head_for_k_space_branch = [conv(2*n_colors, 2*n_feats, kernel_size)]
             modules_pretail_for_k_space_branch = [conv(2*n_feats, 2*n_feats, kernel_size)]
             modules_tail_for_k_space_branch = [
-                Upsampler(conv, scale, 2*n_feats),
+                Upsampler(conv, scale, 2*n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
+                            channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
                 conv(2*n_feats, 2*n_colors, kernel_size)]
         elif self.type_of_network == 'wavelets_transform_dual_domain':
             modules_body = [
@@ -1486,7 +1587,8 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
 
         # define tail module. The last stage is upsampling module and one more conv layer, show in figure 2 of RCAN paper
         modules_tail = [
-            Upsampler(conv, scale, n_feats),
+            Upsampler(conv, scale, n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
+                            channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
             conv(n_feats, n_colors, kernel_size)]
 
         # Add a downsize converter by using conv layer.
