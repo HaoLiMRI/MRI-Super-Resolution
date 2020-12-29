@@ -17,7 +17,7 @@ Version: 3.0.0(Stable Version, even deformable conv works at least for RCAN netw
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20201228
+This is the current version we are working on, in 20201229
 This is a demo code of 2D_RCAN_Based_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) RCAN as single branch
@@ -1253,9 +1253,7 @@ class SelfAttentionBasedChannelAttention(nn.Module):
         value = x   # Shape of value is (N, C, (H*W))
         query = x.permute(0, 2, 1)  # Transpose the data from (N, C, (H*W)) to (N, (H*W), C)
         attention_map = tc.matmul(key, query)   # Shape of attention_map is (N, C, C)
-        attention_map = attention_map.reshape(N, C*C)   # Shape of attention_map is (N, (C*C))
         attention_map = self.softmax(attention_map)     # Shape of attention_map is (N, (C*C))
-        attention_map = attention_map.reshape(N, C, C)  # Shape of attention_map is (N, C, C)
         attention_feature_map =  tc.matmul(attention_map, value)    # Shape of attention_feature_map is (N, C, (H*W))
         attention_feature_map = attention_feature_map.reshape(N, C, H, W)   # Shape of attention_feature_map is (N, C, H, W)
         return input_feature_map + attention_feature_map
@@ -1278,9 +1276,7 @@ class SelfAttentionBasedSpatialAttention(nn.Module):
         key = value  # Shape key is (N, C, (H*W))
         query = self.conv_1x1(x).reshape(N, C, H*W).permute(0, 2, 1) # Transpose the data from (N, C, (H*W)) to (N, (H*W), C)
         attention_map = tc.matmul(query, key)   # Shape of attention_map is (N, (H*W), (H*W))
-        attention_map = attention_map.reshape(N, (H*W)*(H*W))   # Shape of attention_map is (N, ((H*W)*(H*W)))
-        attention_map = self.softmax(attention_map)     # Shape of attention_map is (N, ((H*W)*(H*W)))
-        attention_map = attention_map.reshape(N, (H*W), (H*W))  # Shape of attention_map is (N, C, C)
+        attention_map = self.softmax(attention_map)     # Shape of attention_map is (N, (H*W), (H*W))
         attention_feature_map =  tc.matmul(value, attention_map)    # Shape of attention_feature_map is (N, C, (H*W))
         attention_feature_map = attention_feature_map.reshape(N, C, H, W)   # Shape of attention_feature_map is (N, C, H, W)
         return input_feature_map + attention_feature_map
