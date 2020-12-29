@@ -1266,15 +1266,17 @@ class SelfAttentionBasedSpatialAttention(nn.Module):
     """
     def __init__(self, in_channel):
         super(SelfAttentionBasedSpatialAttention, self).__init__()
-        self.conv_1x1 = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
+        self.conv_1x1_for_v = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
+        self.conv_1x1_for_k = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
+        self.conv_1x1_for_q = self.conv_1x1_for_k
         self.softmax = nn.Softmax(dim = 1)
 
     def forward(self, x):
         N, C, H, W = x.size(0), x.size(1), x.size(2), x.size(3)
         input_feature_map = x
-        value = self.conv_1x1(x).reshape(N, C, H*W)   # Reshape input data from (N, C, H, W) to (N, C, (H*W))
-        key = value  # Shape key is (N, C, (H*W))
-        query = self.conv_1x1(x).reshape(N, C, H*W).permute(0, 2, 1) # Transpose the data from (N, C, (H*W)) to (N, (H*W), C)
+        value = self.conv_1x1_for_v(x).reshape(N, C, H*W)   # Reshape input data from (N, C, H, W) to (N, C, (H*W))
+        key = self.conv_1x1_for_k(x).reshape(N, C, H*W)  # Shape key is (N, C, (H*W))
+        query = self.conv_1x1_for_q(x).reshape(N, C, H*W).permute(0, 2, 1) # Transpose the data from (N, C, (H*W)) to (N, (H*W), C)
         attention_map = tc.matmul(query, key)   # Shape of attention_map is (N, (H*W), (H*W))
         attention_map = self.softmax(attention_map)     # Shape of attention_map is (N, (H*W), (H*W))
         attention_feature_map =  tc.matmul(value, attention_map)    # Shape of attention_feature_map is (N, C, (H*W))
