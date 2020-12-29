@@ -229,7 +229,7 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'n_resgroups': 2, 'n_rcablocks': 2, 'n_feats': 32, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
+args = {'n_resgroups': 3, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
     'use_channel_and_spatial_attention_inside_upsampler': True, 'channel_and_spatial_attention_framework': 'self_attention', 'channel_and_spatial_attention_mode': 'parallel_mode',\
     'conv_layer_type': 'default_conv', 'activation_function_type': 'Dynamic_ReLU_Type_B', 'type_of_network': 'RCAN', \
     'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
@@ -1243,7 +1243,7 @@ class SelfAttentionBasedChannelAttention(nn.Module):
     """
     def __init__(self):
         super(SelfAttentionBasedChannelAttention, self).__init__()
-        self.softmax = nn.Softmax(dim = 1)
+        self.softmax = nn.Softmax(dim = 2)
 
     def forward(self, x):
         N, C, H, W = x.size(0), x.size(1), x.size(2), x.size(3)
@@ -1253,7 +1253,7 @@ class SelfAttentionBasedChannelAttention(nn.Module):
         value = x   # Shape of value is (N, C, (H*W))
         query = x.permute(0, 2, 1)  # Transpose the data from (N, C, (H*W)) to (N, (H*W), C)
         attention_map = tc.matmul(key, query)   # Shape of attention_map is (N, C, C)
-        attention_map = self.softmax(attention_map)     # Shape of attention_map is (N, (C*C))
+        attention_map = self.softmax(attention_map)     # Shape of attention_map is (N, C, C)
         attention_feature_map =  tc.matmul(attention_map, value)    # Shape of attention_feature_map is (N, C, (H*W))
         attention_feature_map = attention_feature_map.reshape(N, C, H, W)   # Shape of attention_feature_map is (N, C, H, W)
         return input_feature_map + attention_feature_map
