@@ -1241,17 +1241,19 @@ class SelfAttentionBasedChannelAttention(nn.Module):
     """
     Non-local self-attention based channel attention.
     """
-    def __init__(self):
+    def __init__(self, in_channel):
         super(SelfAttentionBasedChannelAttention, self).__init__()
+        self.conv_1x1_for_v = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
+        self.conv_1x1_for_k = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
+        self.conv_1x1_for_q = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
         self.softmax = nn.Softmax(dim = 2)
 
     def forward(self, x):
         N, C, H, W = x.size(0), x.size(1), x.size(2), x.size(3)
         input_feature_map = x
-        x = x.reshape(N, C, H*W)   # Reshape input data from (N, C, H, W) to (N, C, (H*W))
-        key = x     # Shape of key is (N, C, (H*W))
-        value = x   # Shape of value is (N, C, (H*W))
-        query = x.permute(0, 2, 1)  # Transpose the data from (N, C, (H*W)) to (N, (H*W), C)
+        value = self.conv_1x1_for_v(x).reshape(N, C, H*W)   # Reshape input data from (N, C, H, W) to (N, C, (H*W))
+        key = self.conv_1x1_for_k(x).reshape(N, C, H*W)  # Shape of key is (N, C, (H*W))
+        query = self.conv_1x1_for_q(x).reshape(N, C, H*W).permute(0, 2, 1) # Transpose the data from (N, C, (H*W)) to (N, (H*W), C) for query
         attention_map = tc.matmul(key, query)   # Shape of attention_map is (N, C, C)
         attention_map = self.softmax(attention_map)     # Shape of attention_map is (N, C, C)
         attention_feature_map =  tc.matmul(attention_map, value)    # Shape of attention_feature_map is (N, C, (H*W))
@@ -1274,9 +1276,9 @@ class SelfAttentionBasedSpatialAttention(nn.Module):
     def forward(self, x):
         N, C, H, W = x.size(0), x.size(1), x.size(2), x.size(3)
         input_feature_map = x
-        value = self.conv_1x1_for_v(x).reshape(N, C, H*W)   # Reshape input data from (N, C, H, W) to (N, C, (H*W))
-        key = self.conv_1x1_for_k(x).reshape(N, C, H*W)  # Shape key is (N, C, (H*W))
-        query = self.conv_1x1_for_q(x).reshape(N, C, H*W).permute(0, 2, 1) # Transpose the data from (N, C, (H*W)) to (N, (H*W), C)
+        value = self.conv_1x1_for_v(x).reshape(N, C, H*W)   # Reshape input data from (N, C, H, W) to (N, C, (H*W)) for value
+        key = self.conv_1x1_for_k(x).reshape(N, C, H*W)  # Shape of key is (N, C, (H*W))
+        query = self.conv_1x1_for_q(x).reshape(N, C, H*W).permute(0, 2, 1) # Transpose the data from (N, C, (H*W)) to (N, (H*W), C) for query
         attention_map = tc.matmul(query, key)   # Shape of attention_map is (N, (H*W), (H*W))
         attention_map = self.softmax(attention_map)     # Shape of attention_map is (N, (H*W), (H*W))
         attention_feature_map =  tc.matmul(value, attention_map)    # Shape of attention_feature_map is (N, C, (H*W))
@@ -1287,7 +1289,7 @@ class SelfAttentionBasedSpatialAttention(nn.Module):
 class SelfAttentionBasedChannelAndSpatialAttention(nn.Module):
     def __init__(self, in_channel, channel_and_spatial_attention_mode = 'sequential_mode'):
         super(SelfAttentionBasedChannelAndSpatialAttention, self).__init__()
-        self.self_attention_channel_attention = SelfAttentionBasedChannelAttention()
+        self.self_attention_channel_attention = SelfAttentionBasedChannelAttention(in_channel)
         self.self_attention_spatial_attention = SelfAttentionBasedSpatialAttention(in_channel)
         self.self_attention_based_channel_and_spatial_attention_mode = channel_and_spatial_attention_mode
     
@@ -1637,7 +1639,7 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         reduction = args['reduction'] # reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
         scale = args['scale'] # resize factor, e.g. 2, 4
         use_channel_and_spatial_attention_inside_upsampler = args['use_channel_and_spatial_attention_inside_upsampler'] # whether we use channel and spatial attention block inside upsampler, e.g. True, False
-        channel_and_spatial_attention_framework = args['channel_and_spatial_attention_framework']
+        channel_and_spatial_attention_framework = args['channel_and_spatial_attention_framework']   # which channel and spatial framework is used in the code, e.g. 'CBAM', 'self_attention'
         channel_and_spatial_attention_mode = args['channel_and_spatial_attention_mode'] # which end to end channel and spatial block to use, e.g. 'sequential_mode', 'parallel_mode'
 
         # --------------------------------------we may NOT need this section------------------------------------------------------- #
