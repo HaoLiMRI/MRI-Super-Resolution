@@ -1270,7 +1270,7 @@ class SelfAttentionBasedSpatialAttention(nn.Module):
         super(SelfAttentionBasedSpatialAttention, self).__init__()
         self.conv_1x1_for_v = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
         self.conv_1x1_for_k = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
-        self.conv_1x1_for_q = self.conv_1x1_for_k
+        self.conv_1x1_for_q = nn.Conv2d(in_channel, in_channel, kernel_size = 1, bias=False)
         self.softmax = nn.Softmax(dim = 1)
 
     def forward(self, x):
