@@ -117,7 +117,7 @@ We also fixed bugs from previous versions, typical ones like:
     5) When accumulate the loss in the training step, only add the value of loss into by using loss_bullet.item(), e.g. ssim_loss_training += ssim_loss.item(), rather than adding the entire
         computational graph into(e.g. ssim_loss_training += ssim_loss). Thus avoid using too much GPU memory which is not necessary.
     6) Replace the mean SSIM (a single value) by using SSIM map (a matrix) in the ssim loss.
-    7) Fix "wrongly reuse the same conv for different branch" bugs in GradientMapDualResidualGroup class, RCAN_Based_MRI_SR_Dual_Domain_2D.
+    7) Fix "wrongly reuse the same conv for different branch" bugs in GradientMapDualResidualGroup, RCAN_Based_MRI_SR_Dual_Domain_2D, Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D.
     
     In this 2D version, the data format has been changed. The input data is just 64 x 64 2D matrix rather than 64 x 64 x 64, we already 
     collapse all the 64 layers into only one layer in the data tailing and noise filtering processing.
@@ -1974,18 +1974,30 @@ class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
     def __init__(self, args):
         super(Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D, self).__init__()
         self.number_of_progressive_stage = args['number_of_progressive_stage']
-        self.stage = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+        if self.number_of_progressive_stage == 1:
+            self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+        elif self.number_of_progressive_stage == 2:
+            self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+            self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+        elif self.number_of_progressive_stage == 3:
+            self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+            self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+            self.stage_3 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+        else:
+            raise ValueError("Not support more than 3 stage!")
     
     def forward(self, x):
         if self.number_of_progressive_stage == 1:
-            return self.stage(x)
+            return self.stage_1(x)
         elif self.number_of_progressive_stage == 2:
-            x, _, _ = self.stage(x)
-            return self.stage(x)
+            x, _, _ = self.stage_1(x)
+            return self.stage_2(x)
         elif self.number_of_progressive_stage == 3:
-            x, _, _ = self.stage(x)
-            x, _, _ = self.stage(x)
-            return self.stage(x)
+            x, _, _ = self.stage_1(x)
+            x, _, _ = self.stage_2(x)
+            return self.stage_3(x)
+        else:
+            raise ValueError("Not support more than 3 stage!")
 
 
 
