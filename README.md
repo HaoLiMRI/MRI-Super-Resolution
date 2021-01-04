@@ -20,7 +20,8 @@
 3. 我们做实验，对比 基于完成的RCSAB based U-Net框架的MRI SR dual domain network,以及RCSAB based U-Net with Panoptic FPN框架的MRI SR dual domain network和RCSAB based RCAN的网络的性能。对应的，论文中改为写我们为这俩大类网络结构（一种是以RCAN为最优的性能代表的channel一直不变的模型，例如EDSR,DDBPN,RCAN。另外一种是以U-Net为代表的channel先逐步放大再逐步缩小）for MRI SR做了比较 上升到这俩大类的网络构架哪个更好。因为这俩类网络结构一个是完全不缩小size，然后channel数量也不变 另一个是size先小后大，然后channel数量是逐步放大再逐步缩小。可以说是完全不同的俩类结构 我们这样对比完善实验 可以说是为MRI SR任务探索了俩种主流模型构架的方案哪个更靠谱。
 4. k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
 5. 对于基于RCAN的SR网络，可以考虑给一个RG中每个RCAB出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在每一个RG的最后加入了一个multi-head self-attention模块。
-6. 对于基于U-Net的SR网络，可以考虑给每一个U-Net decoding layer中出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个U-Net的最后加入了一个multi-head self-attention模块。
+6. 对于基于RCAN的SR网络，可以考虑给每个RG出来的feature map都作为输入进入multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个网络最后加入了一个multi-head self-attention模块。
+7. 对于基于U-Net的SR网络，可以考虑给每一个U-Net decoding layer中出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个U-Net的最后加入了一个multi-head self-attention模块。
 
 
 
