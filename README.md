@@ -22,6 +22,8 @@
 5. 对于基于RCAN的SR网络，可以考虑给一个RG中每个RCAB出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在每一个RG的最后加入了一个multi-head self-attention模块。
 6. 对于基于RCAN的SR网络，可以考虑给每个RG出来的feature map都作为输入进入multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个网络最后加入了一个multi-head self-attention模块。
 7. 对于基于U-Net的SR网络，可以考虑给每一个U-Net decoding layer中出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个U-Net的最后加入了一个multi-head self-attention模块。
+8. MRI SR任务的一个新idea：使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904
+这个方案训练数据和TTSR MRI SR的数据一样。
 
 
 
