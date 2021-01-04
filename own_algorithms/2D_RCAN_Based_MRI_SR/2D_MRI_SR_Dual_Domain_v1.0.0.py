@@ -230,8 +230,8 @@ plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
 args = {'main_network_framework': 'U_Net', \
-    'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
-    'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True, \
+    'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
+    'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': False, \
     'channel_and_spatial_attention_framework': 'self_attention', 'channel_and_spatial_attention_mode': 'sequential_mode',\
     'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'type_of_network': 'image_single_domain', \
     'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
@@ -2049,7 +2049,7 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         n_colors = 1 # number of channels going of input of entire model
         n_feats = args['n_feats'] # number of feature maps/channels we expect to have after the encoder of U-Net framework(which contains n_resgroups residual groups)
         kernel_size = 3 # conv filter size used for all conv in RCAN
-        reduction = args['reduction'] # reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
+        reduction = 1 # reduction is hardcoded as 1 for U-Net. The r mentioned in 3.3 Channel Attention in RCAN paper
         scale = args['scale'] # resize factor, e.g. 2, 4, for every down/up sampling block
         use_channel_and_spatial_attention_inside_upsampler = args['use_channel_and_spatial_attention_inside_upsampler'] # whether we use channel and spatial attention block inside upsampler, e.g. True, False
         use_channel_and_spatial_attention_inside_RCAB = args['use_channel_and_spatial_attention_inside_RCAB']   #  whether we use channel and spatial attention block inside RCAB to replace CALayer, e.g. True, False
@@ -2071,22 +2071,22 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         modules_end_stage_fusion_of_outcome = [conv(2*n_colors, n_colors, kernel_size)]
 
         # define encoder module for different type of network.
-        self.modules_layer = []
-        self.u_net_down_layer = []
-        self.u_net_up_layer = []
+        modules_layer = []
+        u_net_down_layer = []
+        u_net_up_layer = []
         if self.type_of_network == 'image_single_domain':
             for i in range(n_resgroups):
-                self.modules_layer.append( ResidualGroup(
+                modules_layer.append( ResidualGroup(
                     conv, n_feats//np.power(2, n_resgroups - i), kernel_size, reduction, act=act, res_scale=1, n_rcablocks=n_rcablocks,
                     use_channel_and_spatial_attention_inside_RCAB = use_channel_and_spatial_attention_inside_RCAB, 
                     channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, 
                     channel_and_spatial_attention_mode = channel_and_spatial_attention_mode) )
 
-                self.u_net_down_layer.append( DownsamplingResBlock(conv = conv, act =act, in_channels = n_feats//np.power(2, n_resgroups - i), 
+                u_net_down_layer.append( DownsamplingResBlock(conv = conv, act =act, in_channels = n_feats//np.power(2, n_resgroups - i), 
                     out_channels = n_feats//np.power(2, n_resgroups - i - 1), scale = scale) )
                 
                 if i == n_resgroups - 1:
-                    self.u_net_up_layer.append( nn.Sequential(
+                    u_net_up_layer.append( nn.Sequential(
                                                 nn.Conv2d(n_feats, n_feats, kernel_size = 1),
                                                 act,
                                                 Upsampler(conv, scale, n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
@@ -2095,7 +2095,7 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
                                                 nn.Conv2d(n_feats, n_feats//2, kernel_size = 1),
                                                 ) )
                 else:
-                    self.u_net_up_layer.append( nn.Sequential(
+                    u_net_up_layer.append( nn.Sequential(
                                                 nn.Conv2d(n_feats//np.power(2, n_resgroups - i - 2), n_feats//np.power(2, n_resgroups - i - 1), kernel_size = 1),
                                                 act,
                                                 Upsampler(conv, scale, n_feats//np.power(2, n_resgroups - i - 1), use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
@@ -2103,6 +2103,10 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
                                                             channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
                                                 nn.Conv2d(n_feats//np.power(2, n_resgroups - i - 1), n_feats//np.power(2, n_resgroups - i), kernel_size = 1),
                                                 ) )
+            
+            self.modules_layer = nn.ModuleList(modules_layer)
+            self.u_net_down_layer = nn.ModuleList(u_net_down_layer)
+            self.u_net_up_layer = nn.ModuleList(u_net_up_layer)
             self.last_upsampling_block = Upsampler(conv, scale, n_feats//np.power(2, n_resgroups), use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
                                                             channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, 
                                                             channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)
