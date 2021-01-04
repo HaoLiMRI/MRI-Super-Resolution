@@ -114,7 +114,7 @@ We also fixed bugs from previous versions, typical ones like:
     5) When accumulate the loss in the training step, only add the value of loss into by using loss_bullet.item(), e.g. ssim_loss_training += ssim_loss.item(), rather than adding the entire
         computational graph into(e.g. ssim_loss_training += ssim_loss). Thus avoid using too much GPU memory which is not necessary.
     6) Replace the mean SSIM (a single value) by using SSIM map (a matrix) in the ssim loss.
-    7) Fix "wrongly reuse the same conv for different branch" bugs in GradientMapDualResidualGroup class, RCAN_Based_MRI_SR_Dual_Domain_2D.
+    7) Fix "wrongly reuse the same conv for different branch" bugs in GradientMapDualResidualGroup, RCAN_Based_MRI_SR_Dual_Domain_2D, Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D.
     
     In this 2D version, the data format has been changed. The input data is just 64 x 64 2D matrix rather than 64 x 64 x 64, we already 
     collapse all the 64 layers into only one layer in the data tailing and noise filtering processing.
@@ -2198,6 +2198,7 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             x = self.head(x) # input image goes through first conv layer
 
             #------------------------------- U-Net framework ---------------------------------#
+            res = [None]*self.n_resgroups
             for i in range(self.n_resgroups):
                 if i == 0:
                     x = self.modules_layer[i](x)
@@ -2205,11 +2206,12 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
                 else:
                     res[i - 1] = self.modules_layer[i](res[i - 1])
                     res[i] = self.u_net_down_layer[i](res[i - 1])
+            up_res = [None]*self.n_resgroups
             for j in range(self.n_resgroups - 1, -1, -1):
                 if j == self.n_resgroups - 1:
-                    up_res[j] = u_net_up_layer[j](res[j])
+                    up_res[j] = self.u_net_up_layer[j](res[j])
                 else:
-                    up_res[j] = u_net_up_layer[j]( tc.cat([res[j], up_res[j + 1]], dim = 1) )
+                    up_res[j] = self.u_net_up_layer[j]( tc.cat([res[j], up_res[j + 1]], dim = 1) )
             output_unet_framework = tc.cat([up_res[0], x], dim=1)
             #----------------------------- U-Net framework end -------------------------------#
 
