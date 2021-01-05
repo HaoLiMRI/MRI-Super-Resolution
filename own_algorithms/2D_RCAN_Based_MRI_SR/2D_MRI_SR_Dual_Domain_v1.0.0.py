@@ -10,18 +10,18 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.0.0(Stable Version, even deformable conv works at least for RCAN network)
+Version: 1.1.0(Stable Version, even deformable conv works at least for RCAN network)
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210102
+This is the current version we are working on, in 20210105
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
-        a) RCAN or U-Net as main framework, for single branch network as well.
-        b) gradient map branch as secondary branch, together with main(image) branch, in the framework of RCAN or U-Net
-        b) k space branch as secondary branch, together with main(image) branch, in the framework of RCAN or U-Net
+        a) use RCAN or U-Net as main framework, for image single branch network.
+        b) gradient map branch as secondary branch, together with main(image) branch, in the framework of RCAN
+        b) k space branch as secondary branch, together with main(image) branch, in the framework of RCAN
         c) high frequency component extracted using wavelet transformation and wavelet branch as 
-            secondary branch, together with main(image) branch, in the framework of RCAN or U-Net
+            secondary branch, together with main(image) branch, in the framework of RCAN
         d) interleaving fusion between image branch and  as secondary branch at intermedian level
         e) late stage fusion of outcome from image branch and outcome from secondary branchbranch
     Besides, we already support other features:
@@ -67,40 +67,35 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
         as basic block in every RCAB(for both main branch and second branch if dual branch network is turned), to replace the CALayer.
     27) For all the "normal end to end channel and spatial attention block" and "self-attention based end to end channel and spatial attention block", either "sequential_mode" or "parallel_mode" could be selected.
 
+
+Some feature or bug fixing which have already been planed/started but still not finished yet:
+    1) U-Net used as framework for image single network still has some small bugs, need to fix. 
+    2) U-Net is already used as framework for image single branch. But not support for any of dual domain branch yet! Thus the class "U_Net_Based_MRI_SR_Dual_Domain_2D" still needs to be
+        changed to support U-Net as framework for 3 types of dual domain branch.
     
+
 we will plan to support other features:
     1) multi-kernel size deformable conv in different paths and fuse together, see [26] for similar idea
     2) kernel size wise attention[25] for multi-kernel size deformable conv
     3) multi-kernel size dilated conv in different paths and fuse together[26]
     4) kernel size wise attention[25] for multi-kernel size dilated conv
     5) feature scale wise attention for py_conv
-    6) spatial attention(additional to channel attention) for normal processing inside each branch. One simple way of adding spatial attention is use SAM mechanism proposed in CBAM paper.
-    7) "end to end spatial and channel attention in one 3D conv format" for normal processing inside each branch.
-        
-        Another simple way of ultilizing the "end to end spatial and channel attention" but NOT using 3D conv format, is, make spatial and channel attention in parallel. 
-        See BAM mechanism proposed in paper: 2018.BAM: Bottleneck Attention Module.
-        
-        Another simple way of ultilizing the "end to end spatial and channel attention" but NOT using 3D conv format, is, DANet mechanism proposed in paper: 2018.Dual Attention Network for Scene Segmentation.
-        DANet also makes spatial and channel attention in parallel. However, the attention mechanism employed in DANet is, the Self-Attention(Also called as Non-Local Attention, see paper: 2018.Non-local Neural Networks
-        and paper: 2019.Self-Attention Generative Adversarial Networks for more details about Self-Attention) which borrows from the attention mechanism in the classical paper in NLP which proposes the Transformer 
-        technology: 2017.Attention is All You Needed.
-        See DANet mechanism proposed in paper: 2018.Dual Attention Network for Scene Segmentation.
-
-        类似的双重注意力模式还有scSE注意力，有兴趣的可以自行查看.
-    8) set threshold_low and threshold_high for "contrast between each pixel and all the pixels around it", if contrast is
+    6) set threshold_low and threshold_high for "contrast between each pixel and all the pixels around it", if contrast is
         lower than threshold_high, we have to limit the contrast to let it should be larger than threshold_low. The actual
         threshold_low for contrast between each pixel and all the pixels around it may follow Gaussian distribution(The 
         closer the pixels are the larger threshold_low should be, doing like this lead the contrast between two pixels which
         are close to each other large enough, so they will NOT be samiliar and the super resolution result will NOT be too
         smooth in texture wise.)
-    9) consider using channel attenion to assign different weights for different channel for upscaling, for upsmaler module which is commonly used for high resolution task together with . 
-        We could see similar idea in paper: 
-        2020.Detecting Small Objects Using a Channel-Aware Deconvolutional Network.
-        2020.Attention-based Image Upsampling
-        https://arxiv.org/abs/2012.09904
-    10) consider adding FPN structure into the current framework, to concatenate the feature maps in different sizes from different layer of "encoder" to the 
-        corresponding(feature map with same size as the feature map in particular layer if "encoder") layers in "decoder".
-    11) consider addomg dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution).
+    7) consider adding dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution).
+    8) consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，
+        另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特
+        征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
+        模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
+        这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样。
+    9) 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
+        我们可以像它这样，但不对每一个spatial position来做，而是在8)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它
+        这个geometry prior一样加到self-attention里面。
+    
 
 
 We also fixed bugs from previous versions, typical ones like:
@@ -231,8 +226,8 @@ plot_the_wavelets_transform_data_of_input_image = False
 # --------------------------- configuration of parameters for RCAN --------------------------- #
 args = {'main_network_framework': 'U_Net', \
     'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
-    'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': False, \
-    'channel_and_spatial_attention_framework': 'self_attention', 'channel_and_spatial_attention_mode': 'sequential_mode',\
+    'use_channel_and_spatial_attention_inside_upsampler': True, 'use_channel_and_spatial_attention_inside_RCAB': True, \
+    'channel_and_spatial_attention_framework': 'CBAM', 'channel_and_spatial_attention_mode': 'sequential_mode',\
     'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'type_of_network': 'image_single_domain', \
     'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
     'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
@@ -2150,9 +2145,9 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
 
         # define tail module. The last stage is last stage upsampling module and one more conv layer to make channel number equals to n_colors in the output image.
         modules_tail = [
-            Upsampler(conv, scale, n_feats//np.power(2, n_resgroups), use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
+            Upsampler(conv, scale, 2*n_feats//np.power(2, n_resgroups), use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
                             channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
-            conv(n_feats//np.power(2, n_resgroups), n_colors, kernel_size)]
+            conv(2*n_feats//np.power(2, n_resgroups), n_colors, kernel_size)]
 
         # Add a downsize converter by using conv layer.
         # The purpose of original RCAN designed in original RCAN paper is to upscale scale times of LR image, the output from RIR has same size as input LR image. However, here in our task
