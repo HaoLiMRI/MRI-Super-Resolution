@@ -13,15 +13,24 @@
 5. 跑一下channel and spatial attention on upsampler, 俩种framework（CBAM与self-attention）和俩种mode（并联串联）各自跑一下。
 6. 把分别实现的并联和串联的"普通Channel and Spatial Attention Block"与"基于non local self-attention Channel and Spatial Attention Block"实现方案替换原RCAN中的CALayer，得到多个全新的模型再实验。
 7. 如果可能的话，在代码中加入non local self-attention的channel and spatial attention的heatmap实现可视化。
+8. 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来实现U-Net，并重复基于这种新的结合了Panoptic FPN的U-Net框架的MRI SR dual domain network。仍然是可以用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种Panoptic FPN的U-Net构架下的上面相同的各种实验。
+9. consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，
+        另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特
+        征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
+        模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
+        这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样。
+10.受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
+        我们可以像它这样，但不对每一个spatial position来做，而是在8)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它
+        这个geometry prior一样加到self-attention里面。
+
 
 ### 第一篇中长期还要做的是
-1. 完成基于U-Net框架的MRI SR dual domain network，其中可以用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。
-2. 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来实现U-Net，并重复基于这种新的结合了Panoptic FPN的U-Net框架的MRI SR dual domain network。仍然是可以用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种Panoptic FPN的U-Net构架下的上面相同的各种实验。
-3. 我们做实验，对比 基于完成的RCSAB based U-Net框架的MRI SR dual domain network,以及RCSAB based U-Net with Panoptic FPN框架的MRI SR dual domain network和RCSAB based RCAN的网络的性能。对应的，论文中改为写我们为这俩大类网络结构（一种是以RCAN为最优的性能代表的channel一直不变的模型，例如EDSR,DDBPN,RCAN。另外一种是以U-Net为代表的channel先逐步放大再逐步缩小）for MRI SR做了比较 上升到这俩大类的网络构架哪个更好。因为这俩类网络结构一个是完全不缩小size，然后channel数量也不变 另一个是size先小后大，然后channel数量是逐步放大再逐步缩小。可以说是完全不同的俩类结构 我们这样对比完善实验 可以说是为MRI SR任务探索了俩种主流模型构架的方案哪个更靠谱。
-4. k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
-5. 对于基于RCAN的SR网络，可以考虑给一个RG中每个RCAB出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在每一个RG的最后加入了一个multi-head self-attention模块。
-6. 对于基于RCAN的SR网络，可以考虑给每个RG出来的feature map都作为输入进入multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个网络最后加入了一个multi-head self-attention模块。
-7. 对于基于U-Net的SR网络，可以考虑给每一个U-Net decoding layer中出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个U-Net的最后加入了一个multi-head self-attention模块。
+1. 完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。
+2. 我们做实验，对比 基于完成的RCSAB based U-Net框架的MRI SR dual domain network,以及RCSAB based U-Net with Panoptic FPN框架的MRI SR dual domain network和RCSAB based RCAN的网络的性能。对应的，论文中改为写我们为这俩大类网络结构（一种是以RCAN为最优的性能代表的channel一直不变的模型，例如EDSR,DDBPN,RCAN。另外一种是以U-Net为代表的channel先逐步放大再逐步缩小）for MRI SR做了比较 上升到这俩大类的网络构架哪个更好。因为这俩类网络结构一个是完全不缩小size，然后channel数量也不变 另一个是size先小后大，然后channel数量是逐步放大再逐步缩小。可以说是完全不同的俩类结构 我们这样对比完善实验 可以说是为MRI SR任务探索了俩种主流模型构架的方案哪个更靠谱。
+3. k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
+4. 对于基于RCAN的SR网络，可以考虑给一个RG中每个RCAB出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在每一个RG的最后加入了一个multi-head self-attention模块。
+5. 对于基于RCAN的SR网络，可以考虑给每个RG出来的feature map都作为输入进入multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个网络最后加入了一个multi-head self-attention模块。
+6. 对于基于U-Net的SR网络，可以考虑给每一个U-Net decoding layer中出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在整个U-Net的最后加入了一个multi-head self-attention模块。
 
 
 
