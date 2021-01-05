@@ -10,7 +10,7 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.1.0(Stable Version, even deformable conv works at least for RCAN network)
+Version: 1.0.0(Stable Version, even deformable conv works at least for RCAN network)
 """
 "-------------------------------------------------------------------------------------------------"
 """
@@ -69,9 +69,9 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
-    1) U-Net used as framework for image single network still has some small bugs, need to fix. 
-    2) U-Net is already used as framework for image single branch. But not support for any of dual domain branch yet! Thus the class "U_Net_Based_MRI_SR_Dual_Domain_2D" still needs to be
+    1) U-Net is already used as framework for image single branch. But not support for any of dual domain branch yet! Thus the class "U_Net_Based_MRI_SR_Dual_Domain_2D" still needs to be
         changed to support U-Net as framework for 3 types of dual domain branch.
+    2) k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
     
 
 we will plan to support other features:
@@ -86,7 +86,9 @@ we will plan to support other features:
         closer the pixels are the larger threshold_low should be, doing like this lead the contrast between two pixels which
         are close to each other large enough, so they will NOT be samiliar and the super resolution result will NOT be too
         smooth in texture wise.)
-    7) consider adding dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution).
+    7) 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来增强U-Net framework。现阶段已经用已经实现的
+        "Channel and Spatial Attention Block"模块替换掉了CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG作为U-Net framework中的encoder的每一层。基于这种U-Net framework我们
+        可以在decoder的所有层连上这种Panoptic FPN结构从而构成Panoptic U-Net framework.
     8) consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，
         另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特
         征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
@@ -95,6 +97,7 @@ we will plan to support other features:
     9) 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
         我们可以像它这样，但不对每一个spatial position来做，而是在8)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它
         这个geometry prior一样加到self-attention里面。
+    10) consider adding dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution).
     
 
 
@@ -226,7 +229,7 @@ plot_the_wavelets_transform_data_of_input_image = False
 # --------------------------- configuration of parameters for RCAN --------------------------- #
 args = {'main_network_framework': 'U_Net', \
     'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
-    'use_channel_and_spatial_attention_inside_upsampler': True, 'use_channel_and_spatial_attention_inside_RCAB': True, \
+    'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True, \
     'channel_and_spatial_attention_framework': 'CBAM', 'channel_and_spatial_attention_mode': 'sequential_mode',\
     'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'type_of_network': 'image_single_domain', \
     'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
@@ -1335,7 +1338,7 @@ class RCAB(nn.Module):
             modules_body.append(CALayer(n_feat, reduction)) # use CA Layer
         else: # use_channel_and_spatial_attention_inside_RCAB == True
             if channel_and_spatial_attention_framework == 'CBAM':
-                modules_body.append(ChannelAndSpatialAttention(in_channel = n_feat, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)) # use CBAM attention block
+                modules_body.append(ChannelAndSpatialAttention(in_channel = n_feat, reduction = reduction, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)) # use CBAM attention block
             elif channel_and_spatial_attention_framework == 'self_attention':
                 modules_body.append(SelfAttentionBasedChannelAndSpatialAttention(in_channel = n_feat, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)) # use self_attention based channel and spatial attention block
             else:
