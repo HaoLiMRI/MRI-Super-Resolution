@@ -14,7 +14,7 @@ Version: 1.0.0(Stable Version, even deformable conv works at least for RCAN netw
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210105
+This is the current version we are working on, in 20210106
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) use RCAN or U-Net as main framework, for image single branch network.
@@ -66,12 +66,16 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
     26) option to use "normal end to end channel and spatial attention block"(CAM and SAM in CBAM framework) and "self-attention based end to end channel and spatial attention block"(self_attention framework)
         as basic block in every RCAB(for both main branch and second branch if dual branch network is turned), to replace the CALayer.
     27) For all the "normal end to end channel and spatial attention block" and "self-attention based end to end channel and spatial attention block", either "sequential_mode" or "parallel_mode" could be selected.
+    28) option to use "negative total variation loss(tv_loss)". minimize总变差（TV）loss促进了生成的图像中的空间平滑性,于是minimize negative tv loss防止过度平滑
+    29) option to use "negative trace loss". 用minimize 1/trace(SR*HR)做为negative trace loss。trace(SR*HR)表示SR和HR的相似程度。两个向量内积是把一个向量投影到另一个上的长度，这个值可以用于描述两个向量的相似性。两个矩阵A、B的相似性
+        可以用A、B两个矩阵的内积表征，被定义为Trace(AB)。见paper: 2015.LRTV: MR Image Super-Resolution With Low-Rank and Total Variation Regularizations
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
     1) U-Net is already used as framework for image single branch. But not support for any of dual domain branch yet! Thus the class "U_Net_Based_MRI_SR_Dual_Domain_2D" still needs to be
         changed to support U-Net as framework for 3 types of dual domain branch.
     2) k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
+    3) consider using HR reference with self-attention in the end这个方案已经开始编代码，但刚刚开始完全没有完成。这部分的新code要写在新建的class HR_Reference_Based_MRI_SR_Dual_Domain_2D。
     
 
 we will plan to support other features:
@@ -86,19 +90,30 @@ we will plan to support other features:
         closer the pixels are the larger threshold_low should be, doing like this lead the contrast between two pixels which
         are close to each other large enough, so they will NOT be samiliar and the super resolution result will NOT be too
         smooth in texture wise.)
-    7) 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来增强U-Net framework。现阶段已经用已经实现的
-        "Channel and Spatial Attention Block"模块替换掉了CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG作为U-Net framework中的encoder的每一层。基于这种U-Net framework我们
-        可以在decoder的所有层连上这种Panoptic FPN结构从而构成Panoptic U-Net framework.
+    7) 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来增强U-Net framework对于多尺度信息的提取恢复。
+        现阶段已经用"Channel and Spatial Attention Block"模块替换掉了CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG作为U-Net framework中的encoder的每一层。基于这种U-Net 
+        framework我们可以在decoder的所有层连上这种Panoptic FPN结构从而构成Panoptic U-Net framework.
     8) consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，
         另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特
         征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
         模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
         这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样。
-    9) 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
-        我们可以像它这样，但不对每一个spatial position来做，而是在8)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它
-        这个geometry prior一样加到self-attention里面。
-    10) consider adding dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution).
-    
+    9) non-local edge attention. 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
+        我们可以像它这样，但不对每一个spatial position来做，而是在8)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个LR的图的Gradient map,
+        然后将这个gradient map reshape成为一个1 x NW的向量，再和自己的转置相乘得到一个pixel-wise的互相关矩阵，再通过一个softmax或sigmoid（和self-attention的通过Pixel-wise互相关矩阵求取每个
+        pixel和其他所有pixel之间的相关性再通过softmax的操作逻辑一样）变成一个归一化了的权重矩阵。再将这个基于Gradient map求出来的权重矩阵乘以self-attention模块中的Value矩阵，然后再和“key和
+        query求Pixel-wise的互相关矩阵过softmax之后得到的权重矩阵”再相乘，从而输出一个同时被non-local self-attention强调和gradient map edge强调过的feature map。
+        那这个non-local edge attention模块同时放在整个网络的最前面（做第一个block）给LR输入加一个edge attention的guidence，和最后面（做最后一个block）给SR输出加一个edge attention的guidence。
+        **Beware: 这个idea应该对MRI segmentation一样靠谱！！！！！
+    10) 那么对于8)中提出的基于HR reference的MRI SR网络，其实也可以对输入的HR reference MRI数据在网络的一开始做non-local edge attention，以及fft求k space去掉低频仅保留高频再ifft之后做non-local edge attention
+        类似的操作求出一个high frequency self-attention，这样得到一个被gradient map edge强调和的high frequency self-attention强调的feature map来和LR生成SR的branch进行fuse。
+    11) consider adding dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution).
+    12) Pair-wise and Patch-wise Attention. See paper: 2019.Exploring self-attention for image recognition
+    13) Criss-cross Attention. Criss-cross Attention could reduce the computational burden which introduces from non-local self-attention block(has a high complexity of O(N2), where N denotes 
+        the number of input feature maps). The criss-cross attention module that for each pixel position generates a sparse attention map only on the criss-cross path. Further, by applying 
+        criss-cross attention recurrently, each pixel position can capture context from all other pixels. Compared to non-local self-attention block, the criss-cross uses 11× lesser GPU memory, 
+        and has a complexity of O(2√N).
+        See paper: 2019.CCNet: Criss-cross attention for semantic segmentation
 
 
 We also fixed bugs from previous versions, typical ones like:
@@ -217,6 +232,8 @@ Maintain_Same_Size = False # stand for whether we want the output SR Simage has 
 Use_SSIM_L1_Loss = True # stand for whether we want use SSIM L1 loss in the total loss function
 Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
+Use_Negative_TV_Loss = True # stand for whether we want to use "1/(total variation + 1.000e-10) loss"(on SR , for providing over smoothing)
+Use_Negative_Trace_Loss = True # stand for whether we want to use "1/(trace(sr*hr) + 1.000e-10) loss"(on HR and SR, for increasing similarity between SR and HR)
 Use_Channel_Attention_For_Cross_Branch_Fusion = True # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
 Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
 Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
@@ -228,17 +245,20 @@ plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
 args = {'main_network_framework': 'U_Net', \
-    'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
-    'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True, \
-    'channel_and_spatial_attention_framework': 'CBAM', 'channel_and_spatial_attention_mode': 'sequential_mode',\
-    'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'type_of_network': 'image_single_domain', \
-    'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
-    'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
+        'use_HR_reference' : True, 'use_channel_and_spatial_attention_on_the_fuser_of_HR_reference_based_network': False,\
+        'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
+        'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True, \
+        'channel_and_spatial_attention_framework': 'self_attention', 'channel_and_spatial_attention_mode': 'sequential_mode',\
+        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'type_of_network': 'image_single_domain', \
+        'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
+        'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
                     'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
-                    'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, \
+                    'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, 'negative_total_variation_weight': 3, 'negative_trace_weight': 3,\
                     'ssim_luminance_weight': 2, 'ssim_contrast_weight': 2, 'ssim_structure_weight': 4}
 # args['main_network_framework'] = 'RCAN', stands for which main network framework to use, e.g. 'U_Net', 'RCAN'
+# args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
+# args['use_channel_and_spatial_attention_on_the_fuser_of_HR_reference_based_network'] = True, stands for whether we select to use attention when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. True, False
 # args['n_resgroups'] = 20, stands for number of RGs in RIR/RCAN (per stage)
 # args['n_rcablocks'] = 10, stands for number of RCABs in one RG (per stage)
 # args['n_feats'] = 128, stands for how many "number of channels" for feature map going through model
@@ -603,6 +623,57 @@ class L1_Charbonnier_Loss(tc.nn.Module):
         loss = tc.mean(error)
         print(loss.size())
         return loss
+
+
+"""
+Negative Total Variation Loss(TV loss). negative_tv_loss = 1/(TV +1.000e-10).
+Minimize总变差（TV）loss促进了生成的图像中的空间平滑性。于是minimize Negative Total Variation Loss将防止图像过分平滑。
+See more information regarding TV Loss from paper: 2015.iSeeBetter: Spatio-temporal video super-resolution using recurrent generative back-projection networks
+"""
+class NegativeTVLoss(nn.Module):
+    def __init__(self, negative_tv_loss_weight = 1, tv_loss_weight = 1):
+        super(NegativeTVLoss, self).__init__()
+        self.negative_tv_loss_weight = negative_tv_loss_weight
+        self.tv_loss = TVLoss(tv_loss_weight)
+    
+    def forward(self, x):
+        return self.negative_tv_loss_weight * 1 / (self.tv_loss(x) + 1.000e-10)
+
+class TVLoss(nn.Module):
+    def __init__(self, TVLoss_weight = 1):
+        super(TVLoss,self).__init__()
+        self.TVLoss_weight = TVLoss_weight
+
+    def forward(self, x):
+        batch_size = x.size()[0]
+        h_x = x.size()[2]
+        w_x = x.size()[3]
+        count_h = self._tensor_size(x[:, :, 1:, :])
+        count_w = self._tensor_size(x[:, :, :, 1:])
+        h_tv = tc.pow((x[:, :, 1:, :] - x[:, :, :h_x-1, :]), 2).sum()
+        w_tv = tc.pow((x[:, :, :, 1:] - x[:, :, :, :w_x-1]), 2).sum()
+        return self.TVLoss_weight*2*(h_tv/count_h+w_tv/count_w)/batch_size
+
+    def _tensor_size(self, t):
+        return t.size()[1]*t.size()[2]*t.size()[3]
+
+
+"""
+Negative Trace Loss. Negative_Trace_Loss = 1/(trace(SR*HR) + 1.000e-10).
+trace(SR*HR)表示SR和HR的相似程度。两个向量内积是把一个向量投影到另一个上的长度，这个值可以用于描述两个向量的相似性。两个矩阵A、B的相似性
+可以用A、B两个矩阵的内积表征，被定义为Trace(AB)。于是minimize Negative_Trace_Loss可以最大化相似两个矩阵。
+见paper: 2015.LRTV: MR Image Super-Resolution With Low-Rank and Total Variation Regularizations
+"""
+class NegativeTraceLoss(nn.Module):
+    def __init__(self, negative_trace_loss_weight = 1):
+        super(NegativeTraceLoss, self).__init__()
+        self.negative_trace_loss_weight = negative_trace_loss_weight
+    
+    def forward(self, SR, HR):
+        total_loss = 0.00
+        for i in range(SR.size(0)):
+            total_loss = total_loss + 1 / (tc.trace(SR[i, 0, :, :]*HR[i, 0, :, :]) + 1.000e-10)
+        return self.negative_trace_loss_weight * total_loss/SR.size(0)
 
 
 "Pyramidal Convolution(Py_Conv) Layer"
@@ -2417,8 +2488,60 @@ class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
 
 
 
+
+
+"HR Reference based MRI Reconstruction for multiple size, e.g. 2x, 4x, 8x, etc."
+class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
+    def __init__(self, args):
+        super(HR_Reference_Based_MRI_SR_Dual_Domain_2D, self).__init__()
+        self.number_of_progressive_stage = args['number_of_progressive_stage']
+        if args['main_network_framework'] == 'RCAN':
+            if self.number_of_progressive_stage == 1:
+                self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+            elif self.number_of_progressive_stage == 2:
+                self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+            elif self.number_of_progressive_stage == 3:
+                self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_3 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+            else:
+                raise ValueError("Not support more than 3 stage!")
+        elif args['main_network_framework'] == 'U_Net':
+            if self.number_of_progressive_stage == 1:
+                self.stage_1 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
+            elif self.number_of_progressive_stage == 2:
+                self.stage_1 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_2 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
+            elif self.number_of_progressive_stage == 3:
+                self.stage_1 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_2 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_3 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
+            else:
+                raise ValueError("Not support more than 3 stage!")
+    
+    def forward(self, x):
+        if self.number_of_progressive_stage == 1:
+            return self.stage_1(x)
+        elif self.number_of_progressive_stage == 2:
+            x, _, _ = self.stage_1(x)
+            return self.stage_2(x)
+        elif self.number_of_progressive_stage == 3:
+            x, _, _ = self.stage_1(x)
+            x, _, _ = self.stage_2(x)
+            return self.stage_3(x)
+        else:
+            raise ValueError("Not support more than 3 stage!")
+
+
+
+
+
 device=tc.device("cuda" if use_cuda else "cpu")
-our_rcan_mri_sr_2d = Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(args)
+if args['use_HR_reference'] == True:
+    our_rcan_mri_sr_2d = HR_Reference_Based_MRI_SR_Dual_Domain_2D(args)
+else:    
+    our_rcan_mri_sr_2d = Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(args)
 
 # Weight initialization using He initialization.
 """ for m in our_rcan_mri_sr_2d.modules():
@@ -2480,6 +2603,10 @@ SSIM_function = pytorch_ssim_l1.SSIM(luminance_weight = args_loss_weight['ssim_l
 
 SSIM_map = pytorch_ssim_map.SSIMMap(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
 
+negative_tv_loss = NegativeTVLoss(negative_tv_loss_weight = args_loss_weight['negative_total_variation_weight']).to(device)
+
+negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_weight['negative_trace_weight']).to(device)
+
 # =============================================================================
 # print('The loss function is L1Loss')
 # loss_function = nn.L1Loss(size_average = False).to(device) 
@@ -2526,6 +2653,14 @@ for epoch in range(EPOCH_NUM):
     if Use_Gram_Matrix_L1_Loss == True:
         gram_similarity_between_img_loss_training = 0.0
         gram_similarity_between_img_loss_test = 0.0
+    
+    if Use_Negative_TV_Loss == True:
+        negative_total_variation_for_img_loss_training = 0.0
+        negative_toal_variation_for_img_loss_test = 0.0
+    
+    if Use_Negative_Trace_Loss == True:
+        negative_trace_for_img_loss_training = 0.0
+        negative_trace_for_img_loss_test = 0.0
 
     k_space_branch_k_space_loss_training = 0.0
     k_space_branch_k_space_loss_test = 0.0
@@ -2634,6 +2769,14 @@ for epoch in range(EPOCH_NUM):
             gram_similarity_between_img_loss = args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(img_outputs), calculate_gram_matrix(labels))
             gram_similarity_between_img_loss_training += gram_similarity_between_img_loss.item()    # Only save the value of gram_similarity_between_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
 
+        if Use_Negative_TV_Loss == True:
+            negative_total_variation_for_img_loss = negative_tv_loss(img_outputs)
+            negative_total_variation_for_img_loss_training += negative_total_variation_for_img_loss.item()    # Only save the value of gram_similarity_between_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
+        
+        if Use_Negative_Trace_Loss == True:
+            negative_trace_for_img_loss = negative_trace_loss(img_outputs, labels)
+            negative_trace_for_img_loss_training += negative_trace_for_img_loss.item()
+
         if network_model_type == 'Secondary branch is k space branch':
             if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                 k_space_branch_k_space_loss = args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
@@ -2678,6 +2821,12 @@ for epoch in range(EPOCH_NUM):
 
         if Use_Gram_Matrix_L1_Loss == True:
             loss = loss + gram_similarity_between_img_loss
+        
+        if Use_Negative_TV_Loss == True:
+            loss = loss + negative_total_variation_for_img_loss
+        
+        if Use_Negative_Trace_Loss == True:
+            loss = loss + negative_trace_for_img_loss
 
         if network_model_type == 'Secondary branch is k space branch':
             loss = loss + k_space_branch_k_space_loss
@@ -2807,6 +2956,12 @@ for epoch in range(EPOCH_NUM):
             if Use_Gram_Matrix_L1_Loss == True:
                 gram_similarity_between_img_loss_test = args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(SR_img_test), calculate_gram_matrix(labels))
 
+            if Use_Negative_TV_Loss == True:
+                negative_total_variation_for_img_loss_test = negative_trace_loss(SR_img_test)
+
+            if Use_Negative_Trace_Loss == True:
+                negative_trace_for_img_loss_test = negative_trace_loss(SR_img_test, labels)
+
             if network_model_type_test == 'Secondary branch is k space branch':
                 if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                     k_space_branch_k_space_loss_test += args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
@@ -2838,6 +2993,12 @@ for epoch in range(EPOCH_NUM):
 
             if Use_Gram_Matrix_L1_Loss == True:
                 loss_test = loss_test + gram_similarity_between_img_loss_test
+            
+            if Use_Negative_TV_Loss == True:
+                loss_test = loss_test + negative_total_variation_for_img_loss_test
+            
+            if Use_Negative_Trace_Loss == True:
+                loss_test = loss_test + negative_trace_for_img_loss_test
 
             if network_model_type_test == 'Secondary branch is k space branch':
                 loss_test = loss_test + k_space_branch_k_space_loss_test
@@ -2864,6 +3025,12 @@ for epoch in range(EPOCH_NUM):
     if Use_Gram_Matrix_L1_Loss == True:
         gram_similarity_between_img_loss_test = gram_similarity_between_img_loss_test/batch_number_test
         print('gram_similarity_between_img_loss_test: ', gram_similarity_between_img_loss_test)
+    if Use_Negative_TV_Loss == True:
+        negative_total_variation_for_img_loss_test = negative_total_variation_for_img_loss_test/batch_number_test
+        print('negative_total_variation_for_img_loss_test: ', negative_total_variation_for_img_loss_test)
+    if Use_Negative_Trace_Loss == True:
+        negative_trace_for_img_loss_test = negative_trace_for_img_loss_test/batch_number_test
+        print('negative_trace_for_img_loss_test: ', negative_trace_for_img_loss_test)
     if network_model_type_test == 'Secondary branch is k space branch':
         k_space_branch_k_space_loss_test = k_space_branch_k_space_loss_test/batch_number_test
         print('k_space_branch_k_space_loss_test: ', k_space_branch_k_space_loss_test)
@@ -2885,6 +3052,10 @@ for epoch in range(EPOCH_NUM):
     k_space_freq_loss_for_current_epoch = k_space_freq_loss_training/ batch_number_training
     if Use_Gram_Matrix_L1_Loss == True:
         gram_similarity_between_img_loss_for_current_epoch = gram_similarity_between_img_loss_training/ batch_number_training
+    if Use_Negative_TV_Loss == True:
+        negative_total_variation_for_img_loss_for_current_epoch = negative_total_variation_for_img_loss_training/ batch_number_training
+    if Use_Negative_Trace_Loss == True:
+        negative_trace_for_img_loss_for_current_epoch = negative_trace_for_img_loss_training/ batch_number_training
     if network_model_type == 'Secondary branch is gradient map branch':
         gradient_grad_loss_for_current_epoch = gradient_grad_loss_training/ batch_number_training
     if network_model_type == 'Secondary branch is k space branch':
@@ -2921,6 +3092,8 @@ for epoch in range(EPOCH_NUM):
         f.write('Use_SSIM_L1_Loss is: %s\n' % Use_SSIM_L1_Loss)
         f.write('Use_Gradient_Map_L1_Loss is: %s\n' % Use_Gradient_Map_L1_Loss)
         f.write('Use_Gram_Matrix_L1_Loss is: %s\n' % Use_Gram_Matrix_L1_Loss)
+        f.write('Use_Negative_TV_Loss is: %s\n' % Use_Negative_TV_Loss)
+        f.write('Use_Negative_Trace_Loss is: %s\n' % Use_Negative_Trace_Loss)
         f.write('Use_Channel_Attention_For_Cross_Branch_Fusion is: %s\n' % Use_Channel_Attention_For_Cross_Branch_Fusion)
         f.write('Amplify_Small_Value_In_Gradient_Map: %s\n' % Amplify_Small_Value_In_Gradient_Map)
         f.write('Amplify_High_Frequency_Value_In_K_Space_Loss: %s\n' % Amplify_High_Frequency_Value_In_K_Space_Loss)
@@ -2948,6 +3121,12 @@ for epoch in range(EPOCH_NUM):
     f.write('\n')
     if Use_Gram_Matrix_L1_Loss == True:
         f.write('The gram_similarity_between_img_loss for epoch %d is : %f' % (epoch, gram_similarity_between_img_loss_for_current_epoch))
+        f.write('\n')
+    if Use_Negative_TV_Loss == True:
+        f.write('The negative_total_variation_for_img_loss for epoch %d is : %f' % (epoch, negative_total_variation_for_img_loss_for_current_epoch))
+        f.write('\n')
+    if Use_Negative_Trace_Loss == True:
+        f.write('The negative_trace_for_img_loss for epoch %d is : %f' % (epoch, negative_trace_for_img_loss_for_current_epoch))
         f.write('\n')
     if network_model_type == 'Secondary branch is gradient map branch':
         f.write('The gradient_grad_loss for epoch %d is : %f' % (epoch, gradient_grad_loss_for_current_epoch))
@@ -2979,6 +3158,12 @@ for epoch in range(EPOCH_NUM):
     f.write('\n')
     if Use_Gram_Matrix_L1_Loss == True:
         f.write('The gram_similarity_between_img_loss_validation for epoch %d is : %f' % (epoch, gram_similarity_between_img_loss_test))
+        f.write('\n')
+    if Use_Negative_TV_Loss == True:
+        f.write('The negative_total_variation_for_img_loss_validation for epoch %d is : %f' % (epoch, negative_total_variation_for_img_loss_test))
+        f.write('\n')
+    if Use_Negative_Trace_Loss == True:
+        f.write('The negative_trace_for_img_loss_validation for epoch %d is : %f' % (epoch, negative_trace_for_img_loss_test))
         f.write('\n')
     if network_model_type_test == 'Secondary branch is gradient map branch':
         f.write('The gradient_grad_loss_validation for epoch %d is : %f' % (epoch, gradient_grad_loss_test))
