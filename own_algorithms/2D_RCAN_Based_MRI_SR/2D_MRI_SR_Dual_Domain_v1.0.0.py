@@ -75,7 +75,8 @@ Some feature or bug fixing which have already been planed/started but still not 
     1) U-Net is already used as framework for image single branch. But not support for any of dual domain branch yet! Thus the class "U_Net_Based_MRI_SR_Dual_Domain_2D" still needs to be
         changed to support U-Net as framework for 3 types of dual domain branch.
     2) k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
-    3) consider using HR reference with self-attention in the end这个方案已经开始编代码，但刚刚开始完全没有完成。这部分的新code要写在新建的class HR_Reference_Based_MRI_SR_Dual_Domain_2D。
+    3) consider using HR reference with self-attention in the end这个方案已经开始编代码，但没有完成。
+        还有Call 带HR reference的our_rcan_mri_sr_2d做forward propogationd，与读取LR, HR, HR reference数据的部分没有写。
     
 
 we will plan to support other features:
@@ -99,11 +100,11 @@ we will plan to support other features:
         模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
         这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样。
     9) non-local edge attention. 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
-        我们可以像它这样，但不对每一个spatial position来做，而是在8)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个LR的图的Gradient map,
-        然后将这个gradient map reshape成为一个1 x NW的向量，再和自己的转置相乘得到一个pixel-wise的互相关矩阵，再通过一个softmax或sigmoid（和self-attention的通过Pixel-wise互相关矩阵求取每个
-        pixel和其他所有pixel之间的相关性再通过softmax的操作逻辑一样）变成一个归一化了的权重矩阵。再将这个基于Gradient map求出来的权重矩阵乘以self-attention模块中的Value矩阵，然后再和“key和
-        query求Pixel-wise的互相关矩阵过softmax之后得到的权重矩阵”再相乘，从而输出一个同时被non-local self-attention强调和gradient map edge强调过的feature map。
-        那这个non-local edge attention模块同时放在整个网络的最前面（做第一个block）给LR输入加一个edge attention的guidence，和最后面（做最后一个block）给SR输出加一个edge attention的guidence。
+        我们可以像它这样，但不对每一个spatial position来做，而是做self-attention的部分引入一个LR的图的Gradient map, 然后将这个gradient map reshape成为一个1 x NW的向量，再和自己的转置相乘得到一个
+        pixel-wise的互相关矩阵，再通过一个softmax或sigmoid（和self-attention的通过Pixel-wise互相关矩阵求取每个pixel和其他所有pixel之间的相关性再通过softmax的操作逻辑一样）变成一个归一化了的权重矩阵。
+        再将这个基于Gradient map求出来的权重矩阵乘以self-attention模块中的Value矩阵，然后再和“key和query求Pixel-wise的互相关矩阵过softmax之后得到的权重矩阵”再相乘，从而输出一个同时被non-local 
+        self-attention强调和gradient map edge强调过的feature map。那这个non-local edge attention模块同时放在整个网络的最前面（做第一个block）给LR输入加一个edge attention的guidence，和最后面（做最
+        后一个block）给SR输出加一个edge attention的guidence。
         **Beware: 这个idea应该对MRI segmentation一样靠谱！！！！！
     10) 那么对于8)中提出的基于HR reference的MRI SR网络，其实也可以对输入的HR reference MRI数据在网络的一开始做non-local edge attention，以及fft求k space去掉低频仅保留高频再ifft之后做non-local edge attention
         类似的操作求出一个high frequency self-attention，这样得到一个被gradient map edge强调和的high frequency self-attention强调的feature map来和LR生成SR的branch进行fuse。
@@ -244,12 +245,17 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'main_network_framework': 'U_Net', \
-        'use_HR_reference' : True, 'use_channel_and_spatial_attention_on_the_fuser_of_HR_reference_based_network': False,\
+args = {'main_network_framework': 'U_Net', 'type_of_network': 'image_single_domain',
+        
+        'use_HR_reference' : True, 
+        'use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser': True,
+        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'self_attention',
+        'channel_and_spatial_attention_mode_for_HR_reference_fuser': 'parallel_mode',
+        
         'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
         'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True, \
         'channel_and_spatial_attention_framework': 'self_attention', 'channel_and_spatial_attention_mode': 'sequential_mode',\
-        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'type_of_network': 'image_single_domain', \
+        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', \
         'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
         'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
@@ -1705,6 +1711,8 @@ class Upsampler(nn.Sequential):
 
 
 
+
+
 "Residual Channel Attention Network (RCAN) based Dual Domain Network for Super Resolution MRI"
 class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
     """
@@ -2441,8 +2449,6 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
 
 
 
-
-
 "Wrapper for Progressive Learning Super Resolution MRI Reconstruction for multiple size, e.g. 2x, 4x, 8x, etc."
 class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
     def __init__(self, args):
@@ -2494,44 +2500,91 @@ class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
 class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
     def __init__(self, args):
         super(HR_Reference_Based_MRI_SR_Dual_Domain_2D, self).__init__()
-        self.number_of_progressive_stage = args['number_of_progressive_stage']
-        if args['main_network_framework'] == 'RCAN':
-            if self.number_of_progressive_stage == 1:
-                self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
-            elif self.number_of_progressive_stage == 2:
-                self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
-                self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
-            elif self.number_of_progressive_stage == 3:
-                self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
-                self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
-                self.stage_3 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
-            else:
-                raise ValueError("Not support more than 3 stage!")
-        elif args['main_network_framework'] == 'U_Net':
-            if self.number_of_progressive_stage == 1:
-                self.stage_1 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
-            elif self.number_of_progressive_stage == 2:
-                self.stage_1 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
-                self.stage_2 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
-            elif self.number_of_progressive_stage == 3:
-                self.stage_1 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
-                self.stage_2 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
-                self.stage_3 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
-            else:
-                raise ValueError("Not support more than 3 stage!")
+        """
+        For the HR reference based MRI reconstruction network. The network framework and network type of normal SR branch are based on the args setting 
+        up, e.g. RCAN/U-Net as network framework, image single network/gradient map dual domain network/k-space dual domain network/wavelet dual domain 
+        network as network type. However, HR reference branch is always a simple RCAN network without upsampler.
+        """
+
+        "----------------------------------- Define normal SR branch ---------------------------------"
+        self.SR_branch = Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(args)
+
+        "----------------------------------- Define HR reference branch ---------------------------------"
+        "Beware: If we do not want the parameter setting for HR reference branch is changable according to the args setting up, just hardcode the following parameters for HR reference branch."
+        if args['conv_layer_type'] == 'default_conv':
+            conv_for_HR_reference_branch = default_conv
+        elif args['conv_layer_type'] == 'coord_conv':
+            conv_for_HR_reference_branch = coord_conv
+        elif args['conv_layer_type'] == 'deformable_conv':
+            conv_for_HR_reference_branch = deformable_conv
+        elif args['conv_layer_type'] == 'py_conv':
+            conv_for_HR_reference_branch = py_conv
+
+        if args['activation_function_type'] == 'ReLU':
+            act_for_HR_reference_branch = nn.ReLU(True)
+        elif args['activation_function_type'] == 'Sine':
+            act_for_HR_reference_branch = Sine(w0 = 1.0)
+        elif args['activation_function_type'] == 'FReLU':
+            act_for_HR_reference_branch = 'FReLU'
+        elif args['activation_function_type'] == 'Dynamic_ReLU_Type_A':
+            act_for_HR_reference_branch = 'Dynamic_ReLU_Type_A'
+        elif args['activation_function_type'] == 'Dynamic_ReLU_Type_B':
+            act_for_HR_reference_branch = 'Dynamic_ReLU_Type_B'
+        
+        n_resgroups_for_HR_reference_branch = args['n_resgroups'] # number of RGs in RIR/RCAN
+        n_rcablocks_for_HR_reference_branch = args['n_rcablocks'] # number of RCABs in one RG
+        n_colors = 1 # number of channels going of input of entire model
+        n_feats_for_HR_reference_branch = args['n_feats'] # number of feature maps/channels going through the entire model
+        kernel_size_for_HR_reference_branch = 3 # conv filter size used for all conv in RCAN
+        reduction_for_HR_reference_branch = args['reduction'] # reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
+        use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_branch = args['use_channel_and_spatial_attention_inside_RCAB']   #  whether we use channel and spatial attention block inside RCAB to replace CALayer, e.g. True, False
+        channel_and_spatial_attention_framework_for_HR_reference_branch = args['channel_and_spatial_attention_framework']   # which channel and spatial framework is used in the code, e.g. 'CBAM', 'self_attention'
+        channel_and_spatial_attention_mode_for_HR_reference_branch = args['channel_and_spatial_attention_mode'] # which end to end channel and spatial block to use, e.g. 'sequential_mode', 'parallel_mode'
+
+        # define head module for HR reference branch
+        HR_reference_branch_modules_head = [conv_for_HR_reference_branch(n_colors, n_feats_for_HR_reference_branch, kernel_size_for_HR_reference_branch)] # the first conv layer in RCAN, show in figure 2 of RCAN paper
+        
+        # define body module for HR reference branch.
+        HR_reference_branch_modules_body = [
+            ResidualGroup(
+                    conv_for_HR_reference_branch, n_feats_for_HR_reference_branch, kernel_size_for_HR_reference_branch, reduction_for_HR_reference_branch, 
+                    act=act_for_HR_reference_branch, res_scale=1, n_rcablocks=n_rcablocks_for_HR_reference_branch,
+                    use_channel_and_spatial_attention_inside_RCAB = use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_branch, 
+                    channel_and_spatial_attention_framework = channel_and_spatial_attention_framework_for_HR_reference_branch, 
+                    channel_and_spatial_attention_mode = channel_and_spatial_attention_mode_for_HR_reference_branch) \
+            for _ in range(n_resgroups_for_HR_reference_branch)]
+        self.HR_reference_branch_head = nn.Sequential(*HR_reference_branch_modules_head)
+        self.HR_reference_branch_body = nn.Sequential(*HR_reference_branch_modules_body)
+
+        "----------------------------------- Define the last stage fuser ---------------------------------"
+        use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser = args['use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser']
+        channel_and_spatial_attention_framework_for_HR_reference_fuser = args['channel_and_spatial_attention_framework_for_HR_reference_fuser']
+        channel_and_spatial_attention_mode_for_HR_reference_fuser = args['channel_and_spatial_attention_mode_for_HR_reference_fuser']
+        self.last_stage_fuser = nn.Sequential(nn.Conv2d(in_channels = args['n_feats'] + n_feats_for_HR_reference_branch, out_channels = args['n_feats'], kernel_size = 1),
+                        nn.ReLU(True),
+                        RCAB(conv = deformable_conv, n_feat = args['n_feats'], kernel_size = 3, reduction = 16, bias=True, bn=False, act=nn.ReLU(True), res_scale=1, 
+                            use_channel_and_spatial_attention_inside_RCAB = use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser,
+                            channel_and_spatial_attention_framework = channel_and_spatial_attention_framework_for_HR_reference_fuser, 
+                            channel_and_spatial_attention_mode = channel_and_spatial_attention_mode_for_HR_reference_fuser),
+                        nn.Conv2d(n_feats, n_feats//2, kernel_size = 1),
+                        nn.ReLU(True),
+                        nn.Conv2d(n_feats//2, n_colors, kernel_size = 1)
+                        )
+
     
-    def forward(self, x):
-        if self.number_of_progressive_stage == 1:
-            return self.stage_1(x)
-        elif self.number_of_progressive_stage == 2:
-            x, _, _ = self.stage_1(x)
-            return self.stage_2(x)
-        elif self.number_of_progressive_stage == 3:
-            x, _, _ = self.stage_1(x)
-            x, _, _ = self.stage_2(x)
-            return self.stage_3(x)
-        else:
-            raise ValueError("Not support more than 3 stage!")
+    def forward(self, LR, HR_reference):
+        # feature extraction at SR branch
+        x = self.SR_branch(LR)
+        
+        # feature extraction at HR reference branch
+        y = self.HR_reference_branch_head(HR_reference)
+        y = self.HR_reference_branch_body(y)
+
+        # Fuse the output from SR branch and HR reference branch
+        x = tc.cat((x, y), 1)   # Beware the x and y should have same size if the args sets up properly.
+        result = self.last_stage_fuser(x)
+        
+        return result
 
 
 
