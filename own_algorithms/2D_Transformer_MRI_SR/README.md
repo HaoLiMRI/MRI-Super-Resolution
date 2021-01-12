@@ -1,4 +1,4 @@
-# TTSRMRI
+# TTSR_MRI
 This is the code of "Visual Transformer based MRI Super Resolution Reconstruction".
 The TTSRMRI is modified for MRI SR from the TTSR which was original proposed in paper [Learning Texture Transformer Network for Image Super-Resolution](https://arxiv.org/abs/2006.04139) accepted in CVPR 2020.
 
