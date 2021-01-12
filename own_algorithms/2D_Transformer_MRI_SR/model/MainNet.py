@@ -47,14 +47,14 @@ class SFE(nn.Module):
             self.RBs.append(ResBlock(in_channels=n_feats, out_channels=n_feats, 
                 res_scale=res_scale))
             
-        self.conv_tail1 = conv3x3(n_feats, n_feats)
+        self.conv_tail = conv3x3(n_feats, n_feats)
         
     def forward(self, x):
         x = F.relu(self.conv_head(x))
         x1 = x
         for i in range(self.num_res_blocks):
             x = self.RBs[i](x)
-        x = self.conv_tail1(x)
+        x = self.conv_tail(x)
         x = x + x1
         return x
 
@@ -62,23 +62,23 @@ class SFE(nn.Module):
 """New for scale factor of 2"""
 class SFE_Downsample(nn.Module):
     def __init__(self, num_res_blocks, n_feats, res_scale):
-        super(SFE, self).__init__()
+        super(SFE_Downsample, self).__init__()
         self.num_res_blocks = num_res_blocks
-        self.conv_head = conv3x3(3, n_feats,2)
+        self.conv_head = conv3x3(3, n_feats, 2)
         
         self.RBs = nn.ModuleList()
         for i in range(self.num_res_blocks):
             self.RBs.append(ResBlock(in_channels=n_feats, out_channels=n_feats, 
                 res_scale=res_scale))
             
-        self.conv_tail1 = conv3x3(n_feats, n_feats)
+        self.conv_tail = conv3x3(n_feats, n_feats)
         
     def forward(self, x):
         x = F.relu(self.conv_head(x))
         x1 = x
         for i in range(self.num_res_blocks):
             x = self.RBs[i](x)
-        x = self.conv_tail1(x)
+        x = self.conv_tail(x)
         x = x + x1
         return x
 
@@ -241,8 +241,9 @@ class MainNet(nn.Module):
         """x = self.SFE(x)"""
 
         """New for scale factor of 2"""
-        x = self.SFE_Downsample(x)
         x0 = self.SFE(x)
+        x = self.SFE_Downsample(x)
+        
 
         ### stage11
         x11 = x
