@@ -10,8 +10,8 @@
 2. 跑一下progressive和post upsampling的4x和8x放大
 3. 跑一下deformable conv
 4. 多跑12个左右的epoch，每个epoch都跑完一次完整的learning_rate_start至learning_rate_finish，然后把每个epoch跑完的model point存一下，最后求和取平均。有可能可以获得更好的效果。详见：https://mp.weixin.qq.com/s?__biz=MzIwMTE1NjQxMQ==&mid=2247551932&idx=2&sn=855a70ed0522a3abe571f4939a7511b5&chksm=96f079e8a187f0fecf0d2f18e978d2163568e8f2962577a7fe8f684d4f3c7c2bd0a1ad289df2&scene=132#wechat_redirect
-5. 跑一下channel and spatial attention on upsampler, 俩种framework（CBAM与self-attention）和俩种mode（并联串联）各自跑一下。
-6. 把分别实现的并联和串联的"普通Channel and Spatial Attention Block"与"基于non local self-attention Channel and Spatial Attention Block"实现方案替换原RCAN中的CALayer，得到多个全新的模型再实验。
+5. ~~跑一下channel and spatial attention on upsampler, 俩种framework（CBAM与self-attention）和俩种mode（并联串联）各自跑一下。
+6. ~~把分别实现的并联和串联的"普通Channel and Spatial Attention Block"与"基于non local self-attention Channel and Spatial Attention Block"实现方案替换原RCAN中的CALayer，得到多个全新的模型再实验。
 7. 如果可能的话，在代码中加入non local self-attention的channel and spatial attention的heatmap实现可视化。
 8. 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来实现U-Net，并重复基于这种新的结合了Panoptic FPN的U-Net框架的MRI SR dual domain network。仍然是可以用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种Panoptic FPN的U-Net构架下的上面相同的各种实验。
 9. consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，
@@ -25,7 +25,7 @@
 
 
 ### 第一篇中长期还要做的是
-1. 完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。
+1. ~~完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。
 2. 我们做实验，对比 基于完成的RCSAB based U-Net框架的MRI SR dual domain network,以及RCSAB based U-Net with Panoptic FPN框架的MRI SR dual domain network和RCSAB based RCAN的网络的性能。对应的，论文中改为写我们为这俩大类网络结构（一种是以RCAN为最优的性能代表的channel一直不变的模型，例如EDSR,DDBPN,RCAN。另外一种是以U-Net为代表的channel先逐步放大再逐步缩小）for MRI SR做了比较 上升到这俩大类的网络构架哪个更好。因为这俩类网络结构一个是完全不缩小size，然后channel数量也不变 另一个是size先小后大，然后channel数量是逐步放大再逐步缩小。可以说是完全不同的俩类结构 我们这样对比完善实验 可以说是为MRI SR任务探索了俩种主流模型构架的方案哪个更靠谱。
 3. k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
 4. 对于基于RCAN的SR网络，可以考虑给一个RG中每个RCAB出来的feature map都作为输入进入一个multi-head self-attention模块，并且对于每一个feature map用不同的conv kernel size。这样就在每一个RG的最后加入了一个multi-head self-attention模块。
