@@ -59,6 +59,31 @@ class SFE(nn.Module):
         return x
 
 
+"""New for scale factor of 2"""
+class SFE_Downsample(nn.Module):
+    def __init__(self, num_res_blocks, n_feats, res_scale):
+        super(SFE_Downsample, self).__init__()
+        self.num_res_blocks = num_res_blocks
+        self.conv_head = conv3x3(3, n_feats, 2)
+        
+        self.RBs = nn.ModuleList()
+        for i in range(self.num_res_blocks):
+            self.RBs.append(ResBlock(in_channels=n_feats, out_channels=n_feats, 
+                res_scale=res_scale))
+            
+        self.conv_tail = conv3x3(n_feats, n_feats)
+        
+    def forward(self, x):
+        x = F.relu(self.conv_head(x))
+        x1 = x
+        for i in range(self.num_res_blocks):
+            x = self.RBs[i](x)
+        x = self.conv_tail(x)
+        x = x + x1
+        return x
+
+
+
 class CSFI2(nn.Module):
     def __init__(self, n_feats):
         super(CSFI2, self).__init__()
@@ -151,6 +176,8 @@ class MainNet(nn.Module):
         self.n_feats = n_feats
 
         self.SFE = SFE(self.num_res_blocks[0], n_feats, res_scale)
+        """New for scale factor of 2"""
+        self.SFE_Downsample = SFE_Downsample(self.num_res_blocks[0], n_feats, res_scale)
 
         ### stage11
         self.conv11_head = conv3x3(256+n_feats, n_feats)
@@ -211,7 +238,12 @@ class MainNet(nn.Module):
 
     def forward(self, x, S=None, T_lv3=None, T_lv2=None, T_lv1=None):
         ### shallow feature extraction
-        x = self.SFE(x)
+        """x = self.SFE(x)"""
+
+        """New for scale factor of 2"""
+        x0 = self.SFE(x)
+        x = self.SFE_Downsample(x)
+        
 
         ### stage11
         x11 = x
@@ -233,8 +265,11 @@ class MainNet(nn.Module):
         ### stage21, 22
         x21 = x11
         x21_res = x21
-        x22 = self.conv12(x11)
-        x22 = F.relu(self.ps12(x22))
+        
+        """x22 = self.conv12(x11)
+        x22 = F.relu(self.ps12(x22))"""
+        """New for scale factor of 2"""
+        x22 = x0
 
         ### soft-attention
         x22_res = x22
