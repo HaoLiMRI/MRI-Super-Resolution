@@ -24,11 +24,11 @@ def get_dataloader(args):
         ### import module
         m = import_module('dataset.' + args.dataset.lower())
         data_train = getattr(m, 'TrainSet')(args)   # Set up the training dataset.
-        dataloader_train = DataLoader(data_train, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+        dataloader_train = DataLoader(data_train, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, drop_last=True, pin_memory=True)
         data_test = getattr(m, 'EvaluationSet')(args=args)    # Set up the evaluation dataset.
-        dataloader_test = DataLoader(data_test, batch_size=1, shuffle=False, num_workers=args.num_workers)
+        dataloader_test = DataLoader(data_test, batch_size=1, shuffle=False, num_workers=args.num_workers, drop_last=True, pin_memory=True)
         data_final_test = getattr(m, 'FinalTestSet')(args=args)    # Set up the final test dataset.
-        dataloader_final_test = DataLoader(data_final_test, batch_size=1, shuffle=False, num_workers=args.num_workers)
+        dataloader_final_test = DataLoader(data_final_test, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
         dataloader = {'train': dataloader_train, 'test': dataloader_test, 'final test': dataloader_final_test}
 
     else:

@@ -56,7 +56,7 @@ class TrainSet(Dataset):
 
         for idx_file in file_names:
             print(idx_file)
-            if 'LR_training_2' in os.path.join(folder_log_path, idx_file):
+            if 'LR_training_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more low resolution image set exist')
                 num_low_resolution_mat_file = num_low_resolution_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
@@ -74,13 +74,12 @@ class TrainSet(Dataset):
                     print(num_low_resolution_mat_file)
                     torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
                 print('Training data: Shape of LR data sequence in Torch is: ', np.shape(torch_data_low_resolution_sequence))
-            elif 'LR_UP_training_2' in os.path.join(folder_log_path, idx_file):
+            elif 'LR_UP_training_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more zero padded low resolution image set exist')
                 num_zero_padded_low_resolution_mat_file = num_zero_padded_low_resolution_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_zero_padded_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['LRUP'][:] #----- numpy array """
-                data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['LR_UP'][:] #----- numpy array
                 print('Training data: Shape of LR_UP data is: ', np.shape(data_zero_padded_low_resolution))
                 torch_data_zero_padded_low_resolution = tc.from_numpy(data_zero_padded_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
@@ -92,7 +91,7 @@ class TrainSet(Dataset):
                     print(num_zero_padded_low_resolution_mat_file)
                     torch_data_zero_padded_low_resolution_sequence = tc.cat((torch_data_zero_padded_low_resolution_sequence, torch_data_zero_padded_low_resolution), 0)
                 print('Training data: Shape of LR_UP data sequence in Torch is: ', np.shape(torch_data_zero_padded_low_resolution_sequence))
-            elif 'HRGT_training_2' in os.path.join(folder_log_path, idx_file):
+            elif 'HRGT_training_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more high resolution groundtruth image set exist')
                 num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
@@ -109,13 +108,12 @@ class TrainSet(Dataset):
                     print(num_high_resolution_groundtruth_mat_file)
                     torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
                 print('Training data: Shape of HR data sequence in Torch is: ', np.shape(torch_data_high_resolution_groundtruth_sequence))
-            elif 'REF_training_2' in os.path.join(folder_log_path, idx_file):
+            elif 'REF_training_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more reference high resolution image set exist')
                 num_reference_mat_file = num_reference_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_reference = file_data_reference['REF'][:] #----- numpy array """
-                data_reference = file_data_reference['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_reference = file_data_reference['REF'][:] #----- numpy array
                 print('Training data: Shape of REF data is: ', np.shape(data_reference))
                 torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
@@ -127,13 +125,12 @@ class TrainSet(Dataset):
                     print(num_reference_mat_file)
                     torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
                 print('Training data: Shape of REF data sequence in Torch is: ', np.shape(torch_data_reference_sequence))
-            elif 'REF_DOWN_UP_training_2' in os.path.join(folder_log_path, idx_file):
+            elif 'REF_DOWNUP_training_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more down and up sampled(zero padded) reference high resolution image set exist')
                 num_reference_down_up_mat_file = num_reference_down_up_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_reference_down_up = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_reference_down_up = file_data_reference_down_up['REF_DOWN_UP'][:] #----- numpy array """
-                data_reference_down_up = file_data_reference_down_up['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_reference_down_up = file_data_reference_down_up['REF_DOWNUP'][:] #----- numpy array
                 print('Training data: Shape of REF DOWN UP data is: ', np.shape(data_reference_down_up))
                 torch_data_reference_down_up = tc.from_numpy(data_reference_down_up) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
@@ -202,7 +199,7 @@ class EvaluationSet(Dataset):
 
         for idx_file in file_names:
             print(idx_file)
-            if 'LR_validation_2' in os.path.join(folder_log_path, idx_file):
+            if 'LR_validation_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more low resolution image set exist')
                 num_low_resolution_mat_file = num_low_resolution_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
@@ -220,13 +217,12 @@ class EvaluationSet(Dataset):
                     print(num_low_resolution_mat_file)
                     torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
                 print('Evaluation data: Shape of LR data sequence in Torch is: ', np.shape(torch_data_low_resolution_sequence))
-            elif 'LR_UP_validation_2' in os.path.join(folder_log_path, idx_file):
+            elif 'LR_UP_validation_2_folds_2d_downsize_128x3_ref' in os.path.join(folder_log_path, idx_file):
                 print('One more zero padded low resolution image set exist')
                 num_zero_padded_low_resolution_mat_file = num_zero_padded_low_resolution_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_zero_padded_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['LRUP'][:] #----- numpy array """
-                data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['LR_UP'][:] #----- numpy array
                 print('Evaluation data: Shape of LR_UP data is: ', np.shape(data_zero_padded_low_resolution))
                 torch_data_zero_padded_low_resolution = tc.from_numpy(data_zero_padded_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
@@ -238,7 +234,7 @@ class EvaluationSet(Dataset):
                     print(num_zero_padded_low_resolution_mat_file)
                     torch_data_zero_padded_low_resolution_sequence = tc.cat((torch_data_zero_padded_low_resolution_sequence, torch_data_zero_padded_low_resolution), 0)
                 print('Evaluation data: Shape of LR_UP data sequence in Torch is: ', np.shape(torch_data_zero_padded_low_resolution_sequence))
-            elif 'HRGT_validation_2' in os.path.join(folder_log_path, idx_file):
+            elif 'HRGT_validation_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more high resolution groundtruth image set exist')
                 num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
@@ -255,13 +251,12 @@ class EvaluationSet(Dataset):
                     print(num_high_resolution_groundtruth_mat_file)
                     torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
                 print('Evaluation data: Shape of HR data sequence in Torch is: ', np.shape(torch_data_high_resolution_groundtruth_sequence))
-            elif 'REF_validation_2' in os.path.join(folder_log_path, idx_file):
+            elif 'REF_validation_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more reference high resolution image set exist')
                 num_reference_mat_file = num_reference_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_reference = file_data_reference['REF'][:] #----- numpy array """
-                data_reference = file_data_reference['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_reference = file_data_reference['REF'][:] #----- numpy array
                 print('Evaluation data: Shape of REF data is: ', np.shape(data_reference))
                 torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
@@ -273,13 +268,12 @@ class EvaluationSet(Dataset):
                     print(num_reference_mat_file)
                     torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
                 print('Evaluation data: Shape of REF data sequence in Torch is: ', np.shape(torch_data_reference_sequence))
-            elif 'REF_DOWN_UP_validation_2' in os.path.join(folder_log_path, idx_file):
+            elif 'REF_DOWNUP_validation_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more down and up sampled(zero padded) reference high resolution image set exist')
                 num_reference_down_up_mat_file = num_reference_down_up_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_reference_down_up = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_reference_down_up = file_data_reference_down_up['REF_DOWN_UP'][:] #----- numpy array """
-                data_reference_down_up = file_data_reference_down_up['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_reference_down_up = file_data_reference_down_up['REF_DOWNUP'][:] #----- numpy array
                 print('Evaluation data: Shape of REF DOWN UP data is: ', np.shape(data_reference_down_up))
                 torch_data_reference_down_up = tc.from_numpy(data_reference_down_up) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
@@ -349,7 +343,7 @@ class FinalTestSet(Dataset):
 
         for idx_file in file_names:
             print(idx_file)
-            if 'LR_test_2' in os.path.join(folder_log_path, idx_file):
+            if 'LR_eval_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more low resolution image set exist')
                 num_low_resolution_mat_file = num_low_resolution_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
@@ -367,13 +361,12 @@ class FinalTestSet(Dataset):
                     print(num_low_resolution_mat_file)
                     torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
                 print('Testing data: Shape of LR data sequence in Torch is: ', np.shape(torch_data_low_resolution_sequence))
-            elif 'LR_UP_test_2' in os.path.join(folder_log_path, idx_file):
+            elif 'LR_UP_eval_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more zero padded low resolution image set exist')
                 num_zero_padded_low_resolution_mat_file = num_zero_padded_low_resolution_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_zero_padded_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['LRUP'][:] #----- numpy array """
-                data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_zero_padded_low_resolution = file_data_zero_padded_low_resolution['LR_UP'][:] #----- numpy array
                 print('Testing data: Shape of LR_UP data is: ', np.shape(data_zero_padded_low_resolution))
                 torch_data_zero_padded_low_resolution = tc.from_numpy(data_zero_padded_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
@@ -385,7 +378,7 @@ class FinalTestSet(Dataset):
                     print(num_zero_padded_low_resolution_mat_file)
                     torch_data_zero_padded_low_resolution_sequence = tc.cat((torch_data_zero_padded_low_resolution_sequence, torch_data_zero_padded_low_resolution), 0)
                 print('Testing data: Shape of LR_UP data sequence in Torch is: ', np.shape(torch_data_zero_padded_low_resolution_sequence))
-            elif 'HRGT_test_2' in os.path.join(folder_log_path, idx_file):
+            elif 'HRGT_eval_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more high resolution groundtruth image set exist')
                 num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
@@ -402,13 +395,12 @@ class FinalTestSet(Dataset):
                     print(num_high_resolution_groundtruth_mat_file)
                     torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
                 print('Testing data: Shape of HR data sequence in Torch is: ', np.shape(torch_data_high_resolution_groundtruth_sequence))
-            elif 'REF_test_2' in os.path.join(folder_log_path, idx_file):
+            elif 'REF_eval_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more reference high resolution image set exist')
                 num_reference_mat_file = num_reference_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_reference = file_data_reference['REF'][:] #----- numpy array """
-                data_reference = file_data_reference['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_reference = file_data_reference['REF'][:] #----- numpy array
                 print('Testing data: Shape of REF data is: ', np.shape(data_reference))
                 torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
@@ -420,13 +412,12 @@ class FinalTestSet(Dataset):
                     print(num_reference_mat_file)
                     torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
                 print('Testing data: Shape of REF data sequence in Torch is: ', np.shape(torch_data_reference_sequence))
-            elif 'REF_DOWN_UP_test_2' in os.path.join(folder_log_path, idx_file):
+            elif 'REF_DOWNUP_eval_2_folds_2d_downsize_128x3_ref.mat' in os.path.join(folder_log_path, idx_file):
                 print('One more down and up sampled(zero padded) reference high resolution image set exist')
                 num_reference_down_up_mat_file = num_reference_down_up_mat_file + 1
                 print(os.path.join(folder_log_path, idx_file))
                 file_data_reference_down_up = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-                """ data_reference_down_up = file_data_reference_down_up['REF_DOWN_UP'][:] #----- numpy array """
-                data_reference_down_up = file_data_reference_down_up['HRGT'][:] # Hardcode it as HRGT just for using the wrong data for now!
+                data_reference_down_up = file_data_reference_down_up['REF_DOWNUP'][:] #----- numpy array
                 print('Testing data: Shape of REF DOWN UP data is: ', np.shape(data_reference_down_up))
                 torch_data_reference_down_up = tc.from_numpy(data_reference_down_up) #----- torch type data could be read by tc.utils.data.TensorDataset
                 "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
