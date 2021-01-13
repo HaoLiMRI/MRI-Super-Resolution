@@ -11,7 +11,7 @@ def str2bool(v):
 parser = argparse.ArgumentParser(description='TTSR')
 
 ### log setting
-parser.add_argument('--save_dir', type=str, default='D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/code/2D_Transformer_MRI_SR/output_folder',
+parser.add_argument('--save_dir', type=str, default='D:\\HaoLi\\SR\\results\\20210112_TTSR_64_2folds_2d_downsize_100\\',
                     help='Directory to save log, arguments, models and images')
 parser.add_argument('--reset', type=str2bool, default=True,
                     help='Delete save_dir to create a new one')
@@ -30,12 +30,12 @@ parser.add_argument('--num_gpu', type=int, default=1,
 parser.add_argument('--dataset', type=str, default='MRI_SR', 
                                             # Option: default = 'CUFED',
                     help='Which dataset to train and test')
-parser.add_argument('--dataset_dir', type=str, default='D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/data/sample_downsize_training_data_for_TTSRMRI',
+parser.add_argument('--dataset_dir', type=str, default='C:\\SR_data\\2d_downsize_2d_128x3_ref\\',
                                                 # Option: default='D:/Tech_Resource/Paper_Resource/Dataset/CUFED',
                     help='Directory of dataset')
 
 ### dataloader setting
-parser.add_argument('--num_workers', type=int, default=4,
+parser.add_argument('--num_workers', type=int, default=0,
                     help='The number of workers when loading data')
 
 ### model setting
@@ -55,13 +55,13 @@ parser.add_argument('--tpl_use_S', type=str2bool, default=False,
                     help='Whether to multiply soft-attention map in transferal perceptual loss')
 parser.add_argument('--tpl_type', type=str, default='l2',
                     help='Which loss type to calculate gram matrix difference in transferal perceptual loss [l1 / l2]')
-parser.add_argument('--rec_w', type=float, default=1.,
+parser.add_argument('--rec_w', type=float, default=1,
                     help='The weight of reconstruction loss')
-parser.add_argument('--per_w', type=float, default=0,
+parser.add_argument('--per_w', type=float, default=1e-2,
                     help='The weight of perceptual loss')
 parser.add_argument('--tpl_w', type=float, default=0,
                     help='The weight of transferal perceptual loss')
-parser.add_argument('--adv_w', type=float, default=0,
+parser.add_argument('--adv_w', type=float, default=1e-3,
                     help='The weight of adversarial loss')
 
 ### optimizer setting
@@ -77,40 +77,40 @@ parser.add_argument('--lr_rate_dis', type=float, default=1e-4,
                     help='Learning rate of discriminator')
 parser.add_argument('--lr_rate_lte', type=float, default=1e-5,
                     help='Learning rate of LTE')
-parser.add_argument('--decay', type=float, default=999999,
+parser.add_argument('--decay', type=float, default=10,
                     help='Learning rate decay type')
 parser.add_argument('--gamma', type=float, default=0.5,
                     help='Learning rate decay factor for step decay')
 
 ### training setting
-parser.add_argument('--batch_size', type=int, default=9,
+parser.add_argument('--batch_size', type=int, default=4,
                     help='Training batch size')
-parser.add_argument('--train_crop_size', type=int, default=40,
+parser.add_argument('--train_crop_size', type=int, default=32,
                     help='Training data crop size')
-parser.add_argument('--num_init_epochs', type=int, default=2,
+parser.add_argument('--num_init_epochs', type=int, default=3,
                     help='The number of init epochs which are trained with only reconstruction loss')
-parser.add_argument('--num_epochs', type=int, default=1,
+parser.add_argument('--num_epochs', type=int, default=50,
                     help='The number of training epochs')
-parser.add_argument('--print_every', type=int, default=1,
+parser.add_argument('--print_every', type=int, default=100,
                     help='Print period')
-parser.add_argument('--save_every', type=int, default=999999,
+parser.add_argument('--save_every', type=int, default=5,
                     help='Save period')
-parser.add_argument('--val_every', type=int, default=999999,
+parser.add_argument('--val_every', type=int, default=1,
                     help='Validation period')
 
 ### evaluate / test / finetune setting
-parser.add_argument('--eval', type=str2bool, default=True,
+parser.add_argument('--eval', type=str2bool, default=False,
                     help='Evaluation mode')
-parser.add_argument('--eval_save_results', type=str2bool, default=True,
+parser.add_argument('--eval_save_results', type=str2bool, default=False,
                     help='Save each image during evaluation')
 parser.add_argument('--model_path', type=str, default=None,
                     help='The path of model to evaluation')
 parser.add_argument('--test', type=str2bool, default=False,
                     help='Test mode')
-parser.add_argument('--lr_path', type=str, default='./test/demo/lr/lr.png',
+parser.add_argument('--lr_path', type=str, default='C:\\SR_data\\2d_downsize_2d_128x3_ref\\',
                                             # only for 'CUFED' dataset
                     help='The path of input LR image when perform model testing')
-parser.add_argument('--ref_path', type=str, default='./test/demo/ref/ref.png',
+parser.add_argument('--ref_path', type=str, default='C:\\SR_data\\2d_downsize_2d_128x3_ref\\',
                                             # only for 'CUFED' dataset
                     help='The path of ref image when perform model testing')
 

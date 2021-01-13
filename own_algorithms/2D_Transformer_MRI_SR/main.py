@@ -55,7 +55,7 @@ if __name__ == '__main__':
     
     ### load the model into more than one gpu if have more than one gpu.
     if ((not args.cpu) and (args.num_gpu > 1)):
-        _model = nn.DataParallel(_model, list(range(args.num_gpu)))
+        _model = torch.nn.DataParallel(_model, list(range(args.num_gpu)))
 
     ### create loss function.
     _loss_all = get_loss_dict(args, _logger)
@@ -77,3 +77,4 @@ if __name__ == '__main__':
             t.train(current_epoch=epoch, is_init=False)
             if (epoch % args.val_every == 0):
                 t.evaluate(current_epoch=epoch)
+        t.test()

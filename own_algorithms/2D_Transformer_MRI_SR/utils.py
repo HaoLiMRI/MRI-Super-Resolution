@@ -51,7 +51,8 @@ def mkExpDir(args):
     if ((not args.eval) and (not args.test)):
         os.makedirs(os.path.join(args.save_dir, 'model'))
     
-    if ((args.eval and args.eval_save_results) or args.test):
+#    if ((args.eval and args.eval_save_results) or args.test):
+    if (args.eval_save_results or args.test):
         os.makedirs(os.path.join(args.save_dir, 'saved_results'))
 
     args_file = open(os.path.join(args.save_dir, 'args.txt'), 'w')
