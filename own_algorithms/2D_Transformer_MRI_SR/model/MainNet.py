@@ -160,7 +160,7 @@ class MergeTail(nn.Module):
         x = F.relu(self.conv_merge( torch.cat((x3, x13, x23), dim=1) ))
         x = self.conv_tail1(x)
         x = self.conv_tail2(x)
-        x = torch.clamp(x, -1, 1)
+        x = torch.clamp(x, 0, 1)
         
         return x
 
