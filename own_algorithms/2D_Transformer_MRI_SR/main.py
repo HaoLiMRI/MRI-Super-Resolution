@@ -77,4 +77,4 @@ if __name__ == '__main__':
             t.train(current_epoch=epoch, is_init=False)
             if (epoch % args.val_every == 0):
                 t.evaluate(current_epoch=epoch)
-        t.test()
+                

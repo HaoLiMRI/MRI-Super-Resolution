@@ -86,6 +86,24 @@ class Trainer():
                     '\t batch: ' + str(i_batch+1) )
                 self.logger.info( 'rec_loss: %.10f' %(rec_loss.item()) )
 
+            if ('grad_loss' in self.loss_all):
+                grad_loss = self.args.grad_w * self.loss_all['grad_loss'](sr, hr)
+                loss += grad_loss
+                if (is_print):
+                    self.logger.info( 'grad_loss: %.10f' %(grad_loss.item()) )
+
+            if ('k_space_loss' in self.loss_all):
+                k_space_loss = self.args.kspace_w * self.loss_all['k_space_loss'](sr, hr)
+                loss += k_space_loss
+                if (is_print):
+                    self.logger.info( 'k_space_loss: %.10f' %(k_space_loss.item()) )
+
+            if ('ssim_loss' in self.loss_all):
+                ssim_loss = self.args.ssim_w * self.loss_all['ssim_loss'](sr, hr)
+                loss += ssim_loss
+                if (is_print):
+                    self.logger.info( 'ssim_loss: %.10f' %(ssim_loss.item()) )
+
             if (not is_init):
                 if ('per_loss' in self.loss_all):
                     if (self.args.dataset == 'CUFED'):
@@ -279,13 +297,13 @@ class Trainer():
 
                     sr, _, _, _, _ = self.model(lr=lr, lrsr=lr_sr, ref=ref, refsr=ref_sr)
                     if i_batch == 0:
-                        sr_save = sr.squeeze()
-                        lr_save = lr.squeeze()
-                        hr_save = hr.squeeze()
+                        sr_save = sr
+                        lr_save = lr
+                        hr_save = hr
                     else:
-                        sr_save = torch.cat((sr_save, sr.squeeze()), 0)
-                        lr_save = torch.cat((lr_save, lr.squeeze()), 0)
-                        hr_save = torch.cat((hr_save, hr.squeeze()), 0)
+                        sr_save = torch.cat((sr_save, sr), 0)
+                        lr_save = torch.cat((lr_save, lr), 0)
+                        hr_save = torch.cat((hr_save, hr), 0)
 
                     ### We do not need to calculate psnr and ssim for MRI image in test step, we will calculate them after making a big picture.
             
@@ -293,8 +311,8 @@ class Trainer():
                 lr_save = lr_save.cpu().numpy()
                 hr_save = hr_save.cpu().numpy()
                 "save the .mat files for SR, HR and LR test images"
-                scipy.io.savemat(os.path.join(self.args.save_dir, 'saved_results', 'final_test_MRI_SR.mat'), mdict = {'SR_test_image' : sr_save})
-                scipy.io.savemat(os.path.join(self.args.save_dir, 'saved_results', 'final_test_MRI_LR.mat'), mdict = {'LR_test_image' : lr_save})
-                scipy.io.savemat(os.path.join(self.args.save_dir, 'saved_results', 'final_test_MRI_HR.mat'), mdict = {'HR_test_image' : hr_save})
+                scipy.io.savemat(os.path.join(self.args.save_dir, 'saved_results', 'final_test_MRI_SR_epoch4.mat'), mdict = {'SR_test_image' : sr_save})
+                scipy.io.savemat(os.path.join(self.args.save_dir, 'saved_results', 'final_test_MRI_LR_epoch4.mat'), mdict = {'LR_test_image' : lr_save})
+                scipy.io.savemat(os.path.join(self.args.save_dir, 'saved_results', 'final_test_MRI_HR_epoch4.mat'), mdict = {'HR_test_image' : hr_save})
 
         self.logger.info('Test over.')
