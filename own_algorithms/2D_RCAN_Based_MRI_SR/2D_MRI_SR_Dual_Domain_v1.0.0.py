@@ -14,7 +14,7 @@ Version: 1.0.0(Stable Version, even deformable conv works at least for RCAN netw
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210106
+This is the current version we are working on, in 20210109
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) use RCAN or U-Net as main framework, for image single branch network.
@@ -69,15 +69,19 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
     28) option to use "negative total variation loss(tv_loss)". minimize总变差（TV）loss促进了生成的图像中的空间平滑性,于是minimize negative tv loss防止过度平滑
     29) option to use "negative trace loss". 用minimize 1/trace(SR*HR)做为negative trace loss。trace(SR*HR)表示SR和HR的相似程度。两个向量内积是把一个向量投影到另一个上的长度，这个值可以用于描述两个向量的相似性。两个矩阵A、B的相似性
         可以用A、B两个矩阵的内积表征，被定义为Trace(AB)。见paper: 2015.LRTV: MR Image Super-Resolution With Low-Rank and Total Variation Regularizations
+    30) option to use HR reference with self-attention in the end. 使用MRI HR reference的MRI SR网络并联两个现有的branch，一个branch用于LR的放大，另一个用于给HR reference的feature extraction（去掉upsampler），
+        最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
+        模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
     1) U-Net is already used as framework for image single branch. But not support for any of dual domain branch yet! Thus the class "U_Net_Based_MRI_SR_Dual_Domain_2D" still needs to be
         changed to support U-Net as framework for 3 types of dual domain branch.
     2) k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
-    3) consider using HR reference with self-attention in the end这个方案已经开始编代码，但没有完成。
-        还有Call 带HR reference的our_rcan_mri_sr_2d做forward propogationd，与读取LR, HR, HR reference数据的部分没有写。
-    
+    3) option to use HR reference with self-attention in the end这个方案已经代码已经完成。但现在SR branch的output是channel数为n_colors的图像，而HR reference feature extraction branch的
+        output是channel数为n_feats的feature map，俩者channel数差别非常大却直接concatenate到一块fusion。这块可能要考虑要么把俩者都换为n_feats的feature map，要么都换为n_colors的图像后再concatenate。
+    4) 另外，现在option to use HR reference with self-attention in the end这个方案如果在网络用self-attention，则会out of memory。
+
 
 we will plan to support other features:
     1) multi-kernel size deformable conv in different paths and fuse together, see [26] for similar idea
@@ -94,27 +98,23 @@ we will plan to support other features:
     7) 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来增强U-Net framework对于多尺度信息的提取恢复。
         现阶段已经用"Channel and Spatial Attention Block"模块替换掉了CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG作为U-Net framework中的encoder的每一层。基于这种U-Net 
         framework我们可以在decoder的所有层连上这种Panoptic FPN结构从而构成Panoptic U-Net framework.
-    8) consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，
-        另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特
-        征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
-        模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
-        这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样。
-    9) non-local edge attention. 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
+    8) non-local edge attention. 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
         我们可以像它这样，但不对每一个spatial position来做，而是做self-attention的部分引入一个LR的图的Gradient map, 然后将这个gradient map reshape成为一个1 x NW的向量，再和自己的转置相乘得到一个
         pixel-wise的互相关矩阵，再通过一个softmax或sigmoid（和self-attention的通过Pixel-wise互相关矩阵求取每个pixel和其他所有pixel之间的相关性再通过softmax的操作逻辑一样）变成一个归一化了的权重矩阵。
         再将这个基于Gradient map求出来的权重矩阵乘以self-attention模块中的Value矩阵，然后再和“key和query求Pixel-wise的互相关矩阵过softmax之后得到的权重矩阵”再相乘，从而输出一个同时被non-local 
         self-attention强调和gradient map edge强调过的feature map。那这个non-local edge attention模块同时放在整个网络的最前面（做第一个block）给LR输入加一个edge attention的guidence，和最后面（做最
         后一个block）给SR输出加一个edge attention的guidence。
         **Beware: 这个idea应该对MRI segmentation一样靠谱！！！！！
-    10) 那么对于8)中提出的基于HR reference的MRI SR网络，其实也可以对输入的HR reference MRI数据在网络的一开始做non-local edge attention，以及fft求k space去掉低频仅保留高频再ifft之后做non-local edge attention
+    9) 那么对于8)中提出的基于HR reference的MRI SR网络，其实也可以对输入的HR reference MRI数据在网络的一开始做non-local edge attention，以及fft求k space去掉低频仅保留高频再ifft之后做non-local edge attention
         类似的操作求出一个high frequency self-attention，这样得到一个被gradient map edge强调和的high frequency self-attention强调的feature map来和LR生成SR的branch进行fuse。
-    11) consider adding dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution).
-    12) Pair-wise and Patch-wise Attention. See paper: 2019.Exploring self-attention for image recognition
-    13) Criss-cross Attention. Criss-cross Attention could reduce the computational burden which introduces from non-local self-attention block(has a high complexity of O(N2), where N denotes 
+    10) consider adding dual regression loss(See paper: 2020.Closed-loop Matters: Dual Regression Networks for Single Image Super-Resolution).
+    11) Pair-wise and Patch-wise Attention. See paper: 2019.Exploring self-attention for image recognition
+    12) Criss-cross Attention. Criss-cross Attention could reduce the computational burden which introduces from non-local self-attention block(has a high complexity of O(N2), where N denotes 
         the number of input feature maps). The criss-cross attention module that for each pixel position generates a sparse attention map only on the criss-cross path. Further, by applying 
         criss-cross attention recurrently, each pixel position can capture context from all other pixels. Compared to non-local self-attention block, the criss-cross uses 11× lesser GPU memory, 
         and has a complexity of O(2√N).
         See paper: 2019.CCNet: Criss-cross attention for semantic segmentation
+    13) 在最外侧多加一个LR用zero padding变大之后直接加在网络最后的输出上面的skip connection，把网络结构改变，从而让网络从用LR生成SR变为用LR恢复SR和LR+zero padding相差的部分。
 
 
 We also fixed bugs from previous versions, typical ones like:
@@ -225,8 +225,8 @@ since = time.perf_counter()
 0. Configure all parameter
 """""""""""""""""""""""""""""""""""""""""""""
 # --------------------------- configuration of support parameters --------------------------- #
-batch_size = 8
-EPOCH_NUM = 12
+batch_size = 6
+EPOCH_NUM = 1
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
 Maintain_Same_Size = False # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
@@ -244,261 +244,687 @@ plot_the_gradient_map_of_input_image = False
 plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
-# --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'main_network_framework': 'U_Net', 'type_of_network': 'image_single_domain',
-        
-        'use_HR_reference' : True, 
+# --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
+args = {'use_HR_reference' : True, 
         'use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser': True,
-        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'self_attention',
+        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'CBAM',
         'channel_and_spatial_attention_mode_for_HR_reference_fuser': 'parallel_mode',
+
+        'main_network_framework': 'RCAN', 'type_of_network': 'image_single_domain',
         
-        'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
-        'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True, \
-        'channel_and_spatial_attention_framework': 'self_attention', 'channel_and_spatial_attention_mode': 'sequential_mode',\
-        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', \
-        'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
+        'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True,
+        'channel_and_spatial_attention_framework': 'CBAM', 'channel_and_spatial_attention_mode': 'sequential_mode',
+
+        'n_colors': 1, 'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 
+        
+        'scale': 2, 'number_of_progressive_stage': 1,
+
+        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'gradient_operator': 'sobel', 
+        
+        'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
         'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
+
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
                     'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
                     'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, 'negative_total_variation_weight': 3, 'negative_trace_weight': 3,\
                     'ssim_luminance_weight': 2, 'ssim_contrast_weight': 2, 'ssim_structure_weight': 4}
-# args['main_network_framework'] = 'RCAN', stands for which main network framework to use, e.g. 'U_Net', 'RCAN'
+
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
-# args['use_channel_and_spatial_attention_on_the_fuser_of_HR_reference_based_network'] = True, stands for whether we select to use attention when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. True, False
-# args['n_resgroups'] = 20, stands for number of RGs in RIR/RCAN (per stage)
-# args['n_rcablocks'] = 10, stands for number of RCABs in one RG (per stage)
-# args['n_feats'] = 128, stands for how many "number of channels" for feature map going through model
-# args['reduction'] = 16, stands for reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
-# args['scale'] = 2, stands for scale factor used in one upsampler, e.g. 2, 4
-# args['number_of_progressive_stage'] = 2, stands for number of stages(number of "MRI_SR_Dual_Domain_2D network"), e.g. 1, 2, 3, to ultilize progressive upsampling
+# args['use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser'] = True, stands for whether we select to use attention when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. True, False
+# args['channel_and_spatial_attention_framework_for_HR_reference_fuser'] = 'self_attention', stands for which channel and spatial framework is used when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'CBAM', 'self_attention'
+# args['channel_and_spatial_attention_mode_for_HR_reference_fuser'] = 'parallel_mode', stands for which end to end channel and spatial block to use when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'sequential_mode', 'parallel_mode'
+
+# args['main_network_framework'] = 'RCAN', stands for which main network framework to use, e.g. 'U_Net', 'RCAN'
+# arg['type_of_network'] == 'image_single_domain', stands for type of network, e.g. 'image_single_domain', 'gradient_map_dual_domain', 'k_space_dual_domain', 'wavelets_transform_dual_domain'
+
 # args['use_channel_and_spatial_attention_inside_upsampler'] = True, stands for whether we use channel and spatial attention block inside upsampler, e.g. True, False
 # args['use_channel_and_spatial_attention_inside_RCAB'] = True, stands for whether we use channel and spatial attention block inside RCAB to replace CALayer, e.g. True, False
 # args['channel_and_spatial_attention_framework'] = 'self_attention', stands for which channel and spatial framework is used in the code, e.g. 'CBAM', 'self_attention'
 # args['channel_and_spatial_attention_mode'] = 'sequential_mode', stands for which end to end channel and spatial block to use, e.g. 'sequential_mode', 'parallel_mode'
+
+# args['n_colors'] = 1, stands for number of channels of input image, e.g. 1 for MRI image, 3 for RGB image.
+# args['n_resgroups'] = 20, stands for number of RGs in RIR/RCAN (per stage)
+# args['n_rcablocks'] = 10, stands for number of RCABs in one RG (per stage)
+# args['n_feats'] = 128, stands for how many "number of channels" for feature map going through model
+# args['reduction'] = 16, stands for reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
+
+# args['scale'] = 2, stands for scale factor used in one upsampler, e.g. 2, 4
+# args['number_of_progressive_stage'] = 2, stands for number of stages(number of "MRI_SR_Dual_Domain_2D network"), e.g. 1, 2, 3, to ultilize progressive upsampling
+
 # args['conv_layer_type'] = 'default_conv', stands for type of conv layer, e.g. 'default_conv', 'coord_conv', 'deformable_conv', 'py_conv'
 # args['activation_function_type'] = 'ReLU', stands for type of activation function, e.g. 'ReLU'. 'Sine', 'FReLU', 'Dynamic_ReLU_Type_A', 'Dynamic_ReLU_Type_B'
-# arg['type_of_network'] == 'image_single_domain', stands for type of network, e.g. 'image_single_domain', 'gradient_map_dual_domain', 'k_space_dual_domain', 'wavelets_transform_dual_domain'
 # arg['gradient_operator'] = ['sobel'] # stand for which gradient operator we want use for calculating gradient map, e.g. 'sobel', 'canny'
+
 # arg['optimizer'] = ['Adam'] # stand for which optimizer we want use for training, e.g. 'Adam', 'SGD_with_momentum', 'look_ahead'
 # arg['learning_rate_decay_method'] = ['cosine_learning_rate_decay'] # stand for which learning rate decay method we want use for training, e.g. 'cosine_learning_rate_decay', 'multi_step_learning_rate', 'step_learning_rate', 'cosine_learning_rate_warm_restarts'
 
 
-"""""""""""""""""""""""""""""""""""""""""""""
-1.1 MRI HR and LR Data pair preprocessing training part
-"""""""""""""""""""""""""""""""""""""""""""""
-# =============================================================================
-# h5py.version
-# =============================================================================
+if args['use_HR_reference'] == False and args['n_colors'] == 1:
+    """
+    The data loading pipeline for ordinary SISR MRI SR:
+    """
+    """""""""""""""""""""""""""""""""""""""""""""
+    1.1.a. MRI HR and LR Data pair preprocessing training part
+    """""""""""""""""""""""""""""""""""""""""""""
+    # =============================================================================
+    # h5py.version
+    # =============================================================================
 
-"The folder where to load the training LR, HR data pair"
-folder_log_path = 'D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/data/sample_downsize_training_data_20200728'
-file_names = os.listdir(folder_log_path)
+    "The folder where to load the training LR, HR data pair"
+    folder_log_path = 'D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/data/sample_downsize_training_data_20200728'
+    file_names = os.listdir(folder_log_path)
 
-num_low_resolution_mat_file = 0
-num_high_resolution_groundtruth_mat_file = 0
+    num_low_resolution_mat_file = 0
+    num_high_resolution_groundtruth_mat_file = 0
 
-for idx_file in file_names:
-    print(idx_file)
-    if 'LR_training_4' in os.path.join(folder_log_path, idx_file):
-        print('One more low resolution image set exist')
-        num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-        print(os.path.join(folder_log_path, idx_file))
-        file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-        data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-        print(np.shape(data_low_resolution))
-        print(data_low_resolution.dtype)
-        torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
-        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-        torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-# =============================================================================
-#         torch_data_low_resolution = tc.t(torch_data_low_resolution)
-# =============================================================================
-# =============================================================================
-#         torch_data_low_resolution = torch_data_low_resolution.type(tc.DoubleTensor)
-# =============================================================================
-        print(np.shape(torch_data_low_resolution))
-        if num_low_resolution_mat_file == 1:
-            torch_data_low_resolution_sequence = torch_data_low_resolution
-        elif num_low_resolution_mat_file > 1:
-            print(num_low_resolution_mat_file)
-            torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-        print(np.shape(torch_data_low_resolution_sequence))
-    elif 'HRGT_training_4' in os.path.join(folder_log_path, idx_file):
-        print('One more high resolution groundtruth image set exist')
-        num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-        print(os.path.join(folder_log_path, idx_file))
-        file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-        data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-        print(np.shape(data_high_resolution_groundtruth))
-        torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-        torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-# =============================================================================
-#         torch_data_high_resolution_groundtruth = tc.t(torch_data_high_resolution_groundtruth)
-# =============================================================================
-# =============================================================================
-#         torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.type(tc.DoubleTensor)
-# =============================================================================
-        print(np.shape(torch_data_high_resolution_groundtruth))
-        if num_high_resolution_groundtruth_mat_file == 1:
-            torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-        if num_high_resolution_groundtruth_mat_file > 1:
-            print(num_high_resolution_groundtruth_mat_file)
-            torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-        print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-    else:
-        print('other type NOT support for now')
+    for idx_file in file_names:
+        print(idx_file)
+        if 'LR_training_4' in os.path.join(folder_log_path, idx_file):
+            print('One more low resolution image set exist')
+            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
+            print(np.shape(data_low_resolution))
+            print(data_low_resolution.dtype)
+            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
+    # =============================================================================
+    #         torch_data_low_resolution = tc.t(torch_data_low_resolution)
+    # =============================================================================
+    # =============================================================================
+    #         torch_data_low_resolution = torch_data_low_resolution.type(tc.DoubleTensor)
+    # =============================================================================
+            print(np.shape(torch_data_low_resolution))
+            if num_low_resolution_mat_file == 1:
+                torch_data_low_resolution_sequence = torch_data_low_resolution
+            elif num_low_resolution_mat_file > 1:
+                print(num_low_resolution_mat_file)
+                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+            print(np.shape(torch_data_low_resolution_sequence))
+        elif 'HRGT_training_4' in os.path.join(folder_log_path, idx_file):
+            print('One more high resolution groundtruth image set exist')
+            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
+            print(np.shape(data_high_resolution_groundtruth))
+            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
+    # =============================================================================
+    #         torch_data_high_resolution_groundtruth = tc.t(torch_data_high_resolution_groundtruth)
+    # =============================================================================
+    # =============================================================================
+    #         torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.type(tc.DoubleTensor)
+    # =============================================================================
+            print(np.shape(torch_data_high_resolution_groundtruth))
+            if num_high_resolution_groundtruth_mat_file == 1:
+                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+            if num_high_resolution_groundtruth_mat_file > 1:
+                print(num_high_resolution_groundtruth_mat_file)
+                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+        else:
+            print('other type NOT support for now')
+
+    """Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
+    the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
+    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
+    print(np.shape(torch_data_low_resolution_sequence))
+    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+
+    num_training_samples = math.floor(torch_data_low_resolution_sequence.size(0))
+    #print(num_training_samples)
+    #torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
+    #torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
+    #print(np.shape(torch_data_low_resolution_training_sequence))
+    #print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
+
+    #torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
+    #torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
+    #print(np.shape(torch_data_low_resolution_test_sequence))
+    #print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
+
+    print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    1.2.a. Load MRI HR and LR Data pair training part
+    """""""""""""""""""""""""""""""""""""""""""""
+    torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence.float()
+    torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+
+    # tc.multiprocessing.freeze_support()
+
+    trainset = tc.utils.data.TensorDataset(torch_data_low_resolution_training_sequence, torch_data_high_resolution_groundtruth_training_sequence)
+
+    trainloader = tc.utils.data.DataLoader(
+                        trainset, 
+                        batch_size = batch_size,
+                        shuffle = True, 
+                        num_workers = 0)
+
+    #testset = tc.utils.data.TensorDataset(torch_data_low_resolution_test_sequence, torch_data_high_resolution_groundtruth_test_sequence)
+
+    #testloader = tc.utils.data.DataLoader(
+    #                    testset, 
+    #                    batch_size = batch_size,
+    #                    shuffle = True, 
+    #                    num_workers = 0)
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    2.1.a. MRI HR and LR Validation Data pair preprocessing validation part
+    """""""""""""""""""""""""""""""""""""""""""""
+    num_low_resolution_mat_file = 0
+    num_high_resolution_groundtruth_mat_file = 0
+
+    for idx_file in file_names:
+        print(idx_file)
+        if 'LR_validation_4' in os.path.join(folder_log_path, idx_file):
+            print('One more low resolution image set exist')
+            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
+            print(np.shape(data_low_resolution))
+            print(data_low_resolution.dtype)
+            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
+    # =============================================================================
+    #         torch_data_low_resolution = tc.t(torch_data_low_resolution)
+    # =============================================================================
+    # =============================================================================
+    #         torch_data_low_resolution = torch_data_low_resolution.type(tc.DoubleTensor)
+    # =============================================================================
+            print(np.shape(torch_data_low_resolution))
+            if num_low_resolution_mat_file == 1:
+                torch_data_low_resolution_sequence = torch_data_low_resolution
+            elif num_low_resolution_mat_file > 1:
+                print(num_low_resolution_mat_file)
+                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+            print(np.shape(torch_data_low_resolution_sequence))
+        elif 'HRGT_validation_4' in os.path.join(folder_log_path, idx_file):
+            print('One more high resolution groundtruth image set exist')
+            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
+            print(np.shape(data_high_resolution_groundtruth))
+            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
+    # =============================================================================
+    #         torch_data_high_resolution_groundtruth = tc.t(torch_data_high_resolution_groundtruth)
+    # =============================================================================
+    # =============================================================================
+    #         torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.type(tc.DoubleTensor)
+    # =============================================================================
+            print(np.shape(torch_data_high_resolution_groundtruth))
+            if num_high_resolution_groundtruth_mat_file == 1:
+                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+            if num_high_resolution_groundtruth_mat_file > 1:
+                print(num_high_resolution_groundtruth_mat_file)
+                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+        else:
+            print('other type NOT support for now')
+
+    """Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
+    the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
+    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
+    print(np.shape(torch_data_low_resolution_sequence))
+    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+
+    num_validation_samples = math.floor(torch_data_low_resolution_sequence.size(0))
+    #print(num_training_samples)
+    #torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
+    #torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
+    #print(np.shape(torch_data_low_resolution_training_sequence))
+    #print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
+
+    #torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
+    #torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
+    #print(np.shape(torch_data_low_resolution_test_sequence))
+    #print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
+
+    print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    2.2.a. Load MRI HR and LR Validation Data pair validation part
+    """""""""""""""""""""""""""""""""""""""""""""
+    torch_data_low_resolution_validation_sequence = torch_data_low_resolution_sequence.float()
+    torch_data_high_resolution_groundtruth_validation_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+
+    # tc.multiprocessing.freeze_support()
+
+    validationset = tc.utils.data.TensorDataset(torch_data_low_resolution_validation_sequence, torch_data_high_resolution_groundtruth_validation_sequence)
+
+    validationloader = tc.utils.data.DataLoader(
+                        validationset, 
+                        batch_size = batch_size,
+                        shuffle = False, 
+                        num_workers = 0)
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    3.1.a. MRI HR and LR Evaluation(Test) Data pair preprocessing evaluation(test) part
+    """""""""""""""""""""""""""""""""""""""""""""
+    # Please beware the data should be Evaluation data rather than training data
+    """ folder_log_path = '/srv/DATA/RAID/HaoLi/Data/'
+    file_names = os.listdir(folder_log_path) """
+
+    num_low_resolution_mat_file = 0
+    num_high_resolution_groundtruth_mat_file = 0
+
+    for idx_file in file_names:
+        print(idx_file)
+        if 'LR_eval_4' in os.path.join(folder_log_path, idx_file):
+            print('One more low resolution image set exist')
+            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
+            print(np.shape(data_low_resolution))
+            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
+            print(np.shape(torch_data_low_resolution))
+            if num_low_resolution_mat_file == 1:
+                torch_data_low_resolution_sequence = torch_data_low_resolution
+            elif num_low_resolution_mat_file > 1:
+                print(num_low_resolution_mat_file)
+                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+            print(np.shape(torch_data_low_resolution_sequence))
+        elif 'HRGT_eval_4' in os.path.join(folder_log_path, idx_file):
+            print('One more high resolution groundtruth image set exist')
+            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
+            print(np.shape(data_high_resolution_groundtruth))
+            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
+            print(np.shape(torch_data_high_resolution_groundtruth))
+            if num_high_resolution_groundtruth_mat_file == 1:
+                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+            if num_high_resolution_groundtruth_mat_file > 1:
+                print(num_high_resolution_groundtruth_mat_file)
+                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+        else:
+            print('other type NOT support for now')
+
+    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
+    print(np.shape(torch_data_low_resolution_sequence))
+    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    3.2.a. Load MRI HR and LR Evaluation(Test) Data pair evaluation(test) part
+    """""""""""""""""""""""""""""""""""""""""""""
+    torch_data_low_resolution_eval_sequence = torch_data_low_resolution_sequence.float()
+    torch_data_high_resolution_groundtruth_eval_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+
+    testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_high_resolution_groundtruth_eval_sequence)
+
+    new_batch_size_for_checking = 32
+
+    testloader = tc.utils.data.DataLoader(
+                        testset, 
+                        batch_size = new_batch_size_for_checking,
+                        shuffle = False, 
+                        num_workers = 0)        
+
+    "Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
+    #trainloader = tc.utils.data.DataLoader(
+    #                    trainset, 
+    #                    batch_size = new_batch_size_for_checking,
+    #                    shuffle = True, 
+    #                    num_workers = 0)
+
+elif args['use_HR_reference'] == True and args['n_colors'] == 1:
+    """
+    The data loading pipeline for MRI SR with HR reference:
+    """
+    """""""""""""""""""""""""""""""""""""""""""""
+    1.1.b. MRI HR reference, HR and LR Data pair preprocessing training part
+    """""""""""""""""""""""""""""""""""""""""""""
+    # =============================================================================
+    # h5py.version
+    # =============================================================================
+    "The folder where to load the training LR, HR and HR reference data pair"
+    folder_log_path = 'D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/data/sample_downsize_training_data_HR_reference_20210111'
+    file_names = os.listdir(folder_log_path)
+
+    num_low_resolution_mat_file = 0
+    num_high_resolution_groundtruth_mat_file = 0
+    num_reference_mat_file = 0
+
+    for idx_file in file_names:
+        print(idx_file)
+        if 'LR_training_2' in os.path.join(folder_log_path, idx_file):
+            print('One more low resolution image set exist')
+            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
+            print(np.shape(data_low_resolution))
+            print(data_low_resolution.dtype)
+            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
+            print(np.shape(torch_data_low_resolution))
+            if num_low_resolution_mat_file == 1:
+                torch_data_low_resolution_sequence = torch_data_low_resolution
+            elif num_low_resolution_mat_file > 1:
+                print(num_low_resolution_mat_file)
+                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+            print(np.shape(torch_data_low_resolution_sequence))
+        elif 'HRGT_training_2' in os.path.join(folder_log_path, idx_file):
+            print('One more high resolution groundtruth image set exist')
+            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
+            print(np.shape(data_high_resolution_groundtruth))
+            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
+            print(np.shape(torch_data_high_resolution_groundtruth))
+            if num_high_resolution_groundtruth_mat_file == 1:
+                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+            if num_high_resolution_groundtruth_mat_file > 1:
+                print(num_high_resolution_groundtruth_mat_file)
+                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+        elif 'REF_training_2' in os.path.join(folder_log_path, idx_file):
+            print('One more reference image set exist')
+            num_reference_mat_file = num_reference_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_reference = file_data_reference['REF'][:] #----- numpy array
+            print(np.shape(data_reference))
+            torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_reference = torch_data_reference.permute(0, 2, 1)
+            print(np.shape(torch_data_reference))
+            if num_reference_mat_file == 1:
+                torch_data_reference_sequence = torch_data_reference
+            if num_reference_mat_file > 1:
+                print(num_reference_mat_file)
+                torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
+            print(np.shape(torch_data_reference_sequence))
+        else:
+            print('other type NOT support for now')
+
+    """Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
+    the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
+    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
+    print(np.shape(torch_data_low_resolution_sequence))
+    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+    torch_data_reference_sequence = torch_data_reference_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_reference_sequence))
+
+    num_training_samples = math.floor(torch_data_low_resolution_sequence.size(0))
+    #print(num_training_samples)
+    #torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
+    #torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
+    #print(np.shape(torch_data_low_resolution_training_sequence))
+    #print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
+
+    #torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
+    #torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
+    #print(np.shape(torch_data_low_resolution_test_sequence))
+    #print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
+
+    print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    1.2.b. Load MRI HR reference, HR and LR Data pair training part
+    """""""""""""""""""""""""""""""""""""""""""""
+    torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence.float()
+    torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+    torch_data_reference_training_sequence = torch_data_reference_sequence.float()
+
+    # tc.multiprocessing.freeze_support()
+
+    trainset = tc.utils.data.TensorDataset(torch_data_low_resolution_training_sequence, torch_data_high_resolution_groundtruth_training_sequence,
+                                            torch_data_reference_training_sequence)
+
+    trainloader = tc.utils.data.DataLoader(
+                        trainset, 
+                        batch_size = batch_size,
+                        shuffle = True, 
+                        num_workers = 0)
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    2.1.b. MRI HR reference, HR and LR Validation Data pair preprocessing validation part
+    """""""""""""""""""""""""""""""""""""""""""""
+    num_low_resolution_mat_file = 0
+    num_high_resolution_groundtruth_mat_file = 0
+    num_reference_mat_file = 0
+
+    for idx_file in file_names:
+        print(idx_file)
+        if 'LR_validation_2' in os.path.join(folder_log_path, idx_file):
+            print('One more low resolution image set exist')
+            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
+            print(np.shape(data_low_resolution))
+            print(data_low_resolution.dtype)
+            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
+            print(np.shape(torch_data_low_resolution))
+            if num_low_resolution_mat_file == 1:
+                torch_data_low_resolution_sequence = torch_data_low_resolution
+            elif num_low_resolution_mat_file > 1:
+                print(num_low_resolution_mat_file)
+                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+            print(np.shape(torch_data_low_resolution_sequence))
+        elif 'HRGT_validation_2' in os.path.join(folder_log_path, idx_file):
+            print('One more high resolution groundtruth image set exist')
+            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
+            print(np.shape(data_high_resolution_groundtruth))
+            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
+            print(np.shape(torch_data_high_resolution_groundtruth))
+            if num_high_resolution_groundtruth_mat_file == 1:
+                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+            if num_high_resolution_groundtruth_mat_file > 1:
+                print(num_high_resolution_groundtruth_mat_file)
+                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+        elif 'REF_validation_2' in os.path.join(folder_log_path, idx_file):
+            print('One more referece image set exist')
+            num_reference_mat_file = num_reference_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_reference = file_data_reference['REF'][:] #----- numpy array
+            print(np.shape(data_reference))
+            torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_reference = torch_data_reference.permute(0, 2, 1)
+            print(np.shape(torch_data_reference))
+            if num_reference_mat_file == 1:
+                torch_data_reference_sequence = torch_data_reference
+            if num_reference_mat_file > 1:
+                print(num_reference_mat_file)
+                torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
+            print(np.shape(torch_data_reference_sequence))
+        else:
+            print('other type NOT support for now')
+
+    """Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
+    the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
+    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
+    print(np.shape(torch_data_low_resolution_sequence))
+    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+    torch_data_reference_sequence = torch_data_reference_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_reference_sequence))
+
+    num_validation_samples = math.floor(torch_data_low_resolution_sequence.size(0))
+    #print(num_training_samples)
+    #torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
+    #torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
+    #print(np.shape(torch_data_low_resolution_training_sequence))
+    #print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
+
+    #torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
+    #torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
+    #print(np.shape(torch_data_low_resolution_test_sequence))
+    #print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
+
+    print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    2.2.b. Load MRI HR reference, HR and LR Validation Data pair validation part
+    """""""""""""""""""""""""""""""""""""""""""""
+    torch_data_low_resolution_validation_sequence = torch_data_low_resolution_sequence.float()
+    torch_data_high_resolution_groundtruth_validation_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+    torch_data_reference_validation_sequence = torch_data_reference_sequence.float()
+
+    # tc.multiprocessing.freeze_support()
+
+    validationset = tc.utils.data.TensorDataset(torch_data_low_resolution_validation_sequence, torch_data_high_resolution_groundtruth_validation_sequence, 
+                                                    torch_data_reference_validation_sequence)
+
+    validationloader = tc.utils.data.DataLoader(
+                        validationset, 
+                        batch_size = batch_size,
+                        shuffle = False, 
+                        num_workers = 0)
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    3.1.b. MRI HR reference, HR and LR Evaluation(Test) Data pair preprocessing evaluation(test) part
+    """""""""""""""""""""""""""""""""""""""""""""
+    # Please beware the data should be Evaluation data rather than training data
+    """ folder_log_path = '/srv/DATA/RAID/HaoLi/Data/'
+    file_names = os.listdir(folder_log_path) """
+
+    num_low_resolution_mat_file = 0
+    num_high_resolution_groundtruth_mat_file = 0
+    num_reference_mat_file = 0
+
+    for idx_file in file_names:
+        print(idx_file)
+        if 'LR_eval_2' in os.path.join(folder_log_path, idx_file):
+            print('One more low resolution image set exist')
+            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
+            print(np.shape(data_low_resolution))
+            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
+            print(np.shape(torch_data_low_resolution))
+            if num_low_resolution_mat_file == 1:
+                torch_data_low_resolution_sequence = torch_data_low_resolution
+            elif num_low_resolution_mat_file > 1:
+                print(num_low_resolution_mat_file)
+                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+            print(np.shape(torch_data_low_resolution_sequence))
+        elif 'HRGT_eval_2' in os.path.join(folder_log_path, idx_file):
+            print('One more high resolution groundtruth image set exist')
+            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
+            print(np.shape(data_high_resolution_groundtruth))
+            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
+            print(np.shape(torch_data_high_resolution_groundtruth))
+            if num_high_resolution_groundtruth_mat_file == 1:
+                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+            if num_high_resolution_groundtruth_mat_file > 1:
+                print(num_high_resolution_groundtruth_mat_file)
+                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+        elif 'REF_eval_2' in os.path.join(folder_log_path, idx_file):
+            print('One more reference image set exist')
+            num_reference_mat_file = num_reference_mat_file + 1
+            print(os.path.join(folder_log_path, idx_file))
+            file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_reference = file_data_reference['REF'][:] #----- numpy array
+            print(np.shape(data_reference))
+            torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
+            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+            torch_data_reference = torch_data_reference.permute(0, 2, 1)
+            print(np.shape(torch_data_reference))
+            if num_reference_mat_file == 1:
+                torch_data_reference_sequence = torch_data_reference
+            if num_reference_mat_file > 1:
+                print(num_reference_mat_file)
+                torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
+            print(np.shape(torch_data_reference_sequence))
+        else:
+            print('other type NOT support for now')
+
+    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
+    print(np.shape(torch_data_low_resolution_sequence))
+    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+    torch_data_reference_sequence = torch_data_reference_sequence.unsqueeze(1)  
+    print(np.shape(torch_data_reference_sequence))
+
+    """""""""""""""""""""""""""""""""""""""""""""
+    3.2.b. Load MRI HR reference, HR and LR Evaluation(Test) Data pair evaluation(test) part
+    """""""""""""""""""""""""""""""""""""""""""""
+    torch_data_low_resolution_eval_sequence = torch_data_low_resolution_sequence.float()
+    torch_data_high_resolution_groundtruth_eval_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+    torch_data_reference_eval_sequence = torch_data_reference_sequence.float()
+
+    testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_high_resolution_groundtruth_eval_sequence,
+                                            torch_data_reference_eval_sequence)
+
+    new_batch_size_for_checking = 32
+
+    testloader = tc.utils.data.DataLoader(
+                        testset, 
+                        batch_size = new_batch_size_for_checking,
+                        shuffle = False, 
+                        num_workers = 0)        
+
+    "Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
+    #trainloader = tc.utils.data.DataLoader(
+    #                    trainset, 
+    #                    batch_size = new_batch_size_for_checking,
+    #                    shuffle = True, 
+    #                    num_workers = 0)
+
+elif args['use_HR_reference'] == False and args['n_colors'] == 3:
+    """
+    The data loading pipeline for ordinary SISR RGB SR:
+    """
+    # @TODO: The corresponding data loading part to be added 
+    pass
+
+elif args['use_HR_reference'] == True and args['n_colors'] == 3:
+    """
+    The data loading pipeline for RGB SR with HR reference:
+    """
+    # @TODO: The corresponding data loading part to be added 
+    pass
+else:
+    raise ValueError("Not supported type of input image in loading input data!")
 
 
-"Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all\
-the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"        
-torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-print(np.shape(torch_data_low_resolution_sequence))
-torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-print(np.shape(torch_data_high_resolution_groundtruth_sequence))
 
-
-num_training_samples = math.floor(torch_data_low_resolution_sequence.size(0))
-#print(num_training_samples)
-#torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
-#torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
-#print(np.shape(torch_data_low_resolution_training_sequence))
-#print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
-
-
-#torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
-#torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
-#print(np.shape(torch_data_low_resolution_test_sequence))
-#print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
-
-
-print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
-
-"""""""""""""""""""""""""""""""""""""""""""""
-1.2 Load MRI HR and LR Data pair training part
-"""""""""""""""""""""""""""""""""""""""""""""
-torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence.float()
-torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-
-# tc.multiprocessing.freeze_support()
-
-trainset = tc.utils.data.TensorDataset(torch_data_low_resolution_training_sequence, torch_data_high_resolution_groundtruth_training_sequence)
-
-trainloader = tc.utils.data.DataLoader(
-                    trainset, 
-                    batch_size = batch_size,
-                    shuffle = True, 
-                    num_workers = 0)
-
-
-
-#testset = tc.utils.data.TensorDataset(torch_data_low_resolution_test_sequence, torch_data_high_resolution_groundtruth_test_sequence)
-
-#testloader = tc.utils.data.DataLoader(
-#                    testset, 
-#                    batch_size = batch_size,
-#                    shuffle = True, 
-#                    num_workers = 0)
-
-
-"""""""""""""""""""""""""""""""""""""""""""""
-2.1 MRI HR and LR Validation Data pair preprocessing validation part
-"""""""""""""""""""""""""""""""""""""""""""""
-num_low_resolution_mat_file = 0
-num_high_resolution_groundtruth_mat_file = 0
-
-for idx_file in file_names:
-    print(idx_file)
-    if 'LR_validation_4' in os.path.join(folder_log_path, idx_file):
-        print('One more low resolution image set exist')
-        num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-        print(os.path.join(folder_log_path, idx_file))
-        file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-        data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-        print(np.shape(data_low_resolution))
-        print(data_low_resolution.dtype)
-        torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
-        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-        torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-# =============================================================================
-#         torch_data_low_resolution = tc.t(torch_data_low_resolution)
-# =============================================================================
-# =============================================================================
-#         torch_data_low_resolution = torch_data_low_resolution.type(tc.DoubleTensor)
-# =============================================================================
-        print(np.shape(torch_data_low_resolution))
-        if num_low_resolution_mat_file == 1:
-            torch_data_low_resolution_sequence = torch_data_low_resolution
-        elif num_low_resolution_mat_file > 1:
-            print(num_low_resolution_mat_file)
-            torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-        print(np.shape(torch_data_low_resolution_sequence))
-    elif 'HRGT_validation_4' in os.path.join(folder_log_path, idx_file):
-        print('One more high resolution groundtruth image set exist')
-        num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-        print(os.path.join(folder_log_path, idx_file))
-        file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-        data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-        print(np.shape(data_high_resolution_groundtruth))
-        torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-        torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-# =============================================================================
-#         torch_data_high_resolution_groundtruth = tc.t(torch_data_high_resolution_groundtruth)
-# =============================================================================
-# =============================================================================
-#         torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.type(tc.DoubleTensor)
-# =============================================================================
-        print(np.shape(torch_data_high_resolution_groundtruth))
-        if num_high_resolution_groundtruth_mat_file == 1:
-            torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-        if num_high_resolution_groundtruth_mat_file > 1:
-            print(num_high_resolution_groundtruth_mat_file)
-            torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-        print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-    else:
-        print('other type NOT support for now')
-
-
-"Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all\
-the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"        
-torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-print(np.shape(torch_data_low_resolution_sequence))
-torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-
-
-num_validation_samples = math.floor(torch_data_low_resolution_sequence.size(0))
-#print(num_training_samples)
-#torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
-#torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
-#print(np.shape(torch_data_low_resolution_training_sequence))
-#print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
-
-
-#torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
-#torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
-#print(np.shape(torch_data_low_resolution_test_sequence))
-#print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
-
-
-print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
-
-"""""""""""""""""""""""""""""""""""""""""""""
-2.2 Load MRI HR and LR Validation Data pair validation part
-"""""""""""""""""""""""""""""""""""""""""""""
-torch_data_low_resolution_validation_sequence = torch_data_low_resolution_sequence.float()
-torch_data_high_resolution_groundtruth_validation_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-
-# tc.multiprocessing.freeze_support()
-
-validationset = tc.utils.data.TensorDataset(torch_data_low_resolution_validation_sequence, torch_data_high_resolution_groundtruth_validation_sequence)
-
-validationloader = tc.utils.data.DataLoader(
-                    validationset, 
-                    batch_size = batch_size,
-                    shuffle = False, 
-                    num_workers = 0)
+ 
 
 """
 In the original paper which proposed RCAN(2018. Image Super-Resolution Using Very Deep Residual Channel Attention Networks, mentioned as "original RCAN paper" in following),
@@ -632,7 +1058,7 @@ class L1_Charbonnier_Loss(tc.nn.Module):
 
 
 """
-Negative Total Variation Loss(TV loss). negative_tv_loss = 1/(TV +1.000e-10).
+Negative Total Variation Loss(TV loss). negative_tv_loss = 1 - TV.
 Minimize总变差（TV）loss促进了生成的图像中的空间平滑性。于是minimize Negative Total Variation Loss将防止图像过分平滑。
 See more information regarding TV Loss from paper: 2015.iSeeBetter: Spatio-temporal video super-resolution using recurrent generative back-projection networks
 """
@@ -643,7 +1069,7 @@ class NegativeTVLoss(nn.Module):
         self.tv_loss = TVLoss(tv_loss_weight)
     
     def forward(self, x):
-        return self.negative_tv_loss_weight * 1 / (self.tv_loss(x) + 1.000e-10)
+        return self.negative_tv_loss_weight * (1 - self.tv_loss(x))
 
 class TVLoss(nn.Module):
     def __init__(self, TVLoss_weight = 1):
@@ -1752,7 +2178,7 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
 
         n_resgroups = args['n_resgroups'] # number of RGs in RIR/RCAN
         n_rcablocks = args['n_rcablocks'] # number of RCABs in one RG
-        n_colors = 1 # number of channels going of input of entire model
+        n_colors = args['n_colors'] # number of channels going of input of entire model
         n_feats = args['n_feats'] # number of feature maps/channels going through the entire model
         kernel_size = 3 # conv filter size used for all conv in RCAN
         reduction = args['reduction'] # reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
@@ -2123,7 +2549,7 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         n_resgroups = args['n_resgroups'] # number of RGs in U-Net framework
         self.n_resgroups = n_resgroups # pass to self
         n_rcablocks = args['n_rcablocks'] # number of RCABs in one RG
-        n_colors = 1 # number of channels going of input of entire model
+        n_colors = args['n_colors'] # number of channels going of input of entire model
         n_feats = args['n_feats'] # number of feature maps/channels we expect to have after the encoder of U-Net framework(which contains n_resgroups residual groups)
         kernel_size = 3 # conv filter size used for all conv in RCAN
         reduction = 1 # reduction is hardcoded as 1 for U-Net. The r mentioned in 3.3 Channel Attention in RCAN paper
@@ -2533,7 +2959,7 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         
         n_resgroups_for_HR_reference_branch = args['n_resgroups'] # number of RGs in RIR/RCAN
         n_rcablocks_for_HR_reference_branch = args['n_rcablocks'] # number of RCABs in one RG
-        n_colors = 1 # number of channels going of input of entire model
+        n_colors = args['n_colors'] # number of channels going of input of entire model
         n_feats_for_HR_reference_branch = args['n_feats'] # number of feature maps/channels going through the entire model
         kernel_size_for_HR_reference_branch = 3 # conv filter size used for all conv in RCAN
         reduction_for_HR_reference_branch = args['reduction'] # reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
@@ -2560,31 +2986,34 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser = args['use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser']
         channel_and_spatial_attention_framework_for_HR_reference_fuser = args['channel_and_spatial_attention_framework_for_HR_reference_fuser']
         channel_and_spatial_attention_mode_for_HR_reference_fuser = args['channel_and_spatial_attention_mode_for_HR_reference_fuser']
-        self.last_stage_fuser = nn.Sequential(nn.Conv2d(in_channels = args['n_feats'] + n_feats_for_HR_reference_branch, out_channels = args['n_feats'], kernel_size = 1),
+        self.last_stage_fuser = nn.Sequential(nn.Conv2d(in_channels = args['n_colors'] + n_feats_for_HR_reference_branch, out_channels = args['n_feats'], kernel_size = 1),
                         nn.ReLU(True),
                         RCAB(conv = deformable_conv, n_feat = args['n_feats'], kernel_size = 3, reduction = 16, bias=True, bn=False, act=nn.ReLU(True), res_scale=1, 
                             use_channel_and_spatial_attention_inside_RCAB = use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser,
                             channel_and_spatial_attention_framework = channel_and_spatial_attention_framework_for_HR_reference_fuser, 
                             channel_and_spatial_attention_mode = channel_and_spatial_attention_mode_for_HR_reference_fuser),
-                        nn.Conv2d(n_feats, n_feats//2, kernel_size = 1),
+                        nn.Conv2d(args['n_feats'], args['n_feats']//2, kernel_size = 1),
                         nn.ReLU(True),
-                        nn.Conv2d(n_feats//2, n_colors, kernel_size = 1)
+                        nn.Conv2d(args['n_feats']//2, n_colors, kernel_size = 1)
                         )
 
     
     def forward(self, LR, HR_reference):
-        # feature extraction at SR branch
-        x = self.SR_branch(LR)
+        # Feature extraction at SR branch.
+        # The output x is the output from single branch if 'image_single_domain' type of network is selected, otherwise x is the fused output from 
+        # both image main branch and secondary branch if 'gradient_map_dual_domain', 'k_space_dual_domain', or 'wavelets_transform_dual_domain' 
+        # type of network is selected.
+        x, output_from_secondary_branch_in_SR_branch, network_model_type_of_SR_branch = self.SR_branch(LR)
         
-        # feature extraction at HR reference branch
+        # Feature extraction at HR reference branch
         y = self.HR_reference_branch_head(HR_reference)
         y = self.HR_reference_branch_body(y)
 
         # Fuse the output from SR branch and HR reference branch
-        x = tc.cat((x, y), 1)   # Beware the x and y should have same size if the args sets up properly.
-        result = self.last_stage_fuser(x)
+        x = tc.cat((x, y), 1)   # Beware number of channels for x is only n_colors, but neumber of channels for y is n_feats, in the current implementation.
+        final_HR_reference_based_result = self.last_stage_fuser(x)
         
-        return result
+        return final_HR_reference_based_result, output_from_secondary_branch_in_SR_branch, network_model_type_of_SR_branch
 
 
 
@@ -2750,16 +3179,28 @@ for epoch in range(EPOCH_NUM):
         if args['conv_layer_type'] == 'deformable_conv':
             tc.cuda.empty_cache()
 
-        "load input data"
-        inputs, labels = data
-        inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
-        # print('The data have been loaded' )
+        if args['use_HR_reference'] == False:
+            "load input data"
+            inputs, labels = data
+            inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
+            # print('The data have been loaded' )
 
-        "forward prop"
-        # outputs = our_resnext(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
-        img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(inputs) #-- or using default float as type, however remember to cast the input from Double to Float            
-        # print(outputs.size())
-        # print('the forward pass has been went')
+            "forward prop"
+            # outputs = our_resnext(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
+            img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(inputs) #-- or using default float as type, however remember to cast the input from Double to Float            
+            # print(outputs.size())
+            # print('the forward pass has been went')
+        elif args['use_HR_reference'] == True:
+            "load input data"
+            inputs, labels, references = data
+            inputs, labels, references = Variable(inputs).to(device), Variable(labels).to(device), Variable(references).to(device)
+            # print('The data have been loaded' )
+
+            "forward prop"
+            # outputs = our_resnext(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
+            img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(inputs, references) #-- or using default float as type, however remember to cast the input from Double to Float            
+            # print(outputs.size())
+            # print('the forward pass has been went')
 
         SR_img_copies = tc.cat((img_outputs, img_outputs, img_outputs), 1)
         # print(SR_copies.size())
@@ -2954,12 +3395,19 @@ for epoch in range(EPOCH_NUM):
         "Set evaluation Mode"    
         our_rcan_mri_sr_2d.eval()
         for i, data in enumerate(validationloader, 0):
+            
+            if args['use_HR_reference'] == False:
+                "load input data"
+                inputs, labels = data
+                inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
 
-            "load input data"
-            inputs, labels = data
-            inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
+                SR_img_test, SR_secondary_branch_outputs_test, network_model_type_test = our_rcan_mri_sr_2d(inputs)
+            elif args['use_HR_reference'] == True:
+                "load input data"
+                inputs, labels, references = data
+                inputs, labels, references = Variable(inputs).to(device), Variable(labels).to(device), Variable(references).to(device)
 
-            SR_img_test, SR_secondary_branch_outputs_test, network_model_type_test = our_rcan_mri_sr_2d(inputs)
+                SR_img_test, SR_secondary_branch_outputs_test, network_model_type_test = our_rcan_mri_sr_2d(inputs, references)
 
             SR_test_copies = tc.cat((SR_img_test, SR_img_test, SR_img_test), 1)
             # print(SR_copies.size())
@@ -3010,7 +3458,7 @@ for epoch in range(EPOCH_NUM):
                 gram_similarity_between_img_loss_test = args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(SR_img_test), calculate_gram_matrix(labels))
 
             if Use_Negative_TV_Loss == True:
-                negative_total_variation_for_img_loss_test = negative_trace_loss(SR_img_test)
+                negative_total_variation_for_img_loss_test = negative_tv_loss(SR_img_test)
 
             if Use_Negative_Trace_Loss == True:
                 negative_trace_for_img_loss_test = negative_trace_loss(SR_img_test, labels)
@@ -3244,79 +3692,7 @@ print("training complete")
 
 
 
-"Evaluation"
-# Please beware the data should be Evaluation data rather than training data
-folder_log_path = '/srv/DATA/RAID/HaoLi/Data/'
-file_names = os.listdir(folder_log_path)
-
-num_low_resolution_mat_file = 0
-num_high_resolution_groundtruth_mat_file = 0
-
-for idx_file in file_names:
-    print(idx_file)
-    if 'LR_eval_4' in os.path.join(folder_log_path, idx_file):
-        print('One more low resolution image set exist')
-        num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-        print(os.path.join(folder_log_path, idx_file))
-        file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-        data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-        print(np.shape(data_low_resolution))
-        torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
-        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-        torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-        print(np.shape(torch_data_low_resolution))
-        if num_low_resolution_mat_file == 1:
-            torch_data_low_resolution_sequence = torch_data_low_resolution
-        elif num_low_resolution_mat_file > 1:
-            print(num_low_resolution_mat_file)
-            torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-        print(np.shape(torch_data_low_resolution_sequence))
-    elif 'HRGT_eval_4' in os.path.join(folder_log_path, idx_file):
-        print('One more high resolution groundtruth image set exist')
-        num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-        print(os.path.join(folder_log_path, idx_file))
-        file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-        data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-        print(np.shape(data_high_resolution_groundtruth))
-        torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-        torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-        print(np.shape(torch_data_high_resolution_groundtruth))
-        if num_high_resolution_groundtruth_mat_file == 1:
-            torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-        if num_high_resolution_groundtruth_mat_file > 1:
-            print(num_high_resolution_groundtruth_mat_file)
-            torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-        print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-    else:
-        print('other type NOT support for now')
-
-torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-print(np.shape(torch_data_low_resolution_sequence))
-torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-
-torch_data_low_resolution_eval_sequence = torch_data_low_resolution_sequence.float()
-torch_data_high_resolution_groundtruth_eval_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-
-testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_high_resolution_groundtruth_eval_sequence)
-
-new_batch_size_for_checking = 32
-
-testloader = tc.utils.data.DataLoader(
-                    testset, 
-                    batch_size = new_batch_size_for_checking,
-                    shuffle = False, 
-                    num_workers = 0)        
-
-
-"Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
-#trainloader = tc.utils.data.DataLoader(
-#                    trainset, 
-#                    batch_size = new_batch_size_for_checking,
-#                    shuffle = True, 
-#                    num_workers = 0)
-
+"Evaluation(Test)"
 with tc.no_grad():
     our_rcan_mri_sr_2d.eval()
 #    "exam the generated SR MRI image by using training LR image data and save them"
@@ -3370,9 +3746,6 @@ with tc.no_grad():
 
 #    print("examination of generated SR image by using training samples complete")
 
-
-
-
     "predict the SR MRI image by using testing LR image data and save them"
     # =============================================================================
     # for data in testloader:
@@ -3387,10 +3760,15 @@ with tc.no_grad():
         # =============================================================================
 
 #       if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
-
-        LR_images_test, HR_images_test = testing_data_2
-        HR_images_test = HR_images_test.type(tc.FloatTensor)
-        img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+        if args['use_HR_reference'] == False:
+            LR_images_test, HR_images_test = testing_data_2
+            HR_images_test = HR_images_test.type(tc.FloatTensor)
+            img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+        elif args['use_HR_reference'] == True:
+            LR_images_test, HR_images_test, references_test = testing_data_2
+            HR_images_test = HR_images_test.type(tc.FloatTensor)
+            img_outputs, secondary_branch_outputs, network_model_type = our_rcan_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device),
+                                                                                            Variable(references_test).type(tc.FloatTensor).to(device))
 
         #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
         SR_images_tensor_test = img_outputs.data.cpu().squeeze(1)
