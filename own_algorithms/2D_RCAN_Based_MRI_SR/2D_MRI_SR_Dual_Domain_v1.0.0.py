@@ -66,7 +66,7 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
     26) option to use "normal end to end channel and spatial attention block"(CAM and SAM in CBAM framework) and "self-attention based end to end channel and spatial attention block"(self_attention framework)
         as basic block in every RCAB(for both main branch and second branch if dual branch network is turned), to replace the CALayer.
     27) For all the "normal end to end channel and spatial attention block" and "self-attention based end to end channel and spatial attention block", either "sequential_mode" or "parallel_mode" could be selected.
-    28) option to use "negative total variation loss(tv_loss)". minimize总变差（TV）loss促进了生成的图像中的空间平滑性,于是minimize negative tv loss防止过度平滑
+28) option to use "negative total variation loss(tv_loss)". minimize总变差（TV）loss促进了生成的图像中的空间平滑性,于是minimize negative tv loss防止过度平滑
     29) option to use "negative trace loss". 用minimize 1/trace(SR*HR)做为negative trace loss。trace(SR*HR)表示SR和HR的相似程度。两个向量内积是把一个向量投影到另一个上的长度，这个值可以用于描述两个向量的相似性。两个矩阵A、B的相似性
         可以用A、B两个矩阵的内积表征，被定义为Trace(AB)。见paper: 2015.LRTV: MR Image Super-Resolution With Low-Rank and Total Variation Regularizations
 
@@ -114,7 +114,7 @@ we will plan to support other features:
         criss-cross attention recurrently, each pixel position can capture context from all other pixels. Compared to non-local self-attention block, the criss-cross uses 11× lesser GPU memory, 
         and has a complexity of O(2√N).
         See paper: 2019.CCNet: Criss-cross attention for semantic segmentation
-
+   
 
 We also fixed bugs from previous versions, typical ones like:
     1) After PyTorch version 1.1, call scheduler.step() will overwrite the learning rate used in optimizer to be same as scheduler sets up immediately.
@@ -197,14 +197,13 @@ import math
 import os
 import time
 import scipy.io
-from torchvision.models import vgg19
 from pytorch_wavelets import DWT, IDWT # (or import DWTForward, DWTInverse)
 import copy
 import pickle
 
-from ultility import pytorch_ssim_l1
-from ultility import pytorch_ssim_map
-from ultility.optimizer import lookahead
+import pytorch_ssim_l1
+import pytorch_ssim_map
+from optimizer import lookahead
 
 from ultility.deform_conv import th_batch_map_offsets, th_generate_grid # For supporting deformable conv filter
 
@@ -225,18 +224,26 @@ since = time.perf_counter()
 """""""""""""""""""""""""""""""""""""""""""""
 # --------------------------- configuration of support parameters --------------------------- #
 batch_size = 8
-EPOCH_NUM = 12
+EPOCH_NUM = 60
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
 Maintain_Same_Size = False # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
+Use_kspace_loss = True # stand for using K-space MSE loss in the total loss function
 Use_SSIM_L1_Loss = True # stand for whether we want use SSIM L1 loss in the total loss function
 Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
-Use_Negative_TV_Loss = True # stand for whether we want to use "1/(total variation + 1.000e-10) loss"(on SR , for providing over smoothing)
-Use_Negative_Trace_Loss = True # stand for whether we want to use "1/(trace(sr*hr) + 1.000e-10) loss"(on HR and SR, for increasing similarity between SR and HR)
-Use_Channel_Attention_For_Cross_Branch_Fusion = True # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
-Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
-Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
+Use_Channel_Attention_For_Cross_Branch_Fusion = False # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
+Use_Negative_TV_Loss = False # stand for whether we want to use "1/(total variation + 1.000e-10) loss"(on SR , for providing over smoothing)
+Use_Negative_Trace_Loss = False # stand for whether we want to use "1/(trace(sr*hr) + 1.000e-10) loss"(on HR and SR, for increasing similarity between SR and HR)
+Amplify_Small_Value_In_Gradient_Map = True # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
+Amplify_High_Frequency_Value_In_K_Space_Loss = True # stand for whether we want to amplify high frequence loss values in k space loss
+Use_Feature_Map_Loss = False # Stand for whether we want use feature map L1 loss in the total loss function
+Use_saved_model = False # Load saved network weights
+Freeze_random_seed = True # Freeze seed, so every time the network will have the same intialized weightes
+Use_ssim_map = False # Use ssim map to calculate loss
+
+if Use_Feature_Map_Loss == True:
+    from torchvision.models import vgg19
 
 # If we want to plot some information
 plot_the_gradient_map_of_input_image = False
@@ -244,17 +251,19 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for RCAN --------------------------- #
-args = {'main_network_framework': 'U_Net', \
-        'use_HR_reference' : True, 'use_channel_and_spatial_attention_on_the_fuser_of_HR_reference_based_network': False,\
-        'n_resgroups': 3, 'n_rcablocks': 3, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 2, \
-        'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True, \
-        'channel_and_spatial_attention_framework': 'self_attention', 'channel_and_spatial_attention_mode': 'sequential_mode',\
-        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'type_of_network': 'image_single_domain', \
-        'gradient_operator': 'sobel', 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts', \
-        'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
-args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
-                    'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
-                    'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, 'negative_total_variation_weight': 3, 'negative_trace_weight': 3,\
+args = {'main_network_framework': 'RCAN', \
+    'use_HR_reference' : False, 'use_channel_and_spatial_attention_on_the_fuser_of_HR_reference_based_network': False,\
+    'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 'scale': 2, 'number_of_progressive_stage': 1, \
+    'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': False, \
+    'channel_and_spatial_attention_framework': 'self_attention', 'channel_and_spatial_attention_mode': 'parallel_mode',\
+    'long_skip_connection': False,\
+    'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'type_of_network': 'image_single_domain', \
+    'gradient_operator': 'sobel', 'seed': 1, 'optimizer': 'Adam', 'learning_rate_decay_method': 'step_learning_rate', \
+    'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 5, 'initial_learning_rate_after_warm_up': 0.0001}
+args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 100, 'k_space_weight': 10, 'ssim_weight': 10, \
+                    'gradient_img_weight': 50, 'gradient_grd_weight': 1000, 'k_space_branch_weight': 0.02, \
+                    'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, \
+                    'negative_total_variation_weight': 0.001, 'negative_trace_weight': 5, \
                     'ssim_luminance_weight': 2, 'ssim_contrast_weight': 2, 'ssim_structure_weight': 4}
 # args['main_network_framework'] = 'RCAN', stands for which main network framework to use, e.g. 'U_Net', 'RCAN'
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
@@ -285,7 +294,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # =============================================================================
 
 "The folder where to load the training LR, HR data pair"
-folder_log_path = 'D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/data/sample_downsize_training_data_20200728'
+folder_log_path = 'C:\\SR_data\\'
 file_names = os.listdir(folder_log_path)
 
 num_low_resolution_mat_file = 0
@@ -293,7 +302,7 @@ num_high_resolution_groundtruth_mat_file = 0
 
 for idx_file in file_names:
     print(idx_file)
-    if 'LR_training_4' in os.path.join(folder_log_path, idx_file):
+    if 'LR_training_2_folds_2d_downsize_128.mat' in os.path.join(folder_log_path, idx_file):
         print('One more low resolution image set exist')
         num_low_resolution_mat_file = num_low_resolution_mat_file + 1
         print(os.path.join(folder_log_path, idx_file))
@@ -317,7 +326,7 @@ for idx_file in file_names:
             print(num_low_resolution_mat_file)
             torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
         print(np.shape(torch_data_low_resolution_sequence))
-    elif 'HRGT_training_4' in os.path.join(folder_log_path, idx_file):
+    elif 'HRGT_training_2_folds_2d_downsize_128.mat' in os.path.join(folder_log_path, idx_file):
         print('One more high resolution groundtruth image set exist')
         num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
         print(os.path.join(folder_log_path, idx_file))
@@ -382,7 +391,9 @@ trainloader = tc.utils.data.DataLoader(
                     trainset, 
                     batch_size = batch_size,
                     shuffle = True, 
-                    num_workers = 0)
+                    num_workers = 0,
+                    pin_memory = True,
+                    drop_last = True)
 
 
 
@@ -403,7 +414,7 @@ num_high_resolution_groundtruth_mat_file = 0
 
 for idx_file in file_names:
     print(idx_file)
-    if 'LR_validation_4' in os.path.join(folder_log_path, idx_file):
+    if 'LR_validation_2_folds_2d_downsize_128.mat' in os.path.join(folder_log_path, idx_file):
         print('One more low resolution image set exist')
         num_low_resolution_mat_file = num_low_resolution_mat_file + 1
         print(os.path.join(folder_log_path, idx_file))
@@ -427,7 +438,7 @@ for idx_file in file_names:
             print(num_low_resolution_mat_file)
             torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
         print(np.shape(torch_data_low_resolution_sequence))
-    elif 'HRGT_validation_4' in os.path.join(folder_log_path, idx_file):
+    elif 'HRGT_validation_2_folds_2d_downsize_128.mat' in os.path.join(folder_log_path, idx_file):
         print('One more high resolution groundtruth image set exist')
         num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
         print(os.path.join(folder_log_path, idx_file))
@@ -492,7 +503,9 @@ validationloader = tc.utils.data.DataLoader(
                     validationset, 
                     batch_size = batch_size,
                     shuffle = False, 
-                    num_workers = 0)
+                    num_workers = 0,
+                    pin_memory = True,
+                    drop_last = True)
 
 """
 In the original paper which proposed RCAN(2018. Image Super-Resolution Using Very Deep Residual Channel Attention Networks, mentioned as "original RCAN paper" in following),
@@ -525,7 +538,7 @@ def create_2d_Gaussian_weights(window_size, num_of_samples, channel):
     are lower). This function generates the weights which could emphasize the high frequency components(e.g. edge in the image) in the k space loss
     cause high frequency compoenents in k space are centrolized in the center area of k space data. 
     '''
-    weights_in_1D_window = gaussian(window_size = window_size, sigma = 32).unsqueeze(1) # window_size is "how many weights we expect to generate over a Gaussian pdf
+    weights_in_1D_window = gaussian(window_size = window_size, sigma = 20).unsqueeze(1) # window_size is "how many weights we expect to generate over a Gaussian pdf
     weights_in_2D_window = weights_in_1D_window.mm(weights_in_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
     weights_in_2D_window_pytorch = Variable(weights_in_2D_window.expand(num_of_samples, channel, window_size, window_size).contiguous())
     weights_in_2D_window_pytorch = weights_in_2D_window_pytorch/tc.max(weights_in_2D_window_pytorch)
@@ -581,9 +594,11 @@ def calculate_gradient_map(img):
     gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
 
     gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
+#    gradient_map = tc.cat((gradient_vertical_map, gradient_horizontal_map),1)
 
     if Amplify_Small_Value_In_Gradient_Map == True:
-        gradient_map = 1 - tc.exp(-2.5 * gradient_map) # 1 - exp(-ax), a = 2.5
+#        gradient_map = (1 - tc.exp(-2.5 * abs(gradient_map)))*(gradient_map/abs(gradient_map)) # 1 - exp(-ax), a = 2.5
+        gradient_map = 1 - tc.exp(-2.5 * gradient_map)
 
     return gradient_map
 
@@ -601,7 +616,7 @@ def calc_psnr_for_mri_image(img1, img2):
         # img1: pytorch tensor, shape is [N, C, H, W]
         # img2: pytorch tensor, shape is [N, C, H, W]
 
-    diff = (img1 - img2)
+    diff = tc.add(img1, -img2)
     mse = tc.pow(diff, 2).mean(2).mean(2)
     return -10 * tc.log10(mse).mean(0).mean(0)
 
@@ -621,7 +636,6 @@ class L1_Charbonnier_Loss(tc.nn.Module):
         diff = tc.add(X, -Y)
         error = tc.sqrt(diff * diff + self.eps)
         loss = tc.mean(error)
-        print(loss.size())
         return loss
 
 
@@ -637,7 +651,8 @@ class NegativeTVLoss(nn.Module):
         self.tv_loss = TVLoss(tv_loss_weight)
     
     def forward(self, x):
-        return self.negative_tv_loss_weight * 1 / (self.tv_loss(x) + 1.000e-10)
+#        return self.negative_tv_loss_weight * 1.0 / (self.tv_loss(x) + 1.000e-6)
+        return self.negative_tv_loss_weight * (1.0 - self.tv_loss(x))
 
 class TVLoss(nn.Module):
     def __init__(self, TVLoss_weight = 1):
@@ -1559,7 +1574,7 @@ class KSpaceDualResidualGroup(nn.Module):
         res_image_branch = tc.cat((res1, self.ifft_operation(res2_in_format_fits_irfft)), 1) # shape of res_image_branch is (N, 2*C, H, W)
         if Use_Channel_Attention_For_Cross_Branch_Fusion == True:
             res_image_branch = self.channel_attention_for_cross_branch_fusion_in_image_branch(res_image_branch) # set up channel attention for both image and gradeint branch when theu fuse into one feature map
-            """ print("channel attention for fusion:res_image_branch") """
+#            print("channel attention for fusion:res_image_branch")
         res_image_branch = self.connection_in_image_branch(res_image_branch) # shape of res_image_branch is (N, C, H, W)
 
         # fuse intermedian results in both branches into k space branch
@@ -1568,7 +1583,7 @@ class KSpaceDualResidualGroup(nn.Module):
         res_k_space_branch = tc.cat((res1, res2), 1) # shape of res_k_space_branch is (N, 4*C, H, W)
         if Use_Channel_Attention_For_Cross_Branch_Fusion == True:
             res_k_space_branch = self.channel_attention_for_cross_branch_fusion_in_k_space_branch(res_k_space_branch) # set up channel attention for both image and gradeint branch when theu fuse into one feature map
-            """ print("channel attention for fusion:res_k_space_branch") """
+#            print("channel attention for fusion:res_k_space_branch")
         res_k_space_branch = self.connection_in_k_space_branch(res_k_space_branch) # shape of res_k_space_branch is (N, 2*C, H, W)
 
         res_image_branch = res_image_branch.unsqueeze(0) # shape of res_image_branch is (1, N, C, H, W)
@@ -2118,7 +2133,8 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         n_colors = 1 # number of channels going of input of entire model
         n_feats = args['n_feats'] # number of feature maps/channels we expect to have after the encoder of U-Net framework(which contains n_resgroups residual groups)
         kernel_size = 3 # conv filter size used for all conv in RCAN
-        reduction = 1 # reduction is hardcoded as 1 for U-Net. The r mentioned in 3.3 Channel Attention in RCAN paper
+#        reduction = args['reduction'] # reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
+        reduction = 1
         scale = args['scale'] # resize factor, e.g. 2, 4, for every down/up sampling block
         use_channel_and_spatial_attention_inside_upsampler = args['use_channel_and_spatial_attention_inside_upsampler'] # whether we use channel and spatial attention block inside upsampler, e.g. True, False
         use_channel_and_spatial_attention_inside_RCAB = args['use_channel_and_spatial_attention_inside_RCAB']   #  whether we use channel and spatial attention block inside RCAB to replace CALayer, e.g. True, False
@@ -2172,7 +2188,7 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
                                                             channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
                                                 nn.Conv2d(n_feats//np.power(2, n_resgroups - i - 1), n_feats//np.power(2, n_resgroups - i), kernel_size = 1),
                                                 ) )
-            
+                        
             self.modules_layer = nn.ModuleList(modules_layer)
             self.u_net_down_layer = nn.ModuleList(u_net_down_layer)
             self.u_net_up_layer = nn.ModuleList(u_net_up_layer)
@@ -2279,7 +2295,7 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
                 else:
                     res[i - 1] = self.modules_layer[i](res[i - 1])
                     res[i] = self.u_net_down_layer[i](res[i - 1])
-            up_res = [None]*self.n_resgroups
+                    up_res = [None]*self.n_resgroups
             for j in range(self.n_resgroups - 1, -1, -1):
                 if j == self.n_resgroups - 1:
                     up_res[j] = self.u_net_up_layer[j](res[j])
@@ -2439,15 +2455,13 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
 
 
 
-
-
-
-
 "Wrapper for Progressive Learning Super Resolution MRI Reconstruction for multiple size, e.g. 2x, 4x, 8x, etc."
 class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
     def __init__(self, args):
         super(Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D, self).__init__()
         self.number_of_progressive_stage = args['number_of_progressive_stage']
+        self.scale_factor = args['scale'] ** self.number_of_progressive_stage
+        self.long_skip_connection = args['long_skip_connection']
         if args['main_network_framework'] == 'RCAN':
             if self.number_of_progressive_stage == 1:
                 self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
@@ -2472,21 +2486,36 @@ class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
                 self.stage_3 = U_Net_Based_MRI_SR_Dual_Domain_2D(args)
             else:
                 raise ValueError("Not support more than 3 stage!")
-    
     def forward(self, x):
         if self.number_of_progressive_stage == 1:
-            return self.stage_1(x)
+            res, y, z = self.stage_1(x)
+            if self.long_skip_connection:
+                x = F.interpolate(x, scale_factor=self.scale_factor, mode='bicubic')
+                x = x + res
+            else:
+                x = res
+            return x, y, z
         elif self.number_of_progressive_stage == 2:
-            x, _, _ = self.stage_1(x)
-            return self.stage_2(x)
+            res, _, _ = self.stage_1(x)
+            res, y, z = self.stage_2(res)
+            if self.long_skip_connection:
+                x = F.interpolate(x, scale_factor=self.scale_factor, mode='bicubic')
+                x = x + res
+            else:
+                x = res
+            return x, y, z
         elif self.number_of_progressive_stage == 3:
-            x, _, _ = self.stage_1(x)
-            x, _, _ = self.stage_2(x)
-            return self.stage_3(x)
+            res, _, _ = self.stage_1(x)
+            res, _, _ = self.stage_2(res)
+            res, y, z = self.stage_3(res)
+            if self.long_skip_connection:
+                x = F.interpolate(x, scale_factor=self.scale_factor, mode='bicubic')
+                x = x + res
+            else:
+                x = res
+            return x, y, z
         else:
             raise ValueError("Not support more than 3 stage!")
-
-
 
 
 
@@ -2495,6 +2524,7 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
     def __init__(self, args):
         super(HR_Reference_Based_MRI_SR_Dual_Domain_2D, self).__init__()
         self.number_of_progressive_stage = args['number_of_progressive_stage']
+        
         if args['main_network_framework'] == 'RCAN':
             if self.number_of_progressive_stage == 1:
                 self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
@@ -2522,18 +2552,33 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
     
     def forward(self, x):
         if self.number_of_progressive_stage == 1:
-            return self.stage_1(x)
+            res, y, z = self.stage_1(x)
+            x = self.long_skip_connection(x)
+            x = x + res
+            return x, y, z
         elif self.number_of_progressive_stage == 2:
-            x, _, _ = self.stage_1(x)
-            return self.stage_2(x)
+            res, _, _ = self.stage_1(x)
+            res, y, z = self.stage_2(res)
+            x = self.long_skip_connection(x)
+            x = x + res
+            return x, y, z
         elif self.number_of_progressive_stage == 3:
-            x, _, _ = self.stage_1(x)
-            x, _, _ = self.stage_2(x)
-            return self.stage_3(x)
+            res, _, _ = self.stage_1(x)
+            res, _, _ = self.stage_2(res)
+            res, y, z = self.stage_3(res)
+            x = self.long_skip_connection(x)
+            x = x + res
+            return x, y, z
         else:
             raise ValueError("Not support more than 3 stage!")
 
+device=tc.device("cuda" if use_cuda else "cpu")
 
+if Freeze_random_seed == True:
+    tc.manual_seed(args['seed'])
+    tc.backends.cudnn.deterministic = True
+#    tc.backends.cudnn.benchmark = False
+    print('Seed Frozen!')
 
 
 
@@ -2543,6 +2588,13 @@ if args['use_HR_reference'] == True:
 else:    
     our_rcan_mri_sr_2d = Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(args)
 
+if Use_saved_model == True:
+    parameter_file = open('D:\\HaoLi\\SR\\results\\20210104_RCAN_5x5_64_2folds_2d_downsize_Char_kspace_grad_320\\best_ssim_network_parameter.pkl', 'rb')
+    saved_model_wts = pickle.load(parameter_file)
+    parameter_file.close()
+    our_rcan_mri_sr_2d.load_state_dict(saved_model_wts)
+    print("Saved model loaded")
+    
 # Weight initialization using He initialization.
 """ for m in our_rcan_mri_sr_2d.modules():
     if isinstance(m, (nn.Conv2d, nn.Linear)):
@@ -2552,13 +2604,14 @@ if tc.cuda.device_count()>1:
     our_rcan_mri_sr_2d=nn.DataParallel(our_rcan_mri_sr_2d)
 our_rcan_mri_sr_2d.to(device)
 
-print('this is our RCAN_MRI_SR_2D_Dual_Domain: ', our_rcan_mri_sr_2d)
+print('this is our MRI_SR_2D_Dual_Domain: ', our_rcan_mri_sr_2d)
 
-feature_extractor = FeatureExtractor().to(device)
-print('this is our FeatureExtractor: ', feature_extractor)
-
-fft_k_space = FFT_K_SPACE().to(device)
-print('this is our FFT_K_SPACE: ', fft_k_space)
+if Use_Feature_Map_Loss == True:
+    feature_extractor = FeatureExtractor().to(device)
+    print('this is our FeatureExtractor: ', feature_extractor)
+if Use_kspace_loss == True:
+    fft_k_space = FFT_K_SPACE().to(device)
+    print('this is our FFT_K_SPACE: ', fft_k_space)
 
 
 """""""""""""""""""""""""""""""""""""""
@@ -2569,14 +2622,14 @@ if args['optimizer'] == 'look_ahead':
     base_opt = opt.Adam(our_rcan_mri_sr_2d.parameters(), lr=1e-3, betas=(0.9, 0.999)) #----- use Adam algorithm as based optimizer A
     optimizer = lookahead.Lookahead(base_opt, k=5, alpha=0.5) # Initialize Lookahead
 elif args['optimizer'] == 'Adam':
-    optimizer = opt.Adam(our_rcan_mri_sr_2d.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-5)    #----- use Adam algorithm for all parameters of our_classifier
+    optimizer = opt.Adam(our_rcan_mri_sr_2d.parameters(), lr = args['initial_learning_rate_after_warm_up'], eps = 1e-08, weight_decay = 1e-5)    #----- use Adam algorithm for all parameters of our_classifier
 elif args['optimizer'] == 'SGD_with_momentum':
-    optimizer = opt.SGD(our_rcan_mri_sr_2d.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
+    optimizer = opt.SGD(our_rcan_mri_sr_2d.parameters(), lr = args['initial_learning_rate_after_warm_up'], momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
 "set scheduler"
 if args['learning_rate_decay_method'] == 'multi_step_learning_rate':
     scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
 elif args['learning_rate_decay_method'] == 'step_learning_rate':
-    scheduler = opt.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    scheduler = opt.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 elif args['learning_rate_decay_method'] == 'exponential_learning_rate':
     scheduler = opt.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 elif args['learning_rate_decay_method'] == 'cosine_learning_rate_decay':
@@ -2595,17 +2648,24 @@ if args['use_learning_rate_warm_up'] == True:
 "set loss related item"
 loss_function_MSE = nn.MSELoss().to(device)        #----- MSE loss
 
-loss_function_L1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
+loss_function_SmoothL1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
+
+loss_function_L1 = nn.L1Loss().to(device)       #----- L1 loss
+
+loss_function_Charbonnier = L1_Charbonnier_Loss().to(device)        #----- L1 Charbonnier loss
 
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
-SSIM_function = pytorch_ssim_l1.SSIM(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
+if Use_ssim_map == True:
+    SSIM_function = pytorch_ssim_map.SSIM(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim map calculation
+else:
+    SSIM_function = pytorch_ssim_l1.SSIM(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
 
-SSIM_map = pytorch_ssim_map.SSIMMap(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
+if Use_Negative_TV_Loss == True:
+    negative_tv_loss = NegativeTVLoss(negative_tv_loss_weight = args_loss_weight['negative_total_variation_weight']).to(device)
 
-negative_tv_loss = NegativeTVLoss(negative_tv_loss_weight = args_loss_weight['negative_total_variation_weight']).to(device)
-
-negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_weight['negative_trace_weight']).to(device)
+if Use_Negative_Trace_Loss == True:
+    negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_weight['negative_trace_weight']).to(device)
 
 # =============================================================================
 # print('The loss function is L1Loss')
@@ -2624,6 +2684,7 @@ negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_w
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
 
 best_ssim = 0.0 # Initialization of best_ssim = 0.0
+best_psnr = 0.0
 
 for epoch in range(EPOCH_NUM):
     "Set training mode"
@@ -2634,21 +2695,25 @@ for epoch in range(EPOCH_NUM):
     running_loss = 0.0
 
     batch_number_test = 0
-    feature_map_loss_test = 0.0
     pixel_wise_loss_test = 0.0
     k_space_freq_loss_test = 0.0
     ssim_loss_test = 0.0
     gradient_img_loss_test = 0.0
     ssim_test = 0.0
+    psnr_test = 0.0
 
     batch_number_training = 0
-    feature_map_loss_training = 0.0
     pixel_wise_loss_training = 0.0
     k_space_freq_loss_training = 0.0
     ssim_loss_training = 0.0
     gradient_img_loss_training = 0.0
     loss_training = 0.0
     ssim_training = 0.0
+    psnr_training = 0.0
+    
+    if Use_Feature_Map_Loss == True:
+        feature_map_loss_test = 0.0
+        feature_map_loss_training = 0.0
 
     if Use_Gram_Matrix_L1_Loss == True:
         gram_similarity_between_img_loss_training = 0.0
@@ -2656,7 +2721,7 @@ for epoch in range(EPOCH_NUM):
     
     if Use_Negative_TV_Loss == True:
         negative_total_variation_for_img_loss_training = 0.0
-        negative_toal_variation_for_img_loss_test = 0.0
+        negative_total_variation_for_img_loss_test = 0.0
     
     if Use_Negative_Trace_Loss == True:
         negative_trace_for_img_loss_training = 0.0
@@ -2708,61 +2773,64 @@ for epoch in range(EPOCH_NUM):
         # print(outputs.size())
         # print('the forward pass has been went')
 
-        SR_img_copies = tc.cat((img_outputs, img_outputs, img_outputs), 1)
-        # print(SR_copies.size())
-        SR_features = feature_extractor(SR_img_copies)
-        # print(SR_features.size())
-        # print(SR_features.dtype)
+        if Use_Feature_Map_Loss == True:
+            SR_img_copies = tc.cat((img_outputs, img_outputs, img_outputs), 1)
+            # print(SR_copies.size())
+            SR_features = feature_extractor(SR_img_copies)
+            # print(SR_features.size())
+            # print(SR_features.dtype)
 
-        HR_copies = tc.cat((labels, labels, labels), 1)
-        # print(HR_copies.size())
-        HR_features = feature_extractor(HR_copies)
-        # print(HR_features.size())
-        # print(HR_features.dtype)
+            HR_copies = tc.cat((labels, labels, labels), 1)
+            # print(HR_copies.size())
+            HR_features = feature_extractor(HR_copies)
+            # print(HR_features.size())
+            # print(HR_features.dtype)
+        
+        if Use_kspace_loss == True:
+            SR_freq = fft_k_space(img_outputs)
 
-        SR_freq = fft_k_space(img_outputs)
-
-        HR_freq = fft_k_space(labels)
+            HR_freq = fft_k_space(labels)
 
         "calculate the gradients for all Variables during back prop"
         "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
-        feature_map_loss = args_loss_weight['feature_map_weight']*loss_function_MSE(SR_features, HR_features)
-        feature_map_loss_training += feature_map_loss.item()    # Only save the value of feature_map_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
+        if Use_Feature_Map_Loss == True:
+            feature_map_loss = args_loss_weight['feature_map_weight']*loss_function_MSE(SR_features, HR_features)
+            feature_map_loss_training += feature_map_loss.item()    # Only save the value of feature_map_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
         # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
 #           print("feature_map_loss: ", feature_map_loss)
 
 #       pixel_wise_loss = 10*loss_function_MSE(outputs, labels)
-        pixel_wise_loss = args_loss_weight['pixel_wise_weight']*loss_function_L1(img_outputs, labels)
+        pixel_wise_loss = args_loss_weight['pixel_wise_weight']*loss_function_Charbonnier(img_outputs, labels)
         pixel_wise_loss_training += pixel_wise_loss.item()    # Only save the value of pixel_wise_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage 
 #            print("pixel_wise_loss: ", pixel_wise_loss)
-
-        if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
-            k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(
-                create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq[:,:,:,:,0], 
-                create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,0]) + 
-                loss_function_MSE(
-                    create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq[:,:,:,:,1], 
-                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,1]))
-        else:
-            k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]) + loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-        k_space_freq_loss_training += k_space_freq_loss.item()
+        if Use_kspace_loss == True:
+            if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
+                k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(
+                    create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq[:,:,:,:,0], 
+                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,0]) + 
+                    loss_function_MSE(
+                        create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq[:,:,:,:,1], 
+                        create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,1]))
+            else:
+                k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]) + loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+            k_space_freq_loss_training += k_space_freq_loss.item()
 #            print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
 #            print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
-        """ print("k_space_freq_loss: ", k_space_freq_loss) """
+#            print("k_space_freq_loss: ", k_space_freq_loss.item())
+
 
         HR_ssim_weighted, HR_ssim = SSIM_function(labels, labels)
         SR_ssim_weighted, SR_ssim = SSIM_function(img_outputs, labels)
-        HR_ssim_map_weighted, HR_ssim_map = SSIM_map(labels, labels)
-        SR_ssim_map_weighted, SR_ssim_map = SSIM_map(img_outputs, labels)
-
-        ssim_loss = args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_map_weighted, HR_ssim_map_weighted)
-        ssim_loss_training += ssim_loss.item()    # Only save the value of ssim_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage 
+        if Use_SSIM_L1_Loss == True:
+            ssim_loss = args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_weighted, HR_ssim_weighted)
+            ssim_loss_training += ssim_loss.item()    # Only save the value of ssim_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage 
         ssim_training += SR_ssim.item()    # Accumulation of SR_ssim in training over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
-        """ print("ssim_loss: ", ssim_loss) """
-
-        gradient_img_loss = args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(img_outputs), calculate_gradient_map(labels))
-        gradient_img_loss_training += gradient_img_loss.item()  # Only save the value of gradient_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
-        """ print("gradient_img_loss: ", gradient_img_loss) """
+        psnr_training += calc_psnr_for_mri_image(img_outputs, labels).item()
+        
+        
+        if Use_Gradient_Map_L1_Loss == True:
+            gradient_img_loss = args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(img_outputs), calculate_gradient_map(labels))
+            gradient_img_loss_training += gradient_img_loss.item()  # Only save the value of gradient_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
 
         "TODO: The coefficient of this loss function needs to be adjusted"
         if Use_Gram_Matrix_L1_Loss == True:
@@ -2771,10 +2839,12 @@ for epoch in range(EPOCH_NUM):
 
         if Use_Negative_TV_Loss == True:
             negative_total_variation_for_img_loss = negative_tv_loss(img_outputs)
+#            print('negative_total_variation_for_img_loss:', negative_total_variation_for_img_loss.item())
             negative_total_variation_for_img_loss_training += negative_total_variation_for_img_loss.item()    # Only save the value of gram_similarity_between_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
         
         if Use_Negative_Trace_Loss == True:
             negative_trace_for_img_loss = negative_trace_loss(img_outputs, labels)
+#            print('negative_trace_for_img_loss:', negative_trace_for_img_loss.item())
             negative_trace_for_img_loss_training += negative_trace_for_img_loss.item()
 
         if network_model_type == 'Secondary branch is k space branch':
@@ -2802,22 +2872,27 @@ for epoch in range(EPOCH_NUM):
 #            print('gradient_loss: ', gradient_map_loss)
 
 #            loss = pixel_wise_loss + ssim_loss
-        loss = pixel_wise_loss + feature_map_loss
+        loss = pixel_wise_loss
+        
+        if Use_Feature_Map_Loss == True:
+            loss = loss + feature_map_loss
 
 #            if ssim_loss < 0.5:
 #                loss = ssim_loss + feature_map_loss + pixel_wise_loss
 #                print('ssim_loss')
 #            else:
 #                loss = pixel_wise_loss + feature_map_loss
+        if Use_kspace_loss == True:
+            if tc.isnan(k_space_freq_loss) != 1:
+                loss = loss + k_space_freq_loss
+        
+        if Use_SSIM_L1_Loss == True:
+            if tc.isnan(ssim_loss) != 1:
+                loss = loss + ssim_loss
 
-        if tc.isnan(k_space_freq_loss) != 1:
-            loss = loss + k_space_freq_loss
-
-        if tc.isnan(ssim_loss) != 1 and Use_SSIM_L1_Loss == True:
-            loss = loss + ssim_loss
-
-        if tc.isnan(gradient_img_loss) != 1 and Use_Gradient_Map_L1_Loss == True:
-            loss = loss + gradient_img_loss
+        if Use_Gradient_Map_L1_Loss == True:
+            if tc.isnan(gradient_img_loss) != 1:
+                loss = loss + gradient_img_loss
 
         if Use_Gram_Matrix_L1_Loss == True:
             loss = loss + gram_similarity_between_img_loss
@@ -2861,13 +2936,13 @@ for epoch in range(EPOCH_NUM):
 
         "print log info"
         running_loss += loss.data
-        if i % 50 == 0: #----- print log info every 1000 batch
+        if i % 100 == 0: #----- print log info every 1000 batch
             if i == 0:
                 print('[%d, %5d] loss: %.3f' \
                       % (epoch, i, running_loss))
             else:
                 print('[%d, %5d] loss: %.3f' \
-                      % (epoch, i, running_loss / 50))
+                      % (epoch, i, running_loss / 100))
             running_loss = 0.0
         """
         training_loss_for_current_epoch = loss_training / 50
@@ -2886,14 +2961,14 @@ for epoch in range(EPOCH_NUM):
             wavelets_high_frequency_components_branch_high_frequency_loss_for_current_epoch = wavelets_high_frequency_components_branch_high_frequency_loss
         """
 
-    print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
+    
     learning_rate = optimizer.param_groups[0]['lr']
     
     # If NOT using warm up, call the normal scheduler now
     if args['use_learning_rate_warm_up'] == False:
+        print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
         scheduler.step()
-    
-    print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
+        print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
 
     batch_number_training = i+1 # Calculate for the current epoch, how many batches are used.
 
@@ -2908,87 +2983,98 @@ for epoch in range(EPOCH_NUM):
 
             SR_img_test, SR_secondary_branch_outputs_test, network_model_type_test = our_rcan_mri_sr_2d(inputs)
 
-            SR_test_copies = tc.cat((SR_img_test, SR_img_test, SR_img_test), 1)
-            # print(SR_copies.size())
-            SR_test_features = feature_extractor(SR_test_copies)
-            # print(SR_features.size())
+            if Use_Feature_Map_Loss == True:
+                SR_test_copies = tc.cat((SR_img_test, SR_img_test, SR_img_test), 1)
+                # print(SR_copies.size())
+                SR_test_features = feature_extractor(SR_test_copies)
+                # print(SR_features.size())
 
-            HR_test_copies = tc.cat((labels, labels, labels), 1)
-            # print(HR_copies.size())
-            HR_test_features = feature_extractor(HR_test_copies)
-            # print(HR_features.size())
+                HR_test_copies = tc.cat((labels, labels, labels), 1)
+                # print(HR_copies.size())
+                HR_test_features = feature_extractor(HR_test_copies)
+                # print(HR_features.size())
 
-            SR_test_freq = fft_k_space(SR_img_test)
+            if Use_kspace_loss == True:
+                SR_test_freq = fft_k_space(SR_img_test)
 
-            HR_test_freq = fft_k_space(labels)
+                HR_test_freq = fft_k_space(labels)
 
 
             "calculate the gradients for all Variables during back prop"
             "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
-            feature_map_loss_test += args_loss_weight['feature_map_weight']*loss_function_MSE(SR_test_features, HR_test_features)
+            if Use_Feature_Map_Loss == True:
+                feature_map_loss_test += (args_loss_weight['feature_map_weight']*loss_function_MSE(SR_test_features, HR_test_features)).item()
 #                print("feature_map_loss_test: ", feature_map_loss_test)
 
-            pixel_wise_loss_test += args_loss_weight['pixel_wise_weight']*loss_function_L1(SR_img_test, labels)
+            pixel_wise_loss_test += (args_loss_weight['pixel_wise_weight']*loss_function_Charbonnier(SR_img_test, labels)).item()
 #                print("pixel_wise_loss_test: ", pixel_wise_loss_test)
 
-            if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
-                k_space_freq_loss_test += args_loss_weight['k_space_weight']*(loss_function_MSE(
-                    create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq[:,:,:,:,0], 
-                    create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,0]) + 
-                    loss_function_MSE(
-                        create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq[:,:,:,:,1], 
-                        create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,1]))
-            else:
-                k_space_freq_loss_test += args_loss_weight['k_space_weight']*(loss_function_MSE(SR_test_freq[:,:,:,:,0], HR_test_freq[:,:,:,:,0])+loss_function_MSE(SR_test_freq[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))
+            if Use_kspace_loss == True:
+                if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
+                    k_space_freq_loss_test += (args_loss_weight['k_space_weight']*(loss_function_MSE(
+                        create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq[:,:,:,:,0], 
+                        create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,0]) + 
+                        loss_function_MSE(
+                            create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq[:,:,:,:,1], 
+                            create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,1]))).item()
+                else:
+                    k_space_freq_loss_test += (args_loss_weight['k_space_weight']*(loss_function_MSE(SR_test_freq[:,:,:,:,0], HR_test_freq[:,:,:,:,0])+loss_function_MSE(SR_test_freq[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))).item()
 #                print("k_space_freq_loss_test: ", k_space_freq_loss_test)
+
 
             HR_ssim_test_weighted, HR_ssim_test = SSIM_function(labels,labels)
             SR_ssim_test_weighted, SR_ssim_test = SSIM_function(SR_img_test, labels)
-            HR_ssim_map_test_weighted, HR_ssim_map_test = SSIM_map(labels, labels)
-            SR_ssim_map_test_weighted, SR_ssim_map_test = SSIM_map(SR_img_test, labels)
-            ssim_loss_test += args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_map_test_weighted, HR_ssim_map_test_weighted)
-            ssim_test += SR_ssim_test   # Accumulation of SR_ssim in testing over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
+            if Use_SSIM_L1_Loss == True:
+                ssim_loss_test += (args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_test_weighted, HR_ssim_test_weighted)).item()
+            ssim_test += SR_ssim_test.item()   # Accumulation of SR_ssim in testing over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
 #                print("ssim_loss_test: ", ssim_loss_test)
+            psnr_test += (calc_psnr_for_mri_image(SR_img_test, labels)).item()
 
-            gradient_img_loss_test += args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(SR_img_test), calculate_gradient_map(labels))
+            if Use_Gradient_Map_L1_Loss == True:
+                gradient_img_loss_test += (args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(SR_img_test), calculate_gradient_map(labels))).item()
 #                print('gradient_loss_test: ', gradient_map_loss_test)
 
             if Use_Gram_Matrix_L1_Loss == True:
-                gram_similarity_between_img_loss_test = args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(SR_img_test), calculate_gram_matrix(labels))
+                gram_similarity_between_img_loss_test += (args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(SR_img_test), calculate_gram_matrix(labels))).item()
 
             if Use_Negative_TV_Loss == True:
-                negative_total_variation_for_img_loss_test = negative_trace_loss(SR_img_test)
+                negative_total_variation_for_img_loss_test += (negative_tv_loss(SR_img_test)).item()
 
             if Use_Negative_Trace_Loss == True:
-                negative_trace_for_img_loss_test = negative_trace_loss(SR_img_test, labels)
+                negative_trace_for_img_loss_test += (negative_trace_loss(SR_img_test, labels)).item()
 
             if network_model_type_test == 'Secondary branch is k space branch':
                 if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
-                    k_space_branch_k_space_loss_test += args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
+                    k_space_branch_k_space_loss_test += (args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
                         create_2d_Gaussian_weights(window_size = SR_secondary_branch_outputs_test.shape[2], num_of_samples = SR_secondary_branch_outputs_test.shape[0], channel = SR_secondary_branch_outputs_test.shape[1]).to(device)*SR_secondary_branch_outputs_test[:,:,:,:,0], 
                         create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,0]) + 
                         loss_function_MSE(
                             create_2d_Gaussian_weights(window_size = SR_secondary_branch_outputs_test.shape[2], num_of_samples = SR_secondary_branch_outputs_test.shape[0], channel = SR_secondary_branch_outputs_test.shape[1]).to(device)*SR_secondary_branch_outputs_test[:,:,:,:,1], 
-                            create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,1]))
+                            create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,1]))).item()
                 else:
-                    k_space_branch_k_space_loss_test += args_loss_weight['k_space_branch_weight']*(loss_function_MSE(SR_secondary_branch_outputs_test[:,:,:,:,0], HR_test_freq[:,:,:,:,0]) + loss_function_MSE(SR_secondary_branch_outputs_test[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))
+                    k_space_branch_k_space_loss_test += (args_loss_weight['k_space_branch_weight']*(loss_function_MSE(SR_secondary_branch_outputs_test[:,:,:,:,0], HR_test_freq[:,:,:,:,0]) + loss_function_MSE(SR_secondary_branch_outputs_test[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))).item()
             elif network_model_type_test == 'Secondary branch is gradient map branch':
-                gradient_grad_loss_test += args_loss_weight['gradient_grd_weight']*loss_function_L1(SR_secondary_branch_outputs_test, calculate_gradient_map(labels))
+                gradient_grad_loss_test += (args_loss_weight['gradient_grd_weight']*loss_function_L1(SR_secondary_branch_outputs_test, calculate_gradient_map(labels))).item()
             elif network_model_type_test == 'Secondary branch is wavelets high frequency components branch':
                 _, HR_high_frequency_components_test = calculate_wavelet_transform(labels)
-                wavelets_high_frequency_components_branch_high_frequency_loss_test += args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 0, :, :], HR_high_frequency_components_test[:, :, 0, :, :]) + \
-                    args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 1, :, :], HR_high_frequency_components_test[:, :, 1, :, :]) + args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 2, :, :], HR_high_frequency_components_test[:, :, 2, :, :])
+                wavelets_high_frequency_components_branch_high_frequency_loss_test += (args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 0, :, :], HR_high_frequency_components_test[:, :, 0, :, :]) + \
+                    args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 1, :, :], HR_high_frequency_components_test[:, :, 1, :, :]) + args_loss_weight['wavelets_branch_weight']*loss_function_L1(SR_secondary_branch_outputs_test[:, :, 2, :, :], HR_high_frequency_components_test[:, :, 2, :, :])).item()
 
-            loss_test = pixel_wise_loss_test + feature_map_loss_test
+            loss_test = pixel_wise_loss_test 
+            if Use_Feature_Map_Loss == True:
+                loss_test = loss_test + feature_map_loss_test
 #                print('loss_test: ', loss_test)
 
-            if tc.isnan(k_space_freq_loss_test) != 1:
+#            if tc.isnan(k_space_freq_loss_test) != 1:
+            if Use_kspace_loss == True:
                 loss_test = loss_test + k_space_freq_loss_test
 
-            if tc.isnan(ssim_loss_test) != 1 and Use_SSIM_L1_Loss == True:
+#            if tc.isnan(ssim_loss_test) != 1 and Use_SSIM_L1_Loss == True:
+            if Use_SSIM_L1_Loss == True:
                 loss_test = loss_test + ssim_loss_test
 
-            if tc.isnan(gradient_img_loss_test) != 1 and Use_Gradient_Map_L1_Loss == True:
+#            if tc.isnan(gradient_img_loss_test) != 1 and Use_Gradient_Map_L1_Loss == True:
+            if Use_Gradient_Map_L1_Loss == True:
                 loss_test = loss_test + gradient_img_loss_test
 
             if Use_Gram_Matrix_L1_Loss == True:
@@ -3011,17 +3097,22 @@ for epoch in range(EPOCH_NUM):
 
     batch_number_test = i+1
     ssim_test = ssim_test/batch_number_test # Calculate avergae SR SSIM over all validation data samples in one epoch.
+    psnr_test = psnr_test/batch_number_test
     print("ssim_test: ", ssim_test)
-    feature_map_loss_test = feature_map_loss_test/batch_number_test
-    print("feature_map_loss_test: ", feature_map_loss_test)
     pixel_wise_loss_test = pixel_wise_loss_test/batch_number_test
+    if Use_Feature_Map_Loss == True:
+        feature_map_loss_test = feature_map_loss_test/batch_number_test
+        print("feature_map_loss_test: ", feature_map_loss_test)
     print("pixel_wise_loss_test: ", pixel_wise_loss_test)
-    k_space_freq_loss_test = k_space_freq_loss_test/batch_number_test
-    print("k_space_freq_loss_test: ", k_space_freq_loss_test)
-    ssim_loss_test = ssim_loss_test/batch_number_test
-    print("ssim_loss_test: ", ssim_loss_test)
-    gradient_img_loss_test = gradient_img_loss_test/batch_number_test
-    print('gradient_img_loss_test: ', gradient_img_loss_test)
+    if Use_kspace_loss == True:
+        k_space_freq_loss_test = k_space_freq_loss_test/batch_number_test
+        print("k_space_freq_loss_test: ", k_space_freq_loss_test)
+    if Use_SSIM_L1_Loss == True:
+        ssim_loss_test = ssim_loss_test/batch_number_test
+        print("ssim_loss_test: ", ssim_loss_test)
+    if Use_Gradient_Map_L1_Loss == True:
+        gradient_img_loss_test = gradient_img_loss_test/batch_number_test
+        print('gradient_img_loss_test: ', gradient_img_loss_test)
     if Use_Gram_Matrix_L1_Loss == True:
         gram_similarity_between_img_loss_test = gram_similarity_between_img_loss_test/batch_number_test
         print('gram_similarity_between_img_loss_test: ', gram_similarity_between_img_loss_test)
@@ -3043,13 +3134,19 @@ for epoch in range(EPOCH_NUM):
     loss_test = loss_test/batch_number_test
     print('loss_test: ', loss_test)
     
+    
     ssim_training = ssim_training/batch_number_training # Calculate avergae SR SSIM over all training data samples in one epoch.
+    psnr_training = psnr_training/batch_number_training
     training_loss_for_current_epoch = loss_training / batch_number_training
-    feature_map_loss_for_current_epoch = feature_map_loss_training/ batch_number_training
+    if Use_Feature_Map_Loss == True:
+        feature_map_loss_for_current_epoch = feature_map_loss_training/ batch_number_training
     pixel_wise_loss_for_current_epoch = pixel_wise_loss_training/ batch_number_training
-    ssim_loss_for_current_epoch = ssim_loss_training/ batch_number_training
-    gradient_img_loss_for_current_epoch = gradient_img_loss_training/ batch_number_training
-    k_space_freq_loss_for_current_epoch = k_space_freq_loss_training/ batch_number_training
+    if Use_SSIM_L1_Loss == True:
+        ssim_loss_for_current_epoch = ssim_loss_training/ batch_number_training
+    if Use_Gradient_Map_L1_Loss == True:
+        gradient_img_loss_for_current_epoch = gradient_img_loss_training/ batch_number_training
+    if Use_kspace_loss == True:
+        k_space_freq_loss_for_current_epoch = k_space_freq_loss_training/ batch_number_training
     if Use_Gram_Matrix_L1_Loss == True:
         gram_similarity_between_img_loss_for_current_epoch = gram_similarity_between_img_loss_training/ batch_number_training
     if Use_Negative_TV_Loss == True:
@@ -3075,20 +3172,37 @@ for epoch in range(EPOCH_NUM):
     print("validation_ssim:", ssim_test)
     if ssim_test > best_ssim:
         best_ssim = ssim_test
-        best_model_wts = copy.deepcopy(our_rcan_mri_sr_2d.state_dict())
-        parameter_file = open('D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/code/baseline+our_model/output_file/network_weight_parameter.pkl', 'wb')
-        pickle.dump(best_model_wts, parameter_file)
+        best_ssim_model_wts = copy.deepcopy(our_rcan_mri_sr_2d.state_dict())
+        parameter_file = open('D:\\HaoLi\\SR\\results\\20210122_RCAN_5x5_1stage_64_2folds_2d_downsize_Char_kspace_grad_sigma20_101\\best_ssim_network_parameter.pkl', 'wb')
+        pickle.dump(best_ssim_model_wts, parameter_file)
         parameter_file.close()
-        best_epoch = epoch
+        best_ssim_epoch = epoch
+    print("best_psnr:", best_psnr)
+    print("validation_psnr:", psnr_test)
+    if psnr_test > best_psnr:
+        best_psnr = psnr_test
+        best_psnr_model_wts = copy.deepcopy(our_rcan_mri_sr_2d.state_dict())
+        parameter_file = open('D:\\HaoLi\\SR\\results\\20210122_RCAN_5x5_1stage_64_2folds_2d_downsize_Char_kspace_grad_sigma20_101\\best_psnr_network_parameter.pkl', 'wb')
+        pickle.dump(best_psnr_model_wts, parameter_file)
+        parameter_file.close()
+        best_psnr_epoch = epoch
+    last_model_wts = copy.deepcopy(our_rcan_mri_sr_2d.state_dict())
+    parameter_file = open('D:\\HaoLi\\SR\\results\\20210122_RCAN_5x5_1stage_64_2folds_2d_downsize_Char_kspace_grad_sigma20_101\\last_network_parameter.pkl', 'wb')
+    pickle.dump(last_model_wts, parameter_file)
+    parameter_file.close()
 
 
     "Save the training loss for each epoch"
     if (epoch == 0):
-        f = open('D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/code/baseline+our_model/output_file/result_RCAN_l1_gradssim_laf_100_32_2folds_2d_downsize_20200816.txt', 'w')
+        f = open('D:\\HaoLi\\SR\\results\\20210122_RCAN_5x5_1stage_64_2folds_2d_downsize_Char_kspace_grad_sigma20_101\\log.txt', 'w')
+        f.write('Code Version: 1.0.0\n')
         f.write('The configuration of parameters:\n')
         f.write('batch_size is: %d\n' % batch_size)
         f.write('EPOCH_NUM is: %d\n' % EPOCH_NUM)
         f.write('Maintain_Same_Size is: %s\n' % Maintain_Same_Size)
+        f.write('Freeze_random_seed is: %s\n' % Freeze_random_seed)
+        f.write('Use_saved_model is: %s\n' % Use_saved_model)
+        f.write('Use_kspace_Loss is: %s\n' % Use_kspace_loss)
         f.write('Use_SSIM_L1_Loss is: %s\n' % Use_SSIM_L1_Loss)
         f.write('Use_Gradient_Map_L1_Loss is: %s\n' % Use_Gradient_Map_L1_Loss)
         f.write('Use_Gram_Matrix_L1_Loss is: %s\n' % Use_Gram_Matrix_L1_Loss)
@@ -3097,28 +3211,37 @@ for epoch in range(EPOCH_NUM):
         f.write('Use_Channel_Attention_For_Cross_Branch_Fusion is: %s\n' % Use_Channel_Attention_For_Cross_Branch_Fusion)
         f.write('Amplify_Small_Value_In_Gradient_Map: %s\n' % Amplify_Small_Value_In_Gradient_Map)
         f.write('Amplify_High_Frequency_Value_In_K_Space_Loss: %s\n' % Amplify_High_Frequency_Value_In_K_Space_Loss)
+        f.write('Use_ssim_map is: %s\n' % Use_ssim_map)
         f.write('args is: %s\n' % args)
         f.write('args of loss weight is: %s\n' % args_loss_weight)
         f.write('------------------------------------------------------------------------------------------------------------------------------------------------------------------')
         f.write(' \n')
 #    f.write('Training Loss:')
 #    f.write('\n')
-    f.write('Best SR SSIM for validation data has been achieved at epoch : %d' % (best_epoch))
-    f.write('\n')    
-    f.write('Learning rate for current epoch is : %f' % (learning_rate))
+    f.write('Best SR SSIM for validation data has been achieved at epoch : %d' % (best_ssim_epoch))
     f.write('\n')
-    f.write('Training SR SSIM for epoch %d is : %f' % (epoch, ssim_training))
+    f.write('Best SR PSNR for validation data has been achieved at epoch : %d' % (best_psnr_epoch))
+    f.write('\n') 
+    f.write('Learning rate for epoch %d is : %f' % (epoch, learning_rate))
     f.write('\n')
-    f.write('The feature_map_loss for epoch %d is : %f' % (epoch, feature_map_loss_for_current_epoch))
+    f.write('Training SSIM for epoch %d is : %f' % (epoch, ssim_training))
     f.write('\n')
+    f.write('Training PSNR for epoch %d is : %f' % (epoch, psnr_training))
+    f.write('\n')
+    if Use_Feature_Map_Loss == True:
+        f.write('The feature_map_loss for epoch %d is : %f' % (epoch, feature_map_loss_for_current_epoch))
+        f.write('\n')
     f.write('The pixel_wise_loss for epoch %d is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
     f.write('\n')
-    f.write('The k_space_freq_loss for epoch %d is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
-    f.write('\n')
-    f.write('The ssim_loss for epoch %d is : %f' % (epoch, ssim_loss_for_current_epoch))
-    f.write('\n')
-    f.write('The gradient_img_loss for epoch %d is : %f' % (epoch, gradient_img_loss_for_current_epoch))
-    f.write('\n')
+    if Use_kspace_loss == True:
+        f.write('The k_space_freq_loss for epoch %d is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
+        f.write('\n')
+    if Use_SSIM_L1_Loss == True:
+        f.write('The ssim_loss for epoch %d is : %f' % (epoch, ssim_loss_for_current_epoch))
+        f.write('\n')
+    if Use_Gradient_Map_L1_Loss == True:
+        f.write('The gradient_img_loss for epoch %d is : %f' % (epoch, gradient_img_loss_for_current_epoch))
+        f.write('\n')
     if Use_Gram_Matrix_L1_Loss == True:
         f.write('The gram_similarity_between_img_loss for epoch %d is : %f' % (epoch, gram_similarity_between_img_loss_for_current_epoch))
         f.write('\n')
@@ -3144,18 +3267,24 @@ for epoch in range(EPOCH_NUM):
 
 #    f.write('Validation Loss:')
 #    f.write('\n')
-    f.write('Validation SR SSIM for epoch %d is : %f' % (epoch, ssim_test))
-    f.write('\n')    
-    f.write('The feature_map_loss_validation for epoch %d is : %f' % (epoch, feature_map_loss_test))
+    f.write('Validation SSIM for epoch %d is : %f' % (epoch, ssim_test))
     f.write('\n')
+    f.write('Validation PSNR for epoch %d is : %f' % (epoch, psnr_test))
+    f.write('\n')
+    if Use_Feature_Map_Loss == True:
+        f.write('The feature_map_loss_validation for epoch %d is : %f' % (epoch, feature_map_loss_test))
+        f.write('\n')
     f.write('The pixel_wise_loss_validation for epoch %d is : %f' % (epoch, pixel_wise_loss_test))
     f.write('\n')
-    f.write('The k_space_freq_loss_validation for epoch %d is : %f' % (epoch, k_space_freq_loss_test))
-    f.write('\n')
-    f.write('The ssim_loss_validation for epoch %d is : %f' % (epoch, ssim_loss_test))
-    f.write('\n')
-    f.write('The gradient_img_loss_validation for epoch %d is : %f' % (epoch, gradient_img_loss_test))
-    f.write('\n')
+    if Use_kspace_loss == True:
+        f.write('The k_space_freq_loss_validation for epoch %d is : %f' % (epoch, k_space_freq_loss_test))
+        f.write('\n')
+    if Use_SSIM_L1_Loss == True:
+        f.write('The ssim_loss_validation for epoch %d is : %f' % (epoch, ssim_loss_test))
+        f.write('\n')
+    if Use_Gradient_Map_L1_Loss == True:
+        f.write('The gradient_img_loss_validation for epoch %d is : %f' % (epoch, gradient_img_loss_test))
+        f.write('\n')
     if Use_Gram_Matrix_L1_Loss == True:
         f.write('The gram_similarity_between_img_loss_validation for epoch %d is : %f' % (epoch, gram_similarity_between_img_loss_test))
         f.write('\n')
@@ -3183,8 +3312,10 @@ for epoch in range(EPOCH_NUM):
         f.close()
 
 "Reload best weight parameters into the network model, which will be used for evaludation in the following part"
-our_rcan_mri_sr_2d.load_state_dict(best_model_wts)
-
+our_rcan_mri_sr_2d.load_state_dict(best_ssim_model_wts)
+now = time.perf_counter()
+running_time = now - since
+print('The training time in minute is: ', running_time/60) 
 print("training complete")
 
 
@@ -3193,7 +3324,7 @@ print("training complete")
 
 "Evaluation"
 # Please beware the data should be Evaluation data rather than training data
-folder_log_path = '/srv/DATA/RAID/HaoLi/Data/'
+folder_log_path = 'C:\\SR_data\\'
 file_names = os.listdir(folder_log_path)
 
 num_low_resolution_mat_file = 0
@@ -3201,7 +3332,7 @@ num_high_resolution_groundtruth_mat_file = 0
 
 for idx_file in file_names:
     print(idx_file)
-    if 'LR_eval_4' in os.path.join(folder_log_path, idx_file):
+    if 'LR_eval_2_folds_2d_downsize_128.mat' in os.path.join(folder_log_path, idx_file):
         print('One more low resolution image set exist')
         num_low_resolution_mat_file = num_low_resolution_mat_file + 1
         print(os.path.join(folder_log_path, idx_file))
@@ -3218,7 +3349,7 @@ for idx_file in file_names:
             print(num_low_resolution_mat_file)
             torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
         print(np.shape(torch_data_low_resolution_sequence))
-    elif 'HRGT_eval_4' in os.path.join(folder_log_path, idx_file):
+    elif 'HRGT_eval_2_folds_2d_downsize_128.mat' in os.path.join(folder_log_path, idx_file):
         print('One more high resolution groundtruth image set exist')
         num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
         print(os.path.join(folder_log_path, idx_file))
@@ -3248,21 +3379,23 @@ torch_data_high_resolution_groundtruth_eval_sequence = torch_data_high_resolutio
 
 testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_high_resolution_groundtruth_eval_sequence)
 
-new_batch_size_for_checking = 32
+new_batch_size_for_checking = 16
 
 testloader = tc.utils.data.DataLoader(
                     testset, 
                     batch_size = new_batch_size_for_checking,
                     shuffle = False, 
-                    num_workers = 0)        
+                    num_workers = 0,
+                    pin_memory = True)        
 
 
 "Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
 #trainloader = tc.utils.data.DataLoader(
 #                    trainset, 
 #                    batch_size = new_batch_size_for_checking,
-#                    shuffle = True, 
-#                    num_workers = 0)
+#                    shuffle = False, 
+#                    num_workers = 0，
+#                    pin_memory = True)
 
 with tc.no_grad():
     our_rcan_mri_sr_2d.eval()
@@ -3341,7 +3474,7 @@ with tc.no_grad():
 
         #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
         SR_images_tensor_test = img_outputs.data.cpu().squeeze(1)
-        if network_model_type != 'Single Branch Network':
+        if secondary_branch_outputs != None:
             SR_secondary_branch_tensor_test = secondary_branch_outputs.data.cpu().squeeze(1)
         LR_images_tensor_test = LR_images_test.cpu().squeeze(1)
         HR_images_tensor_test = HR_images_test.cpu().squeeze(1)
@@ -3354,28 +3487,28 @@ with tc.no_grad():
         # HR_images_test = HR_images_tensor.numpy()
         if i==0:
             SR_img_eval_tensor = SR_images_tensor_test
-            if network_model_type != 'Single Branch Network':
+            if secondary_branch_outputs != None:
                 SR_secondary_branch_eval_tensor = SR_secondary_branch_tensor_test
             LR_eval_tensor = LR_images_tensor_test
             HR_eval_tensor = HR_images_tensor_test
         else:
             SR_img_eval_tensor = tc.cat((SR_img_eval_tensor, SR_images_tensor_test), 0)
-            if network_model_type != 'Single Branch Network':
+            if secondary_branch_outputs != None:
                 SR_secondary_branch_eval_tensor = tc.cat((SR_secondary_branch_eval_tensor, SR_secondary_branch_tensor_test), 0)
             LR_eval_tensor = tc.cat((LR_eval_tensor, LR_images_tensor_test), 0)
             HR_eval_tensor = tc.cat((HR_eval_tensor, HR_images_tensor_test), 0)
 
     SR_images_test = SR_img_eval_tensor.numpy()
-    if network_model_type != 'Single Branch Network':
+    if secondary_branch_outputs != None:
         SR_secondary_branch_test = SR_secondary_branch_eval_tensor.numpy()
     LR_images_test = LR_eval_tensor.numpy()
     HR_images_test = HR_eval_tensor.numpy()
     "save the .mat files for SR, HR and LR training images"
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-    if network_model_type != 'Single Branch Network':
-        scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/SR_secondary_branch_test.mat', mdict = {'SR_secondary_branch_test' : SR_secondary_branch_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
+    scipy.io.savemat('D:\\HaoLi\\SR\\results\\20210122_RCAN_5x5_1stage_64_2folds_2d_downsize_Char_kspace_grad_sigma20_101\\SR_test_image_ssim.mat', mdict = {'SR_test_image' : SR_images_test})
+    if secondary_branch_outputs != None:
+        scipy.io.savemat('D:\\HaoLi\\SR\\results\\20210122_RCAN_5x5_1stage_64_2folds_2d_downsize_Char_kspace_grad_sigma20_101\\SR_secondary_branch_test.mat', mdict = {'SR_secondary_branch_test' : SR_secondary_branch_test})
+    scipy.io.savemat('D:\\HaoLi\\SR\\results\\20210122_RCAN_5x5_1stage_64_2folds_2d_downsize_Char_kspace_grad_sigma20_101\\HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
+    scipy.io.savemat('D:\\HaoLi\\SR\\results\\20210122_RCAN_5x5_1stage_64_2folds_2d_downsize_Char_kspace_grad_sigma20_101\\LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
 
 
     #        for j in range(new_batch_size_for_checking):
@@ -3394,4 +3527,4 @@ with tc.no_grad():
 now = time.perf_counter()
 
 running_time = now - since
-print('The spent time in minute is: ', running_time/60)
+print('The time spent in minute is: ', running_time/60) 
