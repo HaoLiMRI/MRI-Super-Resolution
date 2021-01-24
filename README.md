@@ -12,6 +12,11 @@
 4. 多跑12个左右的epoch，每个epoch都跑完一次完整的learning_rate_start至learning_rate_finish，然后把每个epoch跑完的model point存一下，最后求和取平均。有可能可以获得更好的效果。详见：https://mp.weixin.qq.com/s?__biz=MzIwMTE1NjQxMQ==&mid=2247551932&idx=2&sn=855a70ed0522a3abe571f4939a7511b5&chksm=96f079e8a187f0fecf0d2f18e978d2163568e8f2962577a7fe8f684d4f3c7c2bd0a1ad289df2&scene=132#wechat_redirect
 5. 同样的RCAN模型再做de-motion artifact，把这个结果写进第一篇论文中。
 6. RCAN模型基础上加入已经实现了的各种模块做de-motion artifact，要是结果很好则再写篇motion artifact removing论文。
+7. SR和HR分别求gradient map，再相减得到一个gradient map差的矩阵，再把这个gradient map差的矩阵从(H * W)变为(1 * HW)，然后再过一个softmax，再变回H * W，然后把得到的矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
+8. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
+9. 看懂PC（Phase Congruency）怎么算，把这个指标做loss项。
+参考论文：2011.FSIM: A Feature Similarity Index for Image Quality Assessment
+参考代码：https://github.com/sunxirui310/FSIM-FSIMc-matlab/blob/master/FSIM.m
 5. ~~跑一下channel and spatial attention on upsampler, 俩种framework（CBAM与self-attention）和俩种mode（并联串联）各自跑一下。~~
 6. ~~把分别实现的并联和串联的"普通Channel and Spatial Attention Block"与"基于non local self-attention Channel and Spatial Attention Block"实现方案替换原RCAN中的CALayer，得到多个全新的模型再实验。~~
 7. 如果可能的话，在代码中加入non local self-attention的channel and spatial attention的heatmap实现可视化。
