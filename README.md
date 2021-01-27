@@ -6,8 +6,8 @@
 ## 2021年的新idea和任务
 
 ### 第一篇至少到现在来看近期还要做的是
-1. 给RCAN dual domain网络重新加一个最外面的long residual link，用zero padding放大LR输入让它跟HR统一尺寸。（如果效果好修改论文不光是网络结构部分要改，还有fig1。描述LR SR的理论部分2.1.）
-2. 跑一下progressive和post upsampling的4x和8x放大
+1. ~~给RCAN dual domain网络重新加一个最外面的long residual link，用zero padding放大LR输入让它跟HR统一尺寸。（如果效果好修改论文不光是网络结构部分要改，还有fig1。描述LR SR的理论部分2.1.）~~
+2. ~~跑一下progressive和post upsampling的4x和8x放大~~
 3. 跑一下deformable conv
 4. 多跑12个左右的epoch，每个epoch都跑完一次完整的learning_rate_start至learning_rate_finish，然后把每个epoch跑完的model point存一下，最后求和取平均。有可能可以获得更好的效果。详见：https://mp.weixin.qq.com/s?__biz=MzIwMTE1NjQxMQ==&mid=2247551932&idx=2&sn=855a70ed0522a3abe571f4939a7511b5&chksm=96f079e8a187f0fecf0d2f18e978d2163568e8f2962577a7fe8f684d4f3c7c2bd0a1ad289df2&scene=132#wechat_redirect
 5. 同样的RCAN模型再做de-motion artifact，把这个结果写进第一篇论文中。
