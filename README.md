@@ -32,7 +32,6 @@
         征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
         模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
         这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样。
-	
 17.受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
         我们可以像它这样，但不对每一个spatial position来做，而是在8)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它
         这个geometry prior一样加到self-attention里面。
