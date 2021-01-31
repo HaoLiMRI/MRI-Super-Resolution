@@ -10,23 +10,29 @@
 2. ~~跑一下progressive和post upsampling的4x和8x放大~~
 3. 跑一下deformable conv
 4. 多跑12个左右的epoch，每个epoch都跑完一次完整的learning_rate_start至learning_rate_finish，然后把每个epoch跑完的model point存一下，最后求和取平均。有可能可以获得更好的效果。详见：https://mp.weixin.qq.com/s?__biz=MzIwMTE1NjQxMQ==&mid=2247551932&idx=2&sn=855a70ed0522a3abe571f4939a7511b5&chksm=96f079e8a187f0fecf0d2f18e978d2163568e8f2962577a7fe8f684d4f3c7c2bd0a1ad289df2&scene=132#wechat_redirect
-5. 同样的RCAN模型再做de-motion artifact，把这个结果写进第一篇论文中。
-6. RCAN模型基础上加入已经实现了的各种模块做de-motion artifact，要是结果很好则再写篇motion artifact removing论文。
-7. SR和HR分别求gradient map，再相减得到一个gradient map差的矩阵，再把这个gradient map差的矩阵从(H * W)变为(1 * HW)，然后再过一个softmax，再变回H * W，然后把得到的矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
-8. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
-9. 看懂PC（Phase Congruency）怎么算，把这个指标做loss项。
+5. ensemble approach: 使用不同随机种子的学习RCAN MRI SR网络F1，…F10 —— 尽管具有非常相似的测试性能 —— 被观察到与非常不同的函数相关联。实际上，使用一种著名的技术叫做集成(ensemble)，只需对这些独立训练的网络的输出进行无加权的平均，就可以在许多深度学习应用中获得测试时性能的巨大提升。(参见下面的图1。)这意味着单个函数F1，…F10必须是不同的。见：https://mp.weixin.qq.com/s/YyLTd8B7M4f3hBTybrnUSQ
+集成
+6. 自蒸馏 ：
+方案一：通过对RCAN MRI SR的单个模型执行知识蒸馏（一个训练好的RCAN MRI SR模型做teacher，一个待训练的RCAN MRI SR模型做student，求俩者distillation loss。该loss可以先从L1 loss或者SSIM loss试验），测试的准确性也可以得到提高。
+方案二：通过对RCAN MRI SR的已经做了ensemble的模型执行知识蒸馏（10个训练好的RCAN MRI SR模型已经用ensemble生成了SR，该loss可以先从L1 loss或者SSIM loss试验），测试的准确性也可以得到更多提高。
+(见：https://mp.weixin.qq.com/s/YyLTd8B7M4f3hBTybrnUSQ 图2。)
+7. 同样的RCAN模型再做de-motion artifact，把这个结果写进第一篇论文中。
+8. RCAN模型基础上加入已经实现了的各种模块做de-motion artifact，要是结果很好则再写篇motion artifact removing论文。
+9. SR和HR分别求gradient map，再相减得到一个gradient map差的矩阵，再把这个gradient map差的矩阵从(H * W)变为(1 * HW)，然后再过一个softmax，再变回H * W，然后把得到的矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
+10. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
+11 看懂PC（Phase Congruency）怎么算，把这个指标做loss项。
 参考论文：2011.FSIM: A Feature Similarity Index for Image Quality Assessment
 参考代码：https://github.com/sunxirui310/FSIM-FSIMc-matlab/blob/master/FSIM.m
 5. ~~跑一下channel and spatial attention on upsampler, 俩种framework（CBAM与self-attention）和俩种mode（并联串联）各自跑一下。~~
 6. ~~把分别实现的并联和串联的"普通Channel and Spatial Attention Block"与"基于non local self-attention Channel and Spatial Attention Block"实现方案替换原RCAN中的CALayer，得到多个全新的模型再实验。~~
-7. 如果可能的话，在代码中加入non local self-attention的channel and spatial attention的heatmap实现可视化。
-8. 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来实现U-Net，并重复基于这种新的结合了Panoptic FPN的U-Net框架的MRI SR dual domain network。仍然是可以用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种Panoptic FPN的U-Net构架下的上面相同的各种实验。
-9. consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，
+12. 如果可能的话，在代码中加入non local self-attention的channel and spatial attention的heatmap实现可视化。
+13. 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来实现U-Net，并重复基于这种新的结合了Panoptic FPN的U-Net框架的MRI SR dual domain network。仍然是可以用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种Panoptic FPN的U-Net构架下的上面相同的各种实验。
+14. consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，
         另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特
         征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
         模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
         这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样。
-10.受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
+15.受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。
         我们可以像它这样，但不对每一个spatial position来做，而是在8)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它
         这个geometry prior一样加到self-attention里面。
 
