@@ -5,7 +5,7 @@
 
 ## 2021年的新idea和任务
 
-### 第一篇至少到现在来看近期还要做的是
+### 第一篇和我们自己的HR reference网络至少到现在来看近期还要做的是
 1. ~~给RCAN dual domain网络重新加一个最外面的long residual link，用zero padding放大LR输入让它跟HR统一尺寸。（如果效果好修改论文不光是网络结构部分要改，还有fig1。描述LR SR的理论部分2.1.）~~
 2. ~~跑一下progressive和post upsampling的4x和8x放大~~
 3. 跑一下deformable conv
