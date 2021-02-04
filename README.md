@@ -48,6 +48,15 @@
 
 
 
+### TTSR MRI最近还要做的是
+1. TTSR的LR输入，HR Reference分别过小波变换得到各自的三个高频分量进LTE，同时在TTSR最外侧加一个long skip connection从而保证LR的信息中的低频部分也都被使用
+
+
+### 其他新内容最近还要做的是
+1. 研究invertable image rescaling那个网络结构和代码 给我们的MRI SR任务用
+
+
+
         
 
 # 2019年的内容：
