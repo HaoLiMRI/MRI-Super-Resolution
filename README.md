@@ -9,9 +9,8 @@
 1. ~~给RCAN dual domain网络重新加一个最外面的long residual link，用zero padding放大LR输入让它跟HR统一尺寸。（如果效果好修改论文不光是网络结构部分要改，还有fig1。描述LR SR的理论部分2.1.）~~
 2. ~~跑一下progressive和post upsampling的4x和8x放大~~
 3. 跑一下deformable conv
-4. 多跑12个左右的epoch，每个epoch都跑完一次完整的learning_rate_start至learning_rate_finish，然后把每个epoch跑完的model point存一下，最后求和取平均。有可能可以获得更好的效果。详见：https://mp.weixin.qq.com/s?__biz=MzIwMTE1NjQxMQ==&mid=2247551932&idx=2&sn=855a70ed0522a3abe571f4939a7511b5&chksm=96f079e8a187f0fecf0d2f18e978d2163568e8f2962577a7fe8f684d4f3c7c2bd0a1ad289df2&scene=132#wechat_redirect
-5. ensemble approach: 使用不同随机种子的学习RCAN MRI SR网络F1，…F10 —— 尽管具有非常相似的测试性能 —— 被观察到与非常不同的函数相关联。实际上，使用一种著名的技术叫做集成(ensemble)，只需对这些独立训练的网络的输出进行无加权的平均，就可以在许多深度学习应用中获得测试时性能的巨大提升。(参见下面的图1。)这意味着单个函数F1，…F10必须是不同的。见：https://mp.weixin.qq.com/s/YyLTd8B7M4f3hBTybrnUSQ
-集成
+4. 多跑12个左右的epoch，每个epoch都跑完一次完整的learning_rate_start至learning_rate_finish，然后把每个epoch跑完的model point存一下，最后求和取平均。有可能可以获得更好的效果。详见：https://mp.weixin.qq.com/s?__biz=MzIwMTE1NjQxMQ==&mid=2247551932&idx=2&sn=855a70ed0522a3abe571f4939a7511b5&chksm=96f079e8a187f0fecf0d2f18e978d2163568e8f2962577a7fe8f684d4f3c7c2bd0a1ad289df2&scene=132#wechat_redirect  这里所谓的“model point存一下，最后求和取平均”应该是指的将每个epoch跑完之后的model的参数求和平均。这种思路其实与ESRGAN中提到的network interpolation技术有差不多的概念（ESRGAN中提到的network interpolation：对GAN分别用PSNR导向的loss训练出一个可以恢复出相对而言较准确但平滑的有些过分的SR图像的网络参数A，和用对抗导向的loss训练出一个可以恢复出相对而言不准确但看起来很像真实图像不过分平滑的SR图像的网络参数B，再用网络参数A乘以p加上(1-p)乘以网络参数B求新的插值网络参数）。
+5. 集成ensemble approach: 使用不同随机种子的学习RCAN MRI SR网络F1，…F10 —— 尽管具有非常相似的测试性能 —— 被观察到与非常不同的函数相关联。实际上，使用一种著名的技术叫做集成(ensemble)，只需对这些独立训练的网络的输出进行无加权的平均，就可以在许多深度学习应用中获得测试时性能的巨大提升。(参见下面的图1。)这意味着单个函数F1，…F10必须是不同的。见：https://mp.weixin.qq.com/s/YyLTd8B7M4f3hBTybrnUSQ
 6. 自蒸馏 ：
 方案一：通过对RCAN MRI SR的单个模型执行知识蒸馏（一个训练好的RCAN MRI SR模型做teacher，一个待训练的RCAN MRI SR模型做student，求俩者distillation loss。该loss可以先从L1 loss或者SSIM loss试验），测试的准确性也可以得到提高。
 方案二：通过对RCAN MRI SR的已经做了ensemble的模型执行知识蒸馏（10个训练好的RCAN MRI SR模型已经用ensemble生成了SR，该loss可以先从L1 loss或者SSIM loss试验），测试的准确性也可以得到更多提高。
