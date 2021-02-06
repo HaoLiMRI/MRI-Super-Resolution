@@ -27,6 +27,11 @@
 14. 如果可能的话，在代码中加入non local self-attention的channel and spatial attention的heatmap实现可视化。
 15. 完成基于He Kaiming的paper: 2019.Panoptic Feature Pyramid Networks内figure 3提出的为semantic segmentation任务提出的Panoptic FPN方案来实现U-Net，并重复基于这种新的结合了Panoptic FPN的U-Net框架的MRI SR dual domain network。仍然是可以用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种Panoptic FPN的U-Net构架下的上面相同的各种实验。
 16. ~~consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 。这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样~~ 。
+已完成，跑一下。
+现在这个任务还有的遗留问题包括：
+a). option to use HR reference with self-attention in the end这个方案已经代码已经完成。但现在SR branch的output是channel数为n_colors的图像，而HR reference feature extraction branch的output是channel数为n_feats的feature map，俩者channel数差别非常大却直接concatenate到一块fusion。这块可能要考虑要么把俩者都换为n_feats的feature map，要么都换为n_colors的图像后再concatenate。
+b). 另外，现在option to use HR reference with self-attention in the end这个方案如果在网络用self-attention，则会out of memory。
+c). option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image这个选项现阶段仅支持非HR Reference based的网络结构，还不支持HR Reference based网络结构。
 
 17.受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。我们可以像它这样，但不对每一个spatial position来做，而是在16)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它这个geometry prior一样加到self-attention里面。	
 18. 我们的HR reference也应该让它经过小波变换，然后只保留高频部分进入网络帮助LR做SR。无论对于自己的HR reference网络还是TTSR都可以这样做下,对于TTSR则可以直接对HR Reference做小波变换保留3个高频分量放在3个channel上面进入LTE。对于我们自己的HR reference网络则可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention一起组成multi-head self-attention。
