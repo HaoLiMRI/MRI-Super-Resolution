@@ -266,7 +266,7 @@ args = {'use_HR_reference' : True,
 
         'n_colors': 1, 'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 
         
-        'scale': 2, 'number_of_progressive_stage': 1,
+        'scale': 2, 'number_of_progressive_stage': 2,
 
         'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'gradient_operator': 'sobel', 
         
