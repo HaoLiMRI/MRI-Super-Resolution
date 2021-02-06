@@ -2,7 +2,7 @@
 "-------------------------------------------------------------------------------------------------"
 """
 2D_MRI_SR_Dual_Domain Reconstruct 
-(2D Dual Domain Fusion Network for MRI Super-Resolution Image Reconstruction)
+(2D Dual Domain Fusion Network for MRI Super-Resolution Image Reconstruction and MRI Motion Artifact Removing)
 This is the code for Dual Domain Fusion Network for MRI SR Reconstruction.
 """
 """
@@ -14,7 +14,7 @@ Version: 1.0.0(Stable Version, even deformable conv works at least for RCAN netw
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210109
+This is the current version we are working on, in 20210206
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) use RCAN or U-Net as main framework, for image single branch network.
@@ -71,7 +71,8 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
         可以用A、B两个矩阵的内积表征，被定义为Trace(AB)。见paper: 2015.LRTV: MR Image Super-Resolution With Low-Rank and Total Variation Regularizations
     30) option to use HR reference with self-attention in the end. 使用MRI HR reference的MRI SR网络并联两个现有的branch，一个branch用于LR的放大，另一个用于给HR reference的feature extraction（去掉upsampler），
         最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
-        模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 
+        模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904
+    31) option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image.从而让网络从用LR生成SR变为用LR恢复SR和LR+bicubic padding相差的部分。
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
@@ -81,6 +82,7 @@ Some feature or bug fixing which have already been planed/started but still not 
     3) option to use HR reference with self-attention in the end这个方案已经代码已经完成。但现在SR branch的output是channel数为n_colors的图像，而HR reference feature extraction branch的
         output是channel数为n_feats的feature map，俩者channel数差别非常大却直接concatenate到一块fusion。这块可能要考虑要么把俩者都换为n_feats的feature map，要么都换为n_colors的图像后再concatenate。
     4) 另外，现在option to use HR reference with self-attention in the end这个方案如果在网络用self-attention，则会out of memory。
+    5) option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image这个选项现阶段仅支持非HR Reference based的网络结构。
 
 
 we will plan to support other features:
@@ -115,6 +117,9 @@ we will plan to support other features:
         and has a complexity of O(2√N).
         See paper: 2019.CCNet: Criss-cross attention for semantic segmentation
     13) 在最外侧多加一个LR用zero padding变大之后直接加在网络最后的输出上面的skip connection，把网络结构改变，从而让网络从用LR生成SR变为用LR恢复SR和LR+zero padding相差的部分。
+    14) 我们的HR reference也应该让它经过小波变换，然后只保留高频部分进入网络帮助LR做SR。无论对于自己的HR reference网络还是TTSR都可以这样做下,对于TTSR则可以直接对HR Reference
+        做小波变换保留3个高频分量放在3个channel上面进入LTE。对于我们自己的HR reference网络则可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention
+        一起组成multi-head self-attention。
 
 
 We also fixed bugs from previous versions, typical ones like:
@@ -229,7 +234,7 @@ batch_size = 6
 EPOCH_NUM = 1
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
-Maintain_Same_Size = False # stand for whether we want the output SR Simage has same size or NOT(e.g. larger size) as input LR image
+Maintain_Same_Size = False # stand for whether we want the output image has same size or NOT(e.g. larger size) as input image
 Use_SSIM_L1_Loss = True # stand for whether we want use SSIM L1 loss in the total loss function
 Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
@@ -250,7 +255,7 @@ args = {'use_HR_reference' : True,
         'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'CBAM',
         'channel_and_spatial_attention_mode_for_HR_reference_fuser': 'parallel_mode',
 
-        'main_network_framework': 'RCAN', 'type_of_network': 'image_single_domain',
+        'main_network_framework': 'RCAN', 'type_of_network': 'image_single_domain', 'long_skip_connection_to_reconstruct_residual_part_only': False,
         
         'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True,
         'channel_and_spatial_attention_framework': 'CBAM', 'channel_and_spatial_attention_mode': 'sequential_mode',
@@ -275,7 +280,8 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # args['channel_and_spatial_attention_mode_for_HR_reference_fuser'] = 'parallel_mode', stands for which end to end channel and spatial block to use when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'sequential_mode', 'parallel_mode'
 
 # args['main_network_framework'] = 'RCAN', stands for which main network framework to use, e.g. 'U_Net', 'RCAN'
-# arg['type_of_network'] == 'image_single_domain', stands for type of network, e.g. 'image_single_domain', 'gradient_map_dual_domain', 'k_space_dual_domain', 'wavelets_transform_dual_domain'
+# args['type_of_network'] == 'image_single_domain', stands for type of network, e.g. 'image_single_domain', 'gradient_map_dual_domain', 'k_space_dual_domain', 'wavelets_transform_dual_domain'
+# args['long_skip_connection_to_reconstruct_residual_part_only'] == False, stands for whether we add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image, e.g. True, False
 
 # args['use_channel_and_spatial_attention_inside_upsampler'] = True, stands for whether we use channel and spatial attention block inside upsampler, e.g. True, False
 # args['use_channel_and_spatial_attention_inside_RCAB'] = True, stands for whether we use channel and spatial attention block inside RCAB to replace CALayer, e.g. True, False
@@ -2880,6 +2886,8 @@ class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
     def __init__(self, args):
         super(Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D, self).__init__()
         self.number_of_progressive_stage = args['number_of_progressive_stage']
+        self.long_skip_connection_to_reconstruct_residual_part_only = args['long_skip_connection_to_reconstruct_residual_part_only']
+        self.total_scale_factor = args['scale'] ** args['number_of_progressive_stage']
         if args['main_network_framework'] == 'RCAN':
             if self.number_of_progressive_stage == 1:
                 self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
@@ -2907,14 +2915,26 @@ class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
     
     def forward(self, x):
         if self.number_of_progressive_stage == 1:
-            return self.stage_1(x)
+            img_outputs, secondary_branch_outputs, network_model_type = self.stage_1(x)
+            if self.long_skip_connection_to_reconstruct_residual_part_only:
+                x = F.interpolate(x, scale_factor=self.total_scale_factor, mode='bicubic')
+                img_outputs = x + img_outputs
+            return img_outputs, secondary_branch_outputs, network_model_type
         elif self.number_of_progressive_stage == 2:
-            x, _, _ = self.stage_1(x)
-            return self.stage_2(x)
+            img_outputs, _, _ = self.stage_1(x)
+            img_outputs, secondary_branch_outputs, network_model_type = self.stage_2(img_outputs)
+            if self.long_skip_connection_to_reconstruct_residual_part_only:
+                x = F.interpolate(x, scale_factor=self.total_scale_factor, mode='bicubic')
+                img_outputs = x + img_outputs
+            return img_outputs, secondary_branch_outputs, network_model_type
         elif self.number_of_progressive_stage == 3:
-            x, _, _ = self.stage_1(x)
-            x, _, _ = self.stage_2(x)
-            return self.stage_3(x)
+            img_outputs, _, _ = self.stage_1(x)
+            img_outputs, _, _ = self.stage_2(img_outputs)
+            img_outputs, secondary_branch_outputs, network_model_type = self.stage_3(img_outputs)
+            if self.long_skip_connection_to_reconstruct_residual_part_only:
+                x = F.interpolate(x, scale_factor=self.total_scale_factor, mode='bicubic')
+                img_outputs = x + img_outputs
+            return img_outputs, secondary_branch_outputs, network_model_type
         else:
             raise ValueError("Not support more than 3 stage!")
 
@@ -2997,7 +3017,6 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
                         nn.Conv2d(args['n_feats']//2, n_colors, kernel_size = 1)
                         )
 
-    
     def forward(self, LR, HR_reference):
         # Feature extraction at SR branch.
         # The output x is the output from single branch if 'image_single_domain' type of network is selected, otherwise x is the fused output from 
