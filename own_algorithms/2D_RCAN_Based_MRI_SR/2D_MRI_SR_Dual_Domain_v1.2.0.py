@@ -73,6 +73,9 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
         最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。
         模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904
     31) option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image.从而让网络从用LR生成SR变为用LR恢复SR和LR+bicubic padding相差的部分。
+    32) option to use Gradient map guided pixel-wise loss. SR和HR分别求gradient map，再相减得到一个gradient map差的矩阵，再把这个gradient map差的矩阵从(H * W)变为(1 * HW)，然后再过一个softmax，再变回H * W，然后把得到的矩
+        阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
+    33) option to use SSIM map guided pixel-wise loss. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
@@ -116,12 +119,10 @@ we will plan to support other features:
         criss-cross attention recurrently, each pixel position can capture context from all other pixels. Compared to non-local self-attention block, the criss-cross uses 11× lesser GPU memory, 
         and has a complexity of O(2√N).
         See paper: 2019.CCNet: Criss-cross attention for semantic segmentation
-    13) Gradient map guided pixel-wise loss. SR和HR分别求gradient map，再相减得到一个gradient map差的矩阵，再把这个gradient map差的矩阵从(H * W)变为(1 * HW)，然后再过一个softmax，再变回H * W，然后把得到的矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
-    14) SSIM map guided pixel-wise loss. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
-    15) 看懂PC（Phase Congruency）怎么算，把这个指标做loss项。 参考论文：2011.FSIM: A Feature Similarity Index for Image Quality Assessment 参考代码：https://github.com/sunxirui310/FSIM-FSIMc-matlab/blob/master/FSIM.m
-    16) 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。我们可以像它这样，但不对每一个spatial position来做，
+    13) 看懂PC（Phase Congruency）怎么算，把这个指标做loss项。 参考论文：2011.FSIM: A Feature Similarity Index for Image Quality Assessment 参考代码：https://github.com/sunxirui310/FSIM-FSIMc-matlab/blob/master/FSIM.m
+    14) 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。我们可以像它这样，但不对每一个spatial position来做，
         而是在option to use HR reference with self-attention in the end方案实现using HR reference with self-attention in the end那样最后做self-attention的部分引入一个比如LR的图的Gradient map像它这个geometry prior一样加到self-attention里面。
-    17) 我们的HR reference based网络也应该让它经过小波变换，然后只保留高频部分进入网络帮助LR做SR。无论对于自己的HR reference网络还是TTSR都可以这样做下,对于TTSR则可以直接对HR Reference
+    15) 我们的HR reference based网络也应该让它经过小波变换，然后只保留高频部分进入网络帮助LR做SR。无论对于自己的HR reference网络还是TTSR都可以这样做下,对于TTSR则可以直接对HR Reference
         做小波变换保留3个高频分量放在3个channel上面进入LTE。对于我们自己的HR reference网络则可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention
         一起组成multi-head self-attention。
 
