@@ -31,7 +31,7 @@
 16. ~~consider using HR reference with self-attention in the end. 使用MRI HR reference的MRI SR，写一个新的wrapper去并联两个现有的网络（比如两个attention based RCAN并联），一个用于LR的2倍放大，另一个用于给HR reference的feature extraction（去掉upsampler），最后用一个self-attention的upsampler来把俩者fuse到一起生成MRI SR。这个方案的思路是用CNN去抓取LR图像和HR图像的局部特征的feature，然后用self-attention方案去找到这些局部feature在整个图上（全局上，更大的范围）的关系。模型的结构可以参考Paper: 2020.Attention-based Image Upsampling. https://arxiv.org/abs/2012.09904 。这个结合self-attention在最后的利用HR reference的方案可以使用的训练数据和TTSR MRI SR的数据一样~~ 。
 已完成，跑一下。
 现在这个任务还有的遗留问题包括：
-a). option to use HR reference with self-attention in the end这个方案已经代码已经完成。但现在SR branch的output是channel数为n_colors的图像，而HR reference feature extraction branch的output是channel数为n_feats的feature map，俩者channel数差别非常大却直接concatenate到一块fusion。这块可能要考虑要么把俩者都换为n_feats的feature map，要么都换为n_colors的图像后再concatenate。
+a). option to use HR reference with self-attention in the end这个方案已经代码已经完成。但现在只支持RCAN的image_single_domain或者gradient_map_dual_domain在没有long_skip_connection_to_reconstruct_residual_part_only时的HR reference based network。不支持其他配置时的HR reference based network。注意：现在gradient_map_dual_domain时用HR reference based network还有问题，会out of memory。
 b). 另外，现在option to use HR reference with self-attention in the end这个方案如果在网络用self-attention，则会out of memory。
 c). option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image这个选项现阶段仅支持非HR Reference based的网络结构，还不支持HR Reference based网络结构。
 
