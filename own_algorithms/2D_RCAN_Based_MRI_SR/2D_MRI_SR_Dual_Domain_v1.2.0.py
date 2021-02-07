@@ -333,7 +333,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
 
     for idx_file in file_names:
         print(idx_file)
-        if 'LR_training_4' in os.path.join(folder_log_path, idx_file):
+        if 'LR_training_2' in os.path.join(folder_log_path, idx_file):
             print('One more low resolution image set exist')
             num_low_resolution_mat_file = num_low_resolution_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -357,7 +357,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
                 print(num_low_resolution_mat_file)
                 torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
             print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_training_4' in os.path.join(folder_log_path, idx_file):
+        elif 'HRGT_training_2' in os.path.join(folder_log_path, idx_file):
             print('One more high resolution groundtruth image set exist')
             num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -436,7 +436,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
 
     for idx_file in file_names:
         print(idx_file)
-        if 'LR_validation_4' in os.path.join(folder_log_path, idx_file):
+        if 'LR_validation_2' in os.path.join(folder_log_path, idx_file):
             print('One more low resolution image set exist')
             num_low_resolution_mat_file = num_low_resolution_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -460,7 +460,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
                 print(num_low_resolution_mat_file)
                 torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
             print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_validation_4' in os.path.join(folder_log_path, idx_file):
+        elif 'HRGT_validation_2' in os.path.join(folder_log_path, idx_file):
             print('One more high resolution groundtruth image set exist')
             num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -535,7 +535,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
 
     for idx_file in file_names:
         print(idx_file)
-        if 'LR_eval_4' in os.path.join(folder_log_path, idx_file):
+        if 'LR_eval_2' in os.path.join(folder_log_path, idx_file):
             print('One more low resolution image set exist')
             num_low_resolution_mat_file = num_low_resolution_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -552,7 +552,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
                 print(num_low_resolution_mat_file)
                 torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
             print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_eval_4' in os.path.join(folder_log_path, idx_file):
+        elif 'HRGT_eval_2' in os.path.join(folder_log_path, idx_file):
             print('One more high resolution groundtruth image set exist')
             num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -922,14 +922,14 @@ elif args['use_HR_reference'] == True and args['n_colors'] == 1:
 
 elif args['use_HR_reference'] == False and args['n_colors'] == 3:
     """
-    The data loading pipeline for ordinary SISR RGB SR:
+    The data loading pipeline for ordinary SISR RGB Visual Image SR:
     """
     # @TODO: The corresponding data loading part to be added 
     pass
 
 elif args['use_HR_reference'] == True and args['n_colors'] == 3:
     """
-    The data loading pipeline for RGB SR with HR reference:
+    The data loading pipeline for RGB Visual Image SR with HR reference:
     """
     # @TODO: The corresponding data loading part to be added 
     pass
