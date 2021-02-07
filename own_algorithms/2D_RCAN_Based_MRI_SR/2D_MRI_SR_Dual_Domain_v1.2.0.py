@@ -82,8 +82,8 @@ Some feature or bug fixing which have already been planed/started but still not 
     1) U-Net is already used as framework for image single branch. But not support for any of dual domain branch yet! Thus the class "U_Net_Based_MRI_SR_Dual_Domain_2D" still needs to be
         changed to support U-Net as framework for 3 types of dual domain branch.
     2) k space, wavelet secondary branch多个分量间分开，各走一个branch来实现。
-    3) option to use HR reference with self-attention in the end这个方案已经代码已经完成。但现在SR branch的output是channel数为n_colors的图像，而HR reference feature extraction branch的
-        output是channel数为n_feats的feature map，俩者channel数差别非常大却直接concatenate到一块fusion。这块可能要考虑要么把俩者都换为n_feats的feature map，要么都换为n_colors的图像后再concatenate。
+    3) option to use HR reference with self-attention in the end这个方案已经代码已经完成。但现在只支持RCAN的image_single_domain或者gradient_map_dual_domain在没有long_skip_connection_to_reconstruct_residual_part_only时的
+        HR reference based network。不支持其他配置时的HR reference based network。注意：现在gradient_map_dual_domain时用HR reference based network还有问题，会out of memory。
     4) 另外，现在option to use HR reference with self-attention in the end这个方案如果在网络用self-attention，则会out of memory。
     5) option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image这个选项现阶段仅支持非HR Reference based的网络结构。
 
@@ -247,7 +247,7 @@ Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 l
 Use_Negative_TV_Loss = True # stand for whether we want to use "1/(total variation + 1.000e-10) loss"(on SR , for providing over smoothing)
 Use_Negative_Trace_Loss = True # stand for whether we want to use "1/(trace(sr*hr) + 1.000e-10) loss"(on HR and SR, for increasing similarity between SR and HR)
 Use_Gradient_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use gradient map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_SSIM_Map_Guided_Pixel_Wise_Loss is True
-Use_SSIM_Map_Guided_Pixel_Wise_Loss = True # stand for whether we want to use SSIM map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_Gradient_Map_Guided_Pixel_Wise_Loss is True
+Use_SSIM_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use SSIM map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_Gradient_Map_Guided_Pixel_Wise_Loss is True
 Use_Channel_Attention_For_Cross_Branch_Fusion = True # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
 Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
 Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
@@ -258,7 +258,7 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
-args = {'use_HR_reference' : False, 
+args = {'use_HR_reference' : True, 
         'use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser': True,
         'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'CBAM',
         'channel_and_spatial_attention_mode_for_HR_reference_fuser': 'parallel_mode',
@@ -333,7 +333,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
 
     for idx_file in file_names:
         print(idx_file)
-        if 'LR_training_2' in os.path.join(folder_log_path, idx_file):
+        if 'LR_training_4' in os.path.join(folder_log_path, idx_file):
             print('One more low resolution image set exist')
             num_low_resolution_mat_file = num_low_resolution_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -357,7 +357,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
                 print(num_low_resolution_mat_file)
                 torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
             print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_training_2' in os.path.join(folder_log_path, idx_file):
+        elif 'HRGT_training_4' in os.path.join(folder_log_path, idx_file):
             print('One more high resolution groundtruth image set exist')
             num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -436,7 +436,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
 
     for idx_file in file_names:
         print(idx_file)
-        if 'LR_validation_2' in os.path.join(folder_log_path, idx_file):
+        if 'LR_validation_4' in os.path.join(folder_log_path, idx_file):
             print('One more low resolution image set exist')
             num_low_resolution_mat_file = num_low_resolution_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -460,7 +460,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
                 print(num_low_resolution_mat_file)
                 torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
             print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_validation_2' in os.path.join(folder_log_path, idx_file):
+        elif 'HRGT_validation_4' in os.path.join(folder_log_path, idx_file):
             print('One more high resolution groundtruth image set exist')
             num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -535,7 +535,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
 
     for idx_file in file_names:
         print(idx_file)
-        if 'LR_eval_2' in os.path.join(folder_log_path, idx_file):
+        if 'LR_eval_4' in os.path.join(folder_log_path, idx_file):
             print('One more low resolution image set exist')
             num_low_resolution_mat_file = num_low_resolution_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -552,7 +552,7 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
                 print(num_low_resolution_mat_file)
                 torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
             print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_eval_2' in os.path.join(folder_log_path, idx_file):
+        elif 'HRGT_eval_4' in os.path.join(folder_log_path, idx_file):
             print('One more high resolution groundtruth image set exist')
             num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
             print(os.path.join(folder_log_path, idx_file))
@@ -2193,7 +2193,7 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
     RCAN(Deep Residual Channel Attention Network) = RIR(Residual in Residual module) + Upsampler Module.
     See bottom figure in figure 2 of original RCAN paper
     """
-    def __init__(self, args):
+    def __init__(self, args, not_use_last_conv_to_change_num_channels_to_n_colors = False):
         super(RCAN_Based_MRI_SR_Dual_Domain_2D, self).__init__()
         if args['type_of_network'] == 'image_single_domain':
             self.type_of_network = 'image_single_domain'
@@ -2224,6 +2224,7 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         elif args['activation_function_type'] == 'Dynamic_ReLU_Type_B':
             act = 'Dynamic_ReLU_Type_B'
 
+        self.not_apply_last_conv_to_change_num_of_channels_to_n_colors = args['use_HR_reference'] and not_use_last_conv_to_change_num_channels_to_n_colors
         n_resgroups = args['n_resgroups'] # number of RGs in RIR/RCAN
         n_rcablocks = args['n_rcablocks'] # number of RCABs in one RG
         n_colors = args['n_colors'] # number of channels going of input of entire model
@@ -2273,10 +2274,15 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
                 for _ in range(n_resgroups)]
             modules_head_for_gradient_map_branch = [conv(n_colors, n_feats, kernel_size)]
             modules_pretail_for_gradient_map_branch = [conv(n_feats, n_feats, kernel_size)]
-            modules_tail_for_gradient_map_branch = [
-            Upsampler(conv, scale, n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
-                            channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
-            conv(n_feats, n_colors, kernel_size)]
+            if self.not_apply_last_conv_to_change_num_of_channels_to_n_colors == True:
+                modules_tail_for_gradient_map_branch = [
+                Upsampler(conv, scale, n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
+                                channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)]
+            else:
+                modules_tail_for_gradient_map_branch = [
+                Upsampler(conv, scale, n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
+                                channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                conv(n_feats, n_colors, kernel_size)]
         elif self.type_of_network == 'k_space_dual_domain':
             modules_body = [
                 KSpaceDualResidualGroup(
@@ -2288,9 +2294,9 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             modules_head_for_k_space_branch = [conv(2*n_colors, 2*n_feats, kernel_size)]
             modules_pretail_for_k_space_branch = [conv(2*n_feats, 2*n_feats, kernel_size)]
             modules_tail_for_k_space_branch = [
-                Upsampler(conv, scale, 2*n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
-                            channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
-                conv(2*n_feats, 2*n_colors, kernel_size)]
+            Upsampler(conv, scale, 2*n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
+                        channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+            conv(2*n_feats, 2*n_colors, kernel_size)]
         elif self.type_of_network == 'wavelets_transform_dual_domain':
             modules_body = [
                 WaveletsTransformDualResidualGroup(
@@ -2301,10 +2307,15 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
                 for _ in range(n_resgroups)]
 
         # define tail module. The last stage is upsampling module and one more conv layer, show in figure 2 of RCAN paper
-        modules_tail = [
+        if self.not_apply_last_conv_to_change_num_of_channels_to_n_colors == True:
+            modules_tail = [
             Upsampler(conv, scale, n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
-                            channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
-            conv(n_feats, n_colors, kernel_size)]
+                            channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)]
+        else:
+            modules_tail = [
+                Upsampler(conv, scale, n_feats, use_channel_and_spatial_attention_inside_upsampler = use_channel_and_spatial_attention_inside_upsampler, 
+                                channel_and_spatial_attention_framework = channel_and_spatial_attention_framework, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                conv(n_feats, n_colors, kernel_size)]
 
         # Add a downsize converter by using conv layer.
         # The purpose of original RCAN designed in original RCAN paper is to upscale scale times of LR image, the output from RIR has same size as input LR image. However, here in our task
@@ -2925,21 +2936,21 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
 
 "Wrapper for Progressive Learning Super Resolution MRI Reconstruction for multiple size, e.g. 2x, 4x, 8x, etc."
 class Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, not_use_last_conv_to_change_num_channels_to_n_colors = False):
         super(Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D, self).__init__()
         self.number_of_progressive_stage = args['number_of_progressive_stage']
         self.long_skip_connection_to_reconstruct_residual_part_only = args['long_skip_connection_to_reconstruct_residual_part_only']
         self.total_scale_factor = args['scale'] ** args['number_of_progressive_stage']
         if args['main_network_framework'] == 'RCAN':
             if self.number_of_progressive_stage == 1:
-                self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args, not_use_last_conv_to_change_num_channels_to_n_colors = not_use_last_conv_to_change_num_channels_to_n_colors)
             elif self.number_of_progressive_stage == 2:
                 self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
-                self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args, not_use_last_conv_to_change_num_channels_to_n_colors = not_use_last_conv_to_change_num_channels_to_n_colors)
             elif self.number_of_progressive_stage == 3:
                 self.stage_1 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
                 self.stage_2 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
-                self.stage_3 = RCAN_Based_MRI_SR_Dual_Domain_2D(args)
+                self.stage_3 = RCAN_Based_MRI_SR_Dual_Domain_2D(args, not_use_last_conv_to_change_num_channels_to_n_colors = not_use_last_conv_to_change_num_channels_to_n_colors)
             else:
                 raise ValueError("Not support more than 3 stage!")
         elif args['main_network_framework'] == 'U_Net':
@@ -2994,8 +3005,11 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         network as network type. However, HR reference branch is always a simple RCAN network without upsampler.
         """
 
-        "----------------------------------- Define normal SR branch ---------------------------------"
-        self.SR_branch = Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(args)
+        "----------------------------------- Define normal SR branch, make sure not_use_last_conv_to_change_num_channels_to_n_colors = True ---------------------------------"
+        if args['main_network_framework'] == 'RCAN' and (args['type_of_network'] == 'image_single_domain' or args['type_of_network'] == 'gradient_map_dual_domain') and args['long_skip_connection_to_reconstruct_residual_part_only'] == False:
+            self.SR_branch = Progressive_Learning_Wrapper_MRI_SR_Dual_Domain_2D(args, not_use_last_conv_to_change_num_channels_to_n_colors = True)
+        else:
+            raise ValueError("For now only support HR reference based network when using RCAN, image_single_domain or gradient_map_dual_domain network type, and no long_skip_connection! Not support HR reference based network by current configuration!")
 
         "----------------------------------- Define HR reference branch ---------------------------------"
         "Beware: If we do not want the parameter setting for HR reference branch is changable according to the args setting up, just hardcode the following parameters for HR reference branch."
@@ -3048,7 +3062,7 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser = args['use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser']
         channel_and_spatial_attention_framework_for_HR_reference_fuser = args['channel_and_spatial_attention_framework_for_HR_reference_fuser']
         channel_and_spatial_attention_mode_for_HR_reference_fuser = args['channel_and_spatial_attention_mode_for_HR_reference_fuser']
-        self.last_stage_fuser = nn.Sequential(nn.Conv2d(in_channels = args['n_colors'] + n_feats_for_HR_reference_branch, out_channels = args['n_feats'], kernel_size = 1),
+        self.last_stage_fuser = nn.Sequential(nn.Conv2d(in_channels = args['n_feats'] + n_feats_for_HR_reference_branch, out_channels = args['n_feats'], kernel_size = 1),
                         nn.ReLU(True),
                         RCAB(conv = deformable_conv, n_feat = args['n_feats'], kernel_size = 3, reduction = 16, bias=True, bn=False, act=nn.ReLU(True), res_scale=1, 
                             use_channel_and_spatial_attention_inside_RCAB = use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser,
