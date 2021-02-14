@@ -35,6 +35,7 @@ b). 另外，现在option to use HR reference with self-attention in the end这�
 c). option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image这个选项现阶段仅支持非HR Reference based的网络结构，还不支持HR Reference based网络结构。
 
 17.受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。我们可以像它这样，但不对每一个spatial position来做，而是在16)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它这个geometry prior一样加到self-attention里面。	
+
 18. 我们的HR reference也应该让它经过小波变换，然后只保留高频部分进入网络帮助LR做SR。无论对于自己的HR reference网络还是TTSR都可以这样做下,对于TTSR则可以直接对HR Reference做小波变换保留3个高频分量放在3个channel上面进入LTE。对于我们自己的HR reference网络则可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention一起组成multi-head self-attention。
 
 
@@ -50,6 +51,7 @@ c). option to add long skip connection outside the entire network model to only 
 
 ### TTSR MRI最近还要做的是
 1. TTSR的LR输入，HR Reference分别过小波变换得到各自的三个高频分量进LTE，同时在TTSR最外侧加一个long skip connection从而保证LR的信息中的低频部分也都被使用
+2. TTSR的LR_UP输入可以不用LR_UP而用RCAN网络生成的SR数据replace现有的LR_UP
 
 
 ### 其他新内容最近还要做的是
