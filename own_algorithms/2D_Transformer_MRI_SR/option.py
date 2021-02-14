@@ -61,7 +61,7 @@ parser.add_argument('--grad_w', type=float, default=0.1,
                     help='The weight of gradient map loss')
 parser.add_argument('--kspace_w', type=float, default=0.001,
                     help='The weight of k-space loss')
-parser.add_argument('--ssim_w', type=float, default=0,
+parser.add_argument('--ssim_w', type=float, default=0.1,
                     help='The weight of SSIM loss')
 parser.add_argument('--per_w', type=float, default=0,
                     help='The weight of perceptual loss')
