@@ -40,19 +40,23 @@ class Logger(object):
 
 def mkExpDir(args):
     if (os.path.exists(args.save_dir)):
-        if (not args.reset):
-            raise SystemExit('Error: save_dir "' + args.save_dir + '" already exists! Please set --reset True to delete the folder.')
-        else:
+        if args.reset:
             shutil.rmtree(args.save_dir)
-
-    os.makedirs(args.save_dir)
+            os.makedirs(args.save_dir)
+#        else:
+#            raise SystemExit('Error: save_dir "' + args.save_dir + '" already exists! Please set --reset True to delete the folder.')
+    else: 
+        os.makedirs(args.save_dir)
     # os.makedirs(os.path.join(args.save_dir, 'img'))
 
     if ((not args.eval) and (not args.test)):
-        os.makedirs(os.path.join(args.save_dir, 'model'))
+        if (not os.path.exists(os.path.join(args.save_dir, 'model'))):
+            os.makedirs(os.path.join(args.save_dir, 'model'))
     
-    if ((args.eval and args.eval_save_results) or args.test):
-        os.makedirs(os.path.join(args.save_dir, 'saved_results'))
+#    if ((args.eval and args.eval_save_results) or args.test):
+    if (args.eval_save_results or args.test):
+        if (not os.path.exists(os.path.join(args.save_dir, 'saved_results'))):
+            os.makedirs(os.path.join(args.save_dir, 'saved_results'))
 
     args_file = open(os.path.join(args.save_dir, 'args.txt'), 'w')
     for k, v in vars(args).items():

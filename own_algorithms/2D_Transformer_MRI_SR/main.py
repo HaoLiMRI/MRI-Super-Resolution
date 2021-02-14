@@ -15,8 +15,16 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.0.0
+Version: 1.2.0
 """
+
+"""
+This is the current version we are working on, in 20210214
+This is a demo code of 2D_Visual_Transformer_MRI_SR(TTSR_MRI). in this version we have already support following items:
+1) added a new class "SFE_Downsample" in MainNet.py which downscale the LR by 1/2, thus to support 2x upscaling in the end.
+2) added support for "L1 Charbonnier loss", "gradient map loss", "ssim map loss" and "k space loss".
+"""
+
 """
 Reference:
 [1] 2020.Learning Texture Transformer Network for Image Super-Resolution
@@ -55,7 +63,7 @@ if __name__ == '__main__':
     
     ### load the model into more than one gpu if have more than one gpu.
     if ((not args.cpu) and (args.num_gpu > 1)):
-        _model = nn.DataParallel(_model, list(range(args.num_gpu)))
+        _model = torch.nn.DataParallel(_model, list(range(args.num_gpu)))
 
     ### create loss function.
     _loss_all = get_loss_dict(args, _logger)
@@ -77,3 +85,4 @@ if __name__ == '__main__':
             t.train(current_epoch=epoch, is_init=False)
             if (epoch % args.val_every == 0):
                 t.evaluate(current_epoch=epoch)
+                

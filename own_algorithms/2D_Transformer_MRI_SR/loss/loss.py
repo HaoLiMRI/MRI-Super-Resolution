@@ -4,6 +4,47 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from pytorch_ssim_l1 import SSIM 
+
+"calculate gradient map for any input MRI image"
+def calculate_gradient_map(img):
+    # sobel operator
+    vertical_edge_mask = torch.Tensor([[[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]])
+    horizontal_edge_mask = torch.Tensor([[[-1, -2, -1], [0, 0, 0], [1, 2, 1]], [[-1, -2, -1], [0, 0, 0], [1, 2, 1]], [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]])
+
+    vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).cuda()
+    horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).cuda()
+
+    gradient_vertical_map = F.conv2d(img, vertical_edge_mask, padding = 1, stride = 1, groups = 1)
+    gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
+
+    gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
+
+    return gradient_map
+
+
+"Calculate the fft to fetch k space result and ifft to go back to image domain"
+def FFT_K_SPACE(img):
+    k_space_result = torch.rfft(img, signal_ndim = 2, onesided = False)
+    return k_space_result
+
+
+"""
+L1 Charbonnier Loss. See more information regarding L1 Charboniier Loss from paper: 2018.Fast and Accurate Image Super-Resolution with 
+Deep Laplacian Pyramid Networks. L1 Charboniier Loss in theory can be used to replace the (smooth) L1 loss, to provide reconstructed 
+image with less over-smoothing issues and problem.
+"""
+class L1_Charbonnier_Loss(nn.Module):
+    def __init__(self):
+        super(L1_Charbonnier_Loss, self).__init__()
+        self.eps = 1e-4
+
+    def forward(self, X, Y):
+        diff = torch.add(X, -Y)
+        error = torch.sqrt(diff * diff + self.eps)
+        loss = torch.mean(error)
+#        print(loss.size())
+        return loss
 
 
 class ReconstructionLoss(nn.Module):
@@ -13,11 +54,69 @@ class ReconstructionLoss(nn.Module):
             self.loss = nn.L1Loss()
         elif (type == 'l2'):
             self.loss = nn.MSELoss()
+        elif (type == 'Charbonnier'):
+            self.loss = L1_Charbonnier_Loss()
         else:
             raise SystemExit('Error: no such type of ReconstructionLoss!')
 
     def forward(self, sr, hr):
         return self.loss(sr, hr)
+
+
+class Gradient_Map_Loss(nn.Module):
+    def __init__(self):
+        super(Gradient_Map_Loss, self).__init__()
+        
+        self.loss = nn.L1Loss()
+
+    def forward(self, sr, hr):
+        loss = self.loss(calculate_gradient_map(sr), calculate_gradient_map(hr))
+        return loss
+
+
+class K_Space_Loss(nn.Module):
+    def __init__(self):
+        super(K_Space_Loss, self).__init__()
+
+        self.loss = nn.MSELoss()
+    
+    def forward(self, sr, hr):
+        sr_k_space = FFT_K_SPACE(sr)
+        hr_k_space = FFT_K_SPACE(hr)
+        loss = self.loss(sr_k_space[:,:,:,:,0], hr_k_space[:,:,:,:,0]) + self.loss(sr_k_space[:,:,:,:,1], hr_k_space[:,:,:,:,1])
+        return loss
+
+
+class SSIM_Loss(nn.Module):
+    def __init__(self, luminance_weight = 2, contrast_weight = 2, structure_weight = 4):
+        super(SSIM_Loss, self).__init__()
+        
+        self.luminance_weight = luminance_weight
+        self.contrast_weight = contrast_weight
+        self.structure_weight = structure_weight
+        self.ssim = SSIM(luminance_weight=self.luminance_weight, contrast_weight=self.contrast_weight, structure_weight=self.structure_weight)
+        self.loss = nn.L1Loss()
+
+    def forward(self, sr, hr):
+        
+        sr_ssim_weighted, _ = self.ssim(sr, hr)
+        print('sr_ssim_weighted:', sr_ssim_weighted)
+        hr_ssim_weighted, _ = self.ssim(hr, hr)
+        print('hr_ssim_weighted:', hr_ssim_weighted)
+        loss = self.loss(sr_ssim_weighted, hr_ssim_weighted)
+        print('ssim_loss:', loss)
+        """
+        sr_lu, sr_co, sr_st = self.ssim(sr, hr)
+        print('sr_luminance: ', sr_lu.mean())
+        print('sr_contrast: ', sr_co.mean())
+        print('sr_structure: ', sr_st.mean())
+        hr_lu, hr_co, hr_st = self.ssim(hr, hr)
+        print('hr_luminance: ', hr_lu.mean())
+        print('hr_contrast: ', hr_co.mean())
+        print('hr_structure: ', hr_st.mean())
+        loss = self.loss(sr_lu*sr_co*sr_st, hr_lu*hr_co*hr_st)
+        """
+        return loss
 
 
 class PerceptualLoss(nn.Module):
@@ -67,7 +166,7 @@ class TPerceptualLoss(nn.Module):
 
 class AdversarialLoss(nn.Module):
     def __init__(self, logger, use_cpu=False, num_gpu=1, gan_type='WGAN_GP', gan_k=1, 
-        lr_dis=1e-4, train_crop_size=40):
+        lr_dis=1e-4, train_crop_size=32):
 
         super(AdversarialLoss, self).__init__()
         self.logger = logger
@@ -148,7 +247,13 @@ def get_loss_dict(args, logger):
     if (abs(args.rec_w - 0) <= 1e-8):
         raise SystemExit('NotImplementError: ReconstructionLoss must exist!')
     else:
-        loss['rec_loss'] = ReconstructionLoss(type='l1')
+        loss['rec_loss'] = ReconstructionLoss(type='Charbonnier')
+    if (abs(args.grad_w - 0) > 1e-8):
+        loss['grad_loss'] = Gradient_Map_Loss()
+    if (abs(args.kspace_w - 0) > 1e-8):
+        loss['k_space_loss'] = K_Space_Loss()
+    if (abs(args.ssim_w - 0) > 1e-8):
+        loss['ssim_loss'] = SSIM_Loss()
     if (abs(args.per_w - 0) > 1e-8):
         loss['per_loss'] = PerceptualLoss()
     if (abs(args.tpl_w - 0) > 1e-8):
