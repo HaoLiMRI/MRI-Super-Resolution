@@ -118,10 +118,8 @@ parser.add_argument('--model_path', type=str, default='D:\\HaoLi\\SR\\results\\2
 parser.add_argument('--test', type=str2bool, default=False,
                     help='Test mode')
 parser.add_argument('--lr_path', type=str, default='C:\\SR_data\\2d_downsize_2d_128x3_ref\\',
-                                            # only for 'CUFED' dataset
                     help='The path of input LR image when perform model testing')
 parser.add_argument('--ref_path', type=str, default='C:\\SR_data\\2d_downsize_2d_128x3_ref\\',
-                                            # only for 'CUFED' dataset
                     help='The path of ref image when perform model testing')
 
 args = parser.parse_args()
