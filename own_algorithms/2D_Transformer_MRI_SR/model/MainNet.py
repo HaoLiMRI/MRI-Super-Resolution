@@ -19,6 +19,36 @@ def conv3x3(in_channels, out_channels, stride=1):
                      stride=stride, padding=1, bias=True)
 
 
+"Channel Attention (CA) Layer"
+class CALayer(nn.Module):
+    """
+    Channel Attention (CA) Layer, is basical block in RCAN. One CA forms one RCAB(Residual Channel Attention Block).
+    See figure 3 of original RCAN paper.
+    Beware the CA Layer used in RCAN is actually same as the channel attention mechanism propsed in SENet(Squeeze-and-Excitation Networks).
+    """
+    def __init__(self, channel, reduction=16):
+        """
+        reduction is the r mentioned in 3.3 Channel Attention in RCAN paper
+        """
+        super(CALayer, self).__init__()
+        # global average pooling(GAP): feature --> point
+        self.avg_pool = nn.AdaptiveAvgPool2d(1) # global average pooling(GAP), output size is 1 for each channel
+        # feature channel downscale and upscale --> channel weight
+        self.conv_du = nn.Sequential(
+                nn.Conv2d(channel, channel // reduction, 1, padding=0, bias=True), # W_d in CA
+                nn.ReLU(inplace=True), # ReLU in CA
+                nn.Conv2d(channel // reduction, channel, 1, padding=0, bias=True), # W_u in CA
+                nn.Sigmoid() # sigmoid in CA
+        )
+
+    def forward(self, x):
+        y = self.avg_pool(x)
+        y = self.conv_du(y)
+        # the x is the "feature maps over channels" in size C x H x W. The y now is actual the weights in size C x 1 x 1 which represents "channel statistics", 
+        # it stands for how much "attention" expected to pay for each channel's feature map 
+        return x * y
+
+
 class ResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, downsample=None, res_scale=1):
         super(ResBlock, self).__init__()
@@ -26,21 +56,24 @@ class ResBlock(nn.Module):
         self.conv1 = conv3x3(in_channels, out_channels, stride)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(out_channels, out_channels)
+        self.channel_attention = CALayer(out_channels)
         
     def forward(self, x):
         x1 = x
         out = self.conv1(x)
         out = self.relu(out)
         out = self.conv2(out)
+        out = self.channel_attention(out)
         out = out * self.res_scale + x1
         return out
 
 
 class SFE(nn.Module):
-    def __init__(self, num_res_blocks, n_feats, res_scale):
+    def __init__(self, num_res_blocks, n_feats, n_colors, res_scale):
         super(SFE, self).__init__()
         self.num_res_blocks = num_res_blocks
-        self.conv_head = conv3x3(3, n_feats)
+        self.n_colors = n_colors
+        self.conv_head = conv3x3(self.n_colors, n_feats)
         
         self.RBs = nn.ModuleList()
         for i in range(self.num_res_blocks):
@@ -61,10 +94,11 @@ class SFE(nn.Module):
 
 """New for scale factor of 2"""
 class SFE_Downsample(nn.Module):
-    def __init__(self, num_res_blocks, n_feats, res_scale):
+    def __init__(self, num_res_blocks, n_feats, n_colors, res_scale):
         super(SFE_Downsample, self).__init__()
         self.num_res_blocks = num_res_blocks
-        self.conv_head = conv3x3(3, n_feats, 2)
+        self.n_colors = n_colors
+        self.conv_head = conv3x3(self.n_colors, n_feats, 2)
         
         self.RBs = nn.ModuleList()
         for i in range(self.num_res_blocks):
@@ -143,13 +177,14 @@ class CSFI3(nn.Module):
 
 
 class MergeTail(nn.Module):
-    def __init__(self, n_feats):
+    def __init__(self, n_feats, n_colors):
         super(MergeTail, self).__init__()
+        self.n_colors = n_colors
         self.conv13 = conv1x1(n_feats, n_feats)
         self.conv23 = conv1x1(n_feats, n_feats)
         self.conv_merge = conv3x3(n_feats*3, n_feats)
         self.conv_tail1 = conv3x3(n_feats, n_feats//2)
-        self.conv_tail2 = conv1x1(n_feats//2, 3)
+        self.conv_tail2 = conv1x1(n_feats//2, self.n_colors)
 
     def forward(self, x1, x2, x3):
         x13 = F.interpolate(x1, scale_factor=4, mode='bicubic')
@@ -160,7 +195,7 @@ class MergeTail(nn.Module):
         x = F.relu(self.conv_merge( torch.cat((x3, x13, x23), dim=1) ))
         x = self.conv_tail1(x)
         x = self.conv_tail2(x)
-        """ x = torch.clamp(x, 0, 1)    # Make sure all elements of x is between [0, 1] due that the elements of MRI image is between [0, 1] """
+#        x = torch.clamp(x, 0, 1)
         
         return x
 
@@ -170,14 +205,16 @@ Class MainNet implements the "Backbone" module and "Soft Attention" module in fi
 group of residual blocks and CSFI(Cross-Scale Feature Integration) module shown in the figure 3 of [1].
 """
 class MainNet(nn.Module):
-    def __init__(self, num_res_blocks, n_feats, res_scale):
+    def __init__(self, num_res_blocks, n_feats, n_colors, res_scale, scale_factor):
         super(MainNet, self).__init__()
         self.num_res_blocks = num_res_blocks ### a list containing number of resblocks of different stages
         self.n_feats = n_feats
+        self.n_colors = n_colors
+        self.scale_factor = scale_factor
 
-        self.SFE = SFE(self.num_res_blocks[0], n_feats, res_scale)
-        """New for scale factor of 2"""
-        self.SFE_Downsample = SFE_Downsample(self.num_res_blocks[0], n_feats, res_scale)
+        self.SFE = SFE(self.num_res_blocks[0], n_feats, n_colors, res_scale)
+        if self.scale_factor == 2:
+            self.SFE_Downsample = SFE_Downsample(self.num_res_blocks[0], n_feats, n_colors, res_scale)
 
         ### stage11
         self.conv11_head = conv3x3(256+n_feats, n_feats)
@@ -234,15 +271,15 @@ class MainNet(nn.Module):
         self.conv32_tail = conv3x3(n_feats, n_feats)
         self.conv33_tail = conv3x3(n_feats, n_feats)
 
-        self.merge_tail = MergeTail(n_feats)
+        self.merge_tail = MergeTail(n_feats, self.n_colors)
 
     def forward(self, x, S=None, T_lv3=None, T_lv2=None, T_lv1=None):
         ### shallow feature extraction
-        """x = self.SFE(x)"""
-
-        """New for scale factor of 2"""
-        x0 = self.SFE(x)
-        x = self.SFE_Downsample(x)
+        if self.scale_factor == 4:
+            x = self.SFE(x)
+        elif self.scale_factor == 2:
+            x0 = self.SFE(x)
+            x = self.SFE_Downsample(x)
         
 
         ### stage11
@@ -266,10 +303,11 @@ class MainNet(nn.Module):
         x21 = x11
         x21_res = x21
         
-        """x22 = self.conv12(x11)
-        x22 = F.relu(self.ps12(x22))"""
-        """New for scale factor of 2"""
-        x22 = x0
+        if self.scale_factor == 4:
+            x22 = self.conv12(x11)
+            x22 = F.relu(self.ps12(x22))
+        elif self.scale_factor == 2:
+            x22 = x0
 
         ### soft-attention
         x22_res = x22
