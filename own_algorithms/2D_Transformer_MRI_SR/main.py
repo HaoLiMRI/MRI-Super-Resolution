@@ -6,7 +6,7 @@ This is the code for "Visual Transformer based Network" for MRI SR Reconstructio
 in paper [1] accepted in CVPR 2020.
 
 ** The basic idea of 2D_Visual_Transformer_MRI_SR is, take the 3 scan layers LR MRI image together in 3 channels(make it similar structure as RGB image), into TTSTMRI 
-network to reconstrcut 4x (for both H and W, e.g. size of LR MRI image is 32x32 and size of reconstructed SR MRI image is 128x128) SR MRI image, with the help from 
+network to reconstrcut 2x (for both H and W, e.g. size of LR MRI image is 64x64 and size of reconstructed SR MRI image is 128x128) SR MRI image, with the help from 
 reference MRI image in same size as SR MRI image. Such refernece MRI image can be obtained from high resolution MRI image from the similar scenarios of measurements 
 with same MRI scaning module as the MRI scaning module used for LR MRI image(e.g. T1) or from the same scenarios of measurements with different MRI scaning module(e.g. T2).
 """
@@ -15,14 +15,21 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.2.0
+Version: 1.3.0
 """
 
 """
-This is the current version we are working on, in 20210214
+This is the current version we are working on, in 20210216
 This is a demo code of 2D_Visual_Transformer_MRI_SR(TTSR_MRI). in this version we have already support following items:
-1) added a new class "SFE_Downsample" in MainNet.py which downscale the LR by 1/2, thus to support 2x upscaling in the end.
-2) added support for "L1 Charbonnier loss", "gradient map loss", "ssim map loss" and "k space loss".
+    1) added a new class "SFE_Downsample" in MainNet.py which downscale the LR by 1/2, thus to support 2x upscaling in the end.
+    2) added support for "L1 Charbonnier loss", "gradient map loss", "ssim map loss" and "k space loss".
+    3) support to load and process normal MRI image with number 0f channel = 1.
+    4) support to use channel attention(CALayer) in ResBlock of SFE(shallow feature extraction) in the MainNet.
+"""
+
+"""
+Some feature or bug fixing which have already been planed/started but still not finished yet:
+    1) TTSR的LR输入，HR Reference分别过小波变换得到各自的三个高频分量进LTE，同时在TTSR最外侧加一个long skip connection从而保证LR的信息中的低频部分也都被使用
 """
 
 """
@@ -85,4 +92,3 @@ if __name__ == '__main__':
             t.train(current_epoch=epoch, is_init=False)
             if (epoch % args.val_every == 0):
                 t.evaluate(current_epoch=epoch)
-                
