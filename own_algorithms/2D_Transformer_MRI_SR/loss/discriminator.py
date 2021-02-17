@@ -9,9 +9,9 @@ def conv3x3(in_channels, out_channels, stride=1):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_size=128):
+    def __init__(self, in_size=128,n_colors=1):
         super(Discriminator, self).__init__()
-        self.conv1 = conv3x3(3, 32)
+        self.conv1 = conv3x3(n_colors, 32)
         self.LReLU1 = nn.LeakyReLU(0.2)
         self.conv2 = conv3x3(32, 32, 2)
         self.LReLU2 = nn.LeakyReLU(0.2)

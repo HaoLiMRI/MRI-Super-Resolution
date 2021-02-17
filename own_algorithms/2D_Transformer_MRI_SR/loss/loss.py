@@ -7,10 +7,16 @@ import torch.optim as optim
 from pytorch_ssim_l1 import SSIM 
 
 "calculate gradient map for any input MRI image"
-def calculate_gradient_map(img):
+def calculate_gradient_map(n_colors, img):
     # sobel operator
-    vertical_edge_mask = torch.Tensor([[[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]])
-    horizontal_edge_mask = torch.Tensor([[[-1, -2, -1], [0, 0, 0], [1, 2, 1]], [[-1, -2, -1], [0, 0, 0], [1, 2, 1]], [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]])
+    vertical_edge_mask = torch.Tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]).unsqueeze(0)
+    horizontal_edge_mask = torch.Tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]).unsqueeze(0)
+
+    if n_colors == 3:
+        vertical_edge_mask = torch.cat((vertical_edge_mask, vertical_edge_mask, vertical_edge_mask),0)
+        horizontal_edge_mask = torch.cat((horizontal_edge_mask, horizontal_edge_mask, horizontal_edge_mask),0)
+    elif not(n_colors == 1):
+        raise SystemExit('Error: n_colors must be 1 or 3!')
 
     vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).cuda()
     horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).cuda()
@@ -64,13 +70,13 @@ class ReconstructionLoss(nn.Module):
 
 
 class Gradient_Map_Loss(nn.Module):
-    def __init__(self):
+    def __init__(self, n_colors):
         super(Gradient_Map_Loss, self).__init__()
-        
+        self.n_colors = n_colors
         self.loss = nn.L1Loss()
 
     def forward(self, sr, hr):
-        loss = self.loss(calculate_gradient_map(sr), calculate_gradient_map(hr))
+        loss = self.loss(calculate_gradient_map(self.n_colors, sr), calculate_gradient_map(self.n_colors, hr))
         return loss
 
 
@@ -100,11 +106,11 @@ class SSIM_Loss(nn.Module):
     def forward(self, sr, hr):
         
         sr_ssim_weighted, _ = self.ssim(sr, hr)
-        print('sr_ssim_weighted:', sr_ssim_weighted)
+#        print('sr_ssim_weighted:', sr_ssim_weighted)
         hr_ssim_weighted, _ = self.ssim(hr, hr)
-        print('hr_ssim_weighted:', hr_ssim_weighted)
+#        print('hr_ssim_weighted:', hr_ssim_weighted)
         loss = self.loss(sr_ssim_weighted, hr_ssim_weighted)
-        print('ssim_loss:', loss)
+#        print('ssim_loss:', loss)
         """
         sr_lu, sr_co, sr_st = self.ssim(sr, hr)
         print('sr_luminance: ', sr_lu.mean())
@@ -166,14 +172,14 @@ class TPerceptualLoss(nn.Module):
 
 class AdversarialLoss(nn.Module):
     def __init__(self, logger, use_cpu=False, num_gpu=1, gan_type='WGAN_GP', gan_k=1, 
-        lr_dis=1e-4, train_crop_size=32):
+        lr_dis=1e-4, train_crop_size=32, n_colors=1):
 
         super(AdversarialLoss, self).__init__()
         self.logger = logger
         self.gan_type = gan_type
         self.gan_k = gan_k
         self.device = torch.device('cpu' if use_cpu else 'cuda')
-        self.discriminator = discriminator.Discriminator(train_crop_size*4).to(self.device)
+        self.discriminator = discriminator.Discriminator(train_crop_size*4, n_colors).to(self.device)
         if (num_gpu > 1):
             self.discriminator = nn.DataParallel(self.discriminator, list(range(num_gpu)))
         if (gan_type in ['WGAN_GP', 'GAN']):
@@ -249,7 +255,7 @@ def get_loss_dict(args, logger):
     else:
         loss['rec_loss'] = ReconstructionLoss(type='Charbonnier')
     if (abs(args.grad_w - 0) > 1e-8):
-        loss['grad_loss'] = Gradient_Map_Loss()
+        loss['grad_loss'] = Gradient_Map_Loss(n_colors = args.n_colors)
     if (abs(args.kspace_w - 0) > 1e-8):
         loss['k_space_loss'] = K_Space_Loss()
     if (abs(args.ssim_w - 0) > 1e-8):
@@ -261,5 +267,5 @@ def get_loss_dict(args, logger):
     if (abs(args.adv_w - 0) > 1e-8):
         loss['adv_loss'] = AdversarialLoss(logger=logger, use_cpu=args.cpu, num_gpu=args.num_gpu, 
             gan_type=args.GAN_type, gan_k=args.GAN_k, lr_dis=args.lr_rate_dis,
-            train_crop_size=args.train_crop_size)
+            train_crop_size=args.train_crop_size, n_colors=args.n_colors)
     return loss

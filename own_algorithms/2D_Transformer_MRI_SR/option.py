@@ -11,7 +11,7 @@ def str2bool(v):
 parser = argparse.ArgumentParser(description='TTSR')
 
 ### log setting
-parser.add_argument('--save_dir', type=str, default='D:\\HaoLi\\SR\\results\\20210113_TTSR_64_2folds_2d_downsize_100\\',
+parser.add_argument('--save_dir', type=str, default='D:\\HaoLi\\SR\\results\\20210216_TTSR_64_2folds_2d_downsize_100\\',
                     help='Directory to save log, arguments, models and images')
 parser.add_argument('--reset', type=str2bool, default=False,
                     help='Delete save_dir to create a new one')
@@ -30,7 +30,7 @@ parser.add_argument('--num_gpu', type=int, default=1,
 parser.add_argument('--dataset', type=str, default='MRI_SR', 
                                             # Option: default = 'CUFED',
                     help='Which dataset to train and test')
-parser.add_argument('--dataset_dir', type=str, default='C:\\SR_data\\2_folds_2d_downsize_128x3_ref\\',
+parser.add_argument('--dataset_dir', type=str, default='C:\\SR_data\\2_folds_2d_downsize_128x1_ref\\',
                                                 # Option: default='D:/Tech_Resource/Paper_Resource/Dataset/CUFED',
                     help='Directory of dataset')
 
@@ -43,8 +43,12 @@ parser.add_argument('--num_res_blocks', type=str, default='16+16+8+4',
                     help='The number of residual blocks in each stage')
 parser.add_argument('--n_feats', type=int, default=64,
                     help='The number of channels in network')
+parser.add_argument('--n_colors', type=int, default=1,
+                    help='The number of channels in input data')
 parser.add_argument('--res_scale', type=float, default=1.,
                     help='Residual scale')
+parser.add_argument('--scale_factor', type=float, default=2.,
+                    help='Scale factor')
 
 ### loss setting
 parser.add_argument('--GAN_type', type=str, default='WGAN_GP',
@@ -61,7 +65,7 @@ parser.add_argument('--grad_w', type=float, default=0.1,
                     help='The weight of gradient map loss')
 parser.add_argument('--kspace_w', type=float, default=0.001,
                     help='The weight of k-space loss')
-parser.add_argument('--ssim_w', type=float, default=0.1,
+parser.add_argument('--ssim_w', type=float, default=0.5,
                     help='The weight of SSIM loss')
 parser.add_argument('--per_w', type=float, default=0,
                     help='The weight of perceptual loss')
@@ -109,9 +113,9 @@ parser.add_argument('--eval', type=str2bool, default=False,
                     help='Evaluation mode')
 parser.add_argument('--eval_save_results', type=str2bool, default=False,
                     help='Save each image during evaluation')
-parser.add_argument('--model_path', type=str, default='D:\\HaoLi\\SR\\results\\20210113_TTSR_64_2folds_2d_downsize_100\\model\\model_00004.pt',
-                    help='The path of model to evaluation')
-parser.add_argument('--test', type=str2bool, default=True,
+parser.add_argument('--model_path', type=str, default='D:\\HaoLi\\SR\\results\\20210115_TTSR_32_4folds_2d_downsize_100\\model\\model_00011.pt',
+                    help='The path of model for evaluation')
+parser.add_argument('--test', type=str2bool, default=False,
                     help='Test mode')
 parser.add_argument('--lr_path', type=str, default='C:\\SR_data\\2d_downsize_2d_128x3_ref\\',
                     help='The path of input LR image when perform model testing')

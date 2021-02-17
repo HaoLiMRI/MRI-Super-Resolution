@@ -19,11 +19,12 @@ class TTSR(nn.Module):
         super(TTSR, self).__init__()
         self.args = args
         self.num_res_blocks = list( map(int, args.num_res_blocks.split('+')) )
-        self.MainNet = MainNet.MainNet(num_res_blocks=self.num_res_blocks, n_feats=args.n_feats, 
-            res_scale=args.res_scale)
-        self.LTE      = LTE.LTE(requires_grad=True)
+        self.MainNet = MainNet.MainNet(num_res_blocks=self.num_res_blocks, n_feats=args.n_feats, n_colors=args.n_colors,
+            res_scale=args.res_scale, scale_factor=args.scale_factor)
+        self.LTE = LTE.LTE(requires_grad=True)
         self.LTE_copy = LTE.LTE(requires_grad=False) ### used in transferal perceptual loss
         self.SearchTransfer = SearchTransfer.SearchTransfer()
+        self.n_colors = args.n_colors
 
     def forward(self, lr=None, lrsr=None, ref=None, refsr=None, sr=None):
         if (type(sr) != type(None)):
@@ -34,6 +35,14 @@ class TTSR(nn.Module):
             elif self.args.dataset == 'MRI_SR':
                 sr_lv1, sr_lv2, sr_lv3 = self.LTE_copy(sr)
             return sr_lv1, sr_lv2, sr_lv3
+
+        if self.n_colors == 1:
+            lrsr = torch.cat((lrsr, lrsr, lrsr), 1)
+            ref = torch.cat((ref, ref, ref), 1)
+            refsr = torch.cat((refsr, refsr, refsr), 1)
+        elif not(self.n_colors == 3):
+            raise SystemExit('Error: n_colors must be 1 or 3!')
+
         if self.args.dataset == 'CUFED':
             _, _, lrsr_lv3  = self.LTE((lrsr.detach() + 1.) / 2.)   # lrsr_lv3 is the Q in equation (1) of [1].
             _, _, refsr_lv3 = self.LTE((refsr.detach() + 1.) / 2.)  # refsr_lv3 is the K in equation (2) of [1].
