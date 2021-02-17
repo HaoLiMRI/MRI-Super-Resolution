@@ -172,14 +172,14 @@ class TPerceptualLoss(nn.Module):
 
 class AdversarialLoss(nn.Module):
     def __init__(self, logger, use_cpu=False, num_gpu=1, gan_type='WGAN_GP', gan_k=1, 
-        lr_dis=1e-4, train_crop_size=32):
+        lr_dis=1e-4, train_crop_size=32, n_colors=1):
 
         super(AdversarialLoss, self).__init__()
         self.logger = logger
         self.gan_type = gan_type
         self.gan_k = gan_k
         self.device = torch.device('cpu' if use_cpu else 'cuda')
-        self.discriminator = discriminator.Discriminator(train_crop_size*4).to(self.device)
+        self.discriminator = discriminator.Discriminator(train_crop_size*4, n_colors).to(self.device)
         if (num_gpu > 1):
             self.discriminator = nn.DataParallel(self.discriminator, list(range(num_gpu)))
         if (gan_type in ['WGAN_GP', 'GAN']):
@@ -267,5 +267,5 @@ def get_loss_dict(args, logger):
     if (abs(args.adv_w - 0) > 1e-8):
         loss['adv_loss'] = AdversarialLoss(logger=logger, use_cpu=args.cpu, num_gpu=args.num_gpu, 
             gan_type=args.GAN_type, gan_k=args.GAN_k, lr_dis=args.lr_rate_dis,
-            train_crop_size=args.train_crop_size)
+            train_crop_size=args.train_crop_size, n_colors=args.n_colors)
     return loss
