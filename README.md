@@ -1,6 +1,6 @@
 # MRI-Super-Resolution
 
-2月8日到14日跑3，9，10，有时间的话跑4，5，6。TTSR，HR-reference和RCAN共用数据，应用的数据。
+2月8日到14日跑3，有时间的话跑4，5，6。TTSR，HR-reference和RCAN共用数据，应用的数据。
 
 ## 2021年的新idea和任务
 
@@ -17,9 +17,9 @@
 7. 同样的RCAN模型再做de-motion artifact，把这个结果写进第一篇论文中。
 8. RCAN模型基础上加入已经实现了的各种模块做de-motion artifact，要是结果很好则再写篇motion artifact removing论文。
 9. ~~SR和HR分别求gradient map，再相减得到一个gradient map差的矩阵，再把这个gradient map差的矩阵从(H * W)变为(1 * HW)，然后再过一个softmax，再变回H * W，然后把得到的矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上~~ 。
-已完成，跑一下。
+已完成，跑一下。跑过，没有明显效果。
 10. ~~SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上~~ 。
-已完成，跑一下。
+已完成，跑一下。跑过，没有明显效果。
 11. 看懂PC（Phase Congruency）怎么算，把这个指标做loss项。
 参考论文：2011.FSIM: A Feature Similarity Index for Image Quality Assessment
 参考代码：https://github.com/sunxirui310/FSIM-FSIMc-matlab/blob/master/FSIM.m
