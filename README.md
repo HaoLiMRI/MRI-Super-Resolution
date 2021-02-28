@@ -40,6 +40,10 @@ c). option to add long skip connection outside the entire network model to only 
 
 18. 我们的HR reference也应该让它经过小波变换，然后只保留高频部分进入网络帮助LR做SR。无论对于自己的HR reference网络还是TTSR都可以这样做下,对于TTSR则可以直接对HR Reference做小波变换保留3个高频分量放在3个channel上面进入LTE。对于我们自己的HR reference网络则可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention一起组成multi-head self-attention。
 
+19. Inverse-wavelet-only RCAN：参考A Wavelet-Based Asymmetric Convolution Network for Single Image Super-Resolution。
+基于当前的RCAN网络，从LR图像生成HR图像的小波分量，用IDWT代替上采样。
+代码中把head里的conv设置成padding=2，tail里的conv输出channel数设置为4，用IDWT代替上采样。
+
 
 ### 第一篇中长期还要做的是
 1. ~~完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。~~
