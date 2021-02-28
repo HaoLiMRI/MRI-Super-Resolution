@@ -1,6 +1,6 @@
 # MRI-Super-Resolution
 
-3月1日开始的任务：TTSR with SSIM Loss, 4x TTST, wavelet TTSR 2x and 4x.
+3月1日开始的任务：TTSR with SSIM Loss, 4x TTSR, wavelet TTSR 2x and 4x.
 
 有时间的话跑4，5，6。
 
