@@ -1,6 +1,8 @@
 # MRI-Super-Resolution
 
-2月8日到14日跑3，有时间的话跑4，5，6。TTSR，HR-reference和RCAN共用数据，应用的数据。
+3月1日开始的任务：TTSR with SSIM Loss, 4x TTST, wavelet TTSR 2x and 4x.
+
+有时间的话跑4，5，6。
 
 ## 2021年的新idea和任务
 
