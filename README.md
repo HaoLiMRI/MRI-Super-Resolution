@@ -55,8 +55,8 @@ c). option to add long skip connection outside the entire network model to only 
 
 
 
-### TTSR MRI最近还要做的是
-1. TTSR的LR输入，HR Reference分别过小波变换得到各自的三个高频分量进LTE，同时在TTSR最外侧加一个long skip connection从而保证LR的信息中的低频部分也都被使用
+### TTSR MRI最近还2xTTSR MRI  CA24RCAN MR 
+1. ~~TTSR的LR输入，HR Reference分别过小波变换得到各自的三个高频分量进LTE，同时在TTSR最外侧加一个long skip connection从而保证LR的信息中的低频部分也都被使用~~。已完成，现在需要跑这种Reference过小波的方案的2x,4x放大，和纯TTSR MRI with CALayer的方案的2x，4x放大，与RCAN MRI SR的图比较。
 2. TTSR的LR_UP输入可以不用LR_UP而用RCAN网络生成的SR数据replace现有的LR_UP
 
 
