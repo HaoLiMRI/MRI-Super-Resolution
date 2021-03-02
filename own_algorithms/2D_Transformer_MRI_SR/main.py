@@ -15,21 +15,25 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.3.0
+Version: 2.0.0
 """
 
 """
-This is the current version we are working on, in 20210216
+This is the current version we are working on, in 20210217
 This is a demo code of 2D_Visual_Transformer_MRI_SR(TTSR_MRI). in this version we have already support following items:
     1) added a new class "SFE_Downsample" in MainNet.py which downscale the LR by 1/2, thus to support 2x upscaling in the end.
     2) added support for "L1 Charbonnier loss", "gradient map loss", "ssim map loss" and "k space loss".
-    3) support to load and process normal MRI image with number 0f channel = 1.
-    4) support to use channel attention(CALayer) in ResBlock of SFE(shallow feature extraction) in the MainNet.
-"""
+    3) support to load and process normal MRI image with number of channel = 1.
+    4) option to use channel attention(CALayer) in ResBlock of SFE(shallow feature extraction) in the MainNet.
+    5) option to apply wavelet transformation to get high freq components of lr, lrsr, ref, refsr, and search transfer for all those high freq components in freq domain.
+        Then fuse the output soft-attention map, S, and e transferred HR texture features, T, in freq domain together with high freq components of lr MRI image, to
+        generate sr high freq components in freq domain by using MainNet. At last step apply inverse wavelet transformation to get back sr MRI image in image domain.
 
-"""
 Some feature or bug fixing which have already been planed/started but still not finished yet:
-    1) TTSR的LR输入，HR Reference分别过小波变换得到各自的三个高频分量进LTE，同时在TTSR最外侧加一个long skip connection从而保证LR的信息中的低频部分也都被使用
+    1) 使用wavelet transformation to get high freq components of lr, lrsr, ref, refsr, and search transfer for all those high freq components in freq domain这个方案
+        还有一些问题。比如应用wavelet transformation后尺寸变为原来H,W的一半加2，这导致之后进入MainNet的数据尺寸不能对齐，所以现在的方案是直接裁掉lr_high_freq最边缘的一圈，
+        比如把34 x 34的矩阵lr_high_freq裁剪为32 x 32的矩阵进入MainNet，生成64 x 64的矩阵。再用66 x 66的lrsr_high_freq的矩阵的边缘一圈放在生成的64 x 64矩阵最外面成为66 x 66
+        的矩阵。这样的方案不见得是正确的或者符合逻辑的，可能需要更好的idea.
 """
 
 """

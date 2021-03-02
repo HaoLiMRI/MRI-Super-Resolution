@@ -7,12 +7,12 @@ import torch.optim as optim
 from pytorch_ssim_l1 import SSIM 
 
 "calculate gradient map for any input MRI image"
-def calculate_gradient_map(n_colors, img):
+def calculate_gradient_map(n_colors, mri_img):
     # sobel operator
     vertical_edge_mask = torch.Tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]).unsqueeze(0)
     horizontal_edge_mask = torch.Tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]).unsqueeze(0)
 
-    if n_colors == 3:
+    if n_colors == 3:   # For MRI image with number of channel = 3, we just stack 3 MRI image with number of channel = 1 together. 
         vertical_edge_mask = torch.cat((vertical_edge_mask, vertical_edge_mask, vertical_edge_mask),0)
         horizontal_edge_mask = torch.cat((horizontal_edge_mask, horizontal_edge_mask, horizontal_edge_mask),0)
     elif not(n_colors == 1):
@@ -21,8 +21,8 @@ def calculate_gradient_map(n_colors, img):
     vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).cuda()
     horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).cuda()
 
-    gradient_vertical_map = F.conv2d(img, vertical_edge_mask, padding = 1, stride = 1, groups = 1)
-    gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
+    gradient_vertical_map = F.conv2d(mri_img, vertical_edge_mask, padding = 1, stride = 1, groups = 1)
+    gradient_horizontal_map = F.conv2d(mri_img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
 
     gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
 
@@ -85,7 +85,7 @@ class K_Space_Loss(nn.Module):
         super(K_Space_Loss, self).__init__()
 
         self.loss = nn.MSELoss()
-    
+
     def forward(self, sr, hr):
         sr_k_space = FFT_K_SPACE(sr)
         hr_k_space = FFT_K_SPACE(hr)
@@ -96,7 +96,6 @@ class K_Space_Loss(nn.Module):
 class SSIM_Loss(nn.Module):
     def __init__(self, luminance_weight = 2, contrast_weight = 2, structure_weight = 4):
         super(SSIM_Loss, self).__init__()
-        
         self.luminance_weight = luminance_weight
         self.contrast_weight = contrast_weight
         self.structure_weight = structure_weight
@@ -104,13 +103,12 @@ class SSIM_Loss(nn.Module):
         self.loss = nn.L1Loss()
 
     def forward(self, sr, hr):
-        
         sr_ssim_weighted, _ = self.ssim(sr, hr)
-#        print('sr_ssim_weighted:', sr_ssim_weighted)
+        """ print('sr_ssim_weighted:', sr_ssim_weighted) """
         hr_ssim_weighted, _ = self.ssim(hr, hr)
-#        print('hr_ssim_weighted:', hr_ssim_weighted)
+        """ print('hr_ssim_weighted:', hr_ssim_weighted) """
         loss = self.loss(sr_ssim_weighted, hr_ssim_weighted)
-#        print('ssim_loss:', loss)
+        """ print('ssim_loss:', loss) """
         """
         sr_lu, sr_co, sr_st = self.ssim(sr, hr)
         print('sr_luminance: ', sr_lu.mean())

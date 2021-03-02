@@ -50,26 +50,29 @@ class CALayer(nn.Module):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1, downsample=None, res_scale=1):
+    def __init__(self, in_channels, out_channels, stride=1, downsample=None, res_scale=1, use_channel_attention_in_ResBlock_of_SFE = False):
         super(ResBlock, self).__init__()
         self.res_scale = res_scale
         self.conv1 = conv3x3(in_channels, out_channels, stride)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(out_channels, out_channels)
-        self.channel_attention = CALayer(out_channels)
+        self.use_channel_attention_in_ResBlock_of_SFE = use_channel_attention_in_ResBlock_of_SFE
+        if use_channel_attention_in_ResBlock_of_SFE == True:
+            self.channel_attention = CALayer(out_channels)
         
     def forward(self, x):
         x1 = x
         out = self.conv1(x)
         out = self.relu(out)
         out = self.conv2(out)
-        out = self.channel_attention(out)
+        if self.use_channel_attention_in_ResBlock_of_SFE == True:
+            out = self.channel_attention(out)
         out = out * self.res_scale + x1
         return out
 
 
 class SFE(nn.Module):
-    def __init__(self, num_res_blocks, n_feats, n_colors, res_scale):
+    def __init__(self, num_res_blocks, n_feats, n_colors, res_scale, use_channel_attention_in_ResBlock_of_SFE = False):
         super(SFE, self).__init__()
         self.num_res_blocks = num_res_blocks
         self.n_colors = n_colors
@@ -78,7 +81,7 @@ class SFE(nn.Module):
         self.RBs = nn.ModuleList()
         for i in range(self.num_res_blocks):
             self.RBs.append(ResBlock(in_channels=n_feats, out_channels=n_feats, 
-                res_scale=res_scale))
+                res_scale=res_scale, use_channel_attention_in_ResBlock_of_SFE = use_channel_attention_in_ResBlock_of_SFE))
             
         self.conv_tail = conv3x3(n_feats, n_feats)
         
@@ -205,14 +208,14 @@ Class MainNet implements the "Backbone" module and "Soft Attention" module in fi
 group of residual blocks and CSFI(Cross-Scale Feature Integration) module shown in the figure 3 of [1].
 """
 class MainNet(nn.Module):
-    def __init__(self, num_res_blocks, n_feats, n_colors, res_scale, scale_factor):
+    def __init__(self, num_res_blocks, n_feats, n_colors, res_scale, scale_factor, use_channel_attention_in_ResBlock_of_SFE = False):
         super(MainNet, self).__init__()
         self.num_res_blocks = num_res_blocks ### a list containing number of resblocks of different stages
         self.n_feats = n_feats
         self.n_colors = n_colors
         self.scale_factor = scale_factor
 
-        self.SFE = SFE(self.num_res_blocks[0], n_feats, n_colors, res_scale)
+        self.SFE = SFE(self.num_res_blocks[0], n_feats, n_colors, res_scale, use_channel_attention_in_ResBlock_of_SFE = use_channel_attention_in_ResBlock_of_SFE)
         if self.scale_factor == 2:
             self.SFE_Downsample = SFE_Downsample(self.num_res_blocks[0], n_feats, n_colors, res_scale)
 
