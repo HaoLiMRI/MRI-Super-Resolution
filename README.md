@@ -38,11 +38,13 @@ c). option to add long skip connection outside the entire network model to only 
 
 17.受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。我们可以像它这样，但不对每一个spatial position来做，而是在16)中的方案using HR reference with self-attention in the end那样最后做slef-attention的部分引入一个比如LR的图的Gradient map像它这个geometry prior一样加到self-attention里面。	
 
-18. 我们的HR reference也应该让它经过小波变换，然后只保留高频部分进入网络帮助LR做SR。无论对于自己的HR reference网络还是TTSR都可以这样做下,对于TTSR则可以直接对HR Reference做小波变换保留3个高频分量放在3个channel上面进入LTE。对于我们自己的HR reference网络则可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention一起组成multi-head self-attention。
-
-19. Inverse-wavelet-only RCAN：参考A Wavelet-Based Asymmetric Convolution Network for Single Image Super-Resolution。
+18 Inverse-wavelet-only RCAN：参考A Wavelet-Based Asymmetric Convolution Network for Single Image Super-Resolution。
 基于当前的RCAN网络，从LR图像生成HR图像的小波分量，用IDWT代替上采样。
 代码中把head里的conv设置成padding=2，tail里的conv输出channel数设置为4，用IDWT代替上采样。
+
+19. 还是我们自己的HR reference网络，也应该让HR reference经过小波变换，然后只保留高频部分进入网络帮助LR做SR。方案二：对于我们自己的HR reference网络可以考虑对HR reference数据做DWT（小波变换），只保留3个高频分量。然后对LR数据像“Inverse-wavelet-only RCAN”这个idea一样处理，直接用网络试图从LR数据生成HR图像的小波分量，然后把用网络对LR数据生成的3个高频小波分量和FR reference做DWT得到的3个HR reference的高频分量进行fusion。最后再把LR数据用网络试图直接生成的一个低频分量和fuse后的3个高频分量一起做IDWT（小波反变换）恢复2x SR图像。如果是4x则用progressive构架重复2次2x放大的该方案。
+
+20. 我们自己的HR reference网络，也应该让HR reference经过小波变换，然后只保留高频部分进入网络帮助LR做SR。方案一：对于我们自己的HR reference网络可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention一起组成multi-head self-attention。
 
 
 ### 第一篇中长期还要做的是
