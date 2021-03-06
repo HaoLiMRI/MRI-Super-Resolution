@@ -46,6 +46,8 @@ c). option to add long skip connection outside the entire network model to only 
 
 20. 我们自己的HR reference网络，也应该让HR reference经过小波变换，然后只保留高频部分进入网络帮助LR做SR。方案一：对于我们自己的HR reference网络可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention一起组成multi-head self-attention。
 
+21. 设计一个通用的“外挂”型纵向切面抓取feature的Transformer。因为MRI数据其实应该为3D数据，所以在相邻的几层间应该有可用的信息来帮助提升分辨率。所以在任何一个现有的2D横切面MRI数据的SR网络（e.g. RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）基础上都可以再增加一个单独的branch，这个branch读进2D LR MRI图像在原始3D图像中对应的前后N层（e.g.前后5层）的数据，在纵向切面（2N层上）用Transformer抓取feature，之后将这些feature在upsampling前与主branch（e.g. 原始RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）得到的feature map来fuse到一起再过Upsampling生成MRI SR。
+
 
 ### 第一篇中长期还要做的是
 1. ~~完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。~~
