@@ -16,7 +16,7 @@
 方案一：通过对RCAN MRI SR的单个模型执行知识蒸馏（一个训练好的RCAN MRI SR模型做teacher，一个待训练的RCAN MRI SR模型做student，求俩者distillation loss。该loss可以先从L1 loss或者SSIM loss试验），测试的准确性也可以得到提高。
 方案二：通过对RCAN MRI SR的已经做了ensemble的模型执行知识蒸馏（10个训练好的RCAN MRI SR模型已经用ensemble生成了SR，该loss可以先从L1 loss或者SSIM loss试验），测试的准确性也可以得到更多提高。
 (见：https://mp.weixin.qq.com/s/YyLTd8B7M4f3hBTybrnUSQ 图2。)
-7. 同样的RCAN模型再做de-motion artifact，把这个结果写进第一篇论文中。
+7. ~~同样的RCAN模型再做de-motion artifact，把这个结果写进第一篇论文中~~。已完成。
 8. RCAN模型基础上加入已经实现了的各种模块做de-motion artifact，要是结果很好则再写篇motion artifact removing论文。
 9. ~~SR和HR分别求gradient map，再相减得到一个gradient map差的矩阵，再把这个gradient map差的矩阵从(H * W)变为(1 * HW)，然后再过一个softmax，再变回H * W，然后把得到的矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上~~ 。
 已完成，跑一下。跑过，没有明显效果。
