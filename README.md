@@ -58,8 +58,9 @@ c). option to add long skip connection outside the entire network model to only 
 
 
 ### TTSR MRI最近还2xTTSR MRI  CA24RCAN MR 
-1. ~~TTSR的LR输入，HR Reference分别过小波变换得到各自的三个高频分量进LTE，同时在TTSR最外侧加一个long skip connection从而保证LR的信息中的低频部分也都被使用。该方案最后是这样做的：apply wavelet transformation to get high freq components of lr, lrsr, ref, refsr, and search transfer for all those high freq components in freq domain. Then fuse the output soft-attention map, S, and e transferred HR texture features, T, in freq domain together with high freq components of lr MRI image, to generate sr high freq components in freq domain by using MainNet. At last step apply inverse wavelet transformation to get back sr MRI image in image domain.~~。已完成，现在需要跑这种Reference过小波的TTSR MRI方案（Wavelet TTSR MRI）的2x,4x放大，和纯TTSR MRI with CALayer的方案的2x，4x放大，与RCAN MRI SR的图比较。20210308已经跑了第一次Wavelet TTSR MRI model但居然ssim仅有0.3，这太奇怪了，不确定code是否哪里有错误还没找到，还需要再研究。
-2. TTSR的LR_UP输入可以不用LR_UP而用RCAN网络生成的SR数据replace现有的LR_UP
+1. ~~TTSR的LR输入，HR Reference分别过小波变换得到各自的三个高频分量进LTE，同时在TTSR最外侧加一个long skip connection从而保证LR的信息中的低频部分也都被使用。该方案最后是这样做的：apply wavelet transformation to get high freq components of lr, lrsr, ref, refsr, and search transfer for all those high freq components in freq domain. Then fuse the output soft-attention map, S, and e transferred HR texture features, T, in freq domain together with high freq components of lr MRI image, to generate sr high freq components in freq domain by using MainNet. At last step apply inverse wavelet transformation to get back sr MRI image in image domain.~~。已完成，现在需要跑这种Reference过小波的TTSR MRI方案（Wavelet TTSR MRI）的2x,4x放大，和纯TTSR MRI with CALayer的方案的2x，4x放大，然后一定要把生成的SR图与RCAN MRI SR的图比较。另外就是找一个带有T1 T2不同模态的MRI公共数据集来跑TTSR MRI SR和Wavelet TTSR MRI SR看看效果怎么样。
+20210308已经跑了第一次Wavelet TTSR MRI model但居然ssim仅有0.3，这太奇怪了，不确定code是否哪里有错误还没找到，还需要再研究。
+3. TTSR的LR_UP输入可以不用LR_UP而用RCAN网络生成的SR数据replace现有的LR_UP
 
 
 ### 其他新内容最近还要做的是
