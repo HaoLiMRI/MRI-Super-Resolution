@@ -8,7 +8,7 @@
 ## 至今方案的总结
 主要包括以下几种方案：
 1. loss function上设计更合理的loss项实现MRI SR， 例如SSIM loss, graident loss
-2. 使用各种即插即用的模块，比如即插即用的conv模块，activation function模块等
+2. 使用各种即插即用的模块，比如即插即用的conv模块(e.g. deformable conv)，activation function模块等
 3. 网络结构上设计各种特征融合的构架，比如gradient map dual branch, k spacce dual branch, wavelet dual branch网络模型
 4. 网络结构上用wavelet变换抓取高频特征，结合HR reference信息进行MRI SR恢复，例如我们自己的HR reference MRI SR网络模型
 5. 网络结构上加入各种attention方案，比如加入CBAM的channel attention和spatial attention, kernel attention，和self-attention
