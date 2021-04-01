@@ -4,6 +4,18 @@
 
 有时间的话跑4，5，6。
 
+
+## 至今方案的总结
+主要包括以下几种方案：
+1. loss function上设计更合理的loss项实现MRI SR， 例如SSIM loss, graident loss
+2. 使用各种即插即用的模块，比如即插即用的conv模块，activation function模块等
+3. 网络结构上设计各种特征融合的构架，比如gradient map dual branch, k spacce dual branch, wavelet dual branch网络模型
+4. 网络结构上用wavelet变换抓取高频特征，结合HR reference信息进行MRI SR恢复，例如我们自己的HR reference MRI SR网络模型
+5. 网络结构上加入各种attention方案，比如加入CBAM的channel attention和spatial attention, kernel attention，和self-attention
+6. 网络结构上仍然在每一层的H by W的MRI数据上结合Transformer抓取信息，结合HR reference信息进行MRI SR恢复，例如TTSR MRI SR网络模型
+7. 试图在层间信息上进行处理或者相关性的抓取，例如直接用正常的3x3 conv with 3 channel的RCAN处理层间降采样（比如HR MRI图是128 x 128 x 6, LR MRI是在层间降采得出的128 x 128 x 3）的channel = 3的3D数据的MRI SR（又或者直接用正常的3x3 conv with 5 channel的RCAN处理层间降采样的channel = 5的3D数据的MRI SR）；又或者用Transformer或者其他网络（LSTM?）在层间纵向切面抓取特征的相关性来结合普通的层内抓取特征的比如RCAN来实现3D MRI SR
+
+
 ## 2021年的新idea和任务
 
 ### 第一篇和我们自己的HR reference网络至少到现在来看近期还要做的是
