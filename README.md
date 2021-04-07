@@ -60,6 +60,10 @@ c). option to add long skip connection outside the entire network model to only 
 
 22. 直接对SR和HR求KL散度loss。我们在做object detection时候有时候不直接估计Bounding box，而是先估计一个feature map或者说一个heat map（就是一个n, 1, h, w的矩阵），然后从这个heatmap提取K个最大值作为估计Object的中心点。所以这种时候估计heatmap的loss function一般都是用BCE loss，表示每个pixel有多大概率是Object的中心。所以这里其实就是把heatmap作为一个概率性的分布表征，求取Ground truth对应的那个概率性分布表征n, 1, h, w的矩阵和估计的那个概率性分布表征n, 1, h, w的矩阵的相似性。BCE loss其实就是KL散度的一种特殊情况。那对于我们的MRI SR任务，其实也是在求取Ground truth对应的那个概率性分布表征n, 1, h, w的矩阵和估计的那个概率性分布表征n, 1, h, w的矩阵的相似性，所以我们是不是可以直接把比如KL散度这种表示俩种分布相似性的准则做loss?
 
+23. 受论文2021.Channel Boosting Feature Ensemble for Radar-based Object Detection图1的结构启发，我们可以把“MRI LR图和相应的HR reference图”，或者“MRI LR图和前后N层的MRI LR数据（self-reference）”，或者“MRI LR图和相应的小波变换之后的分量”，一起concatenate后输入RCAN再过upsampler（或者分别输入RCAN再过upsampler之后再concatenate到一块），然后再输给Transformer（Positioning Encoding，Multi-head self attention，MLP/FFN）提取相关性并输出最终的MRI SR结果（或者RCAN部分只做下采样，upsampler都放在经过Transformer后再upsampling）。
+
+24. 我们自己的HR reference网络现在最后用了self-attention，我们应该在过self-attention后再加一个很小的RCAB（因为2020.Attention is Not All You Need: Pure Attention Loses Rank Doubly Exponentially with Depth这篇论文说没有skip connection和MLP，self-attention layers啥也不是，所以我们考虑再后面再加一个类似FFN/MLP的小CNN）。
+
 
 ### 第一篇中长期还要做的是
 1. ~~完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。~~
