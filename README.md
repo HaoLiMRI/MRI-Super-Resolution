@@ -64,6 +64,11 @@ c). option to add long skip connection outside the entire network model to only 
 
 24. 我们自己的HR reference网络现在最后用了self-attention，我们应该在过self-attention后再加一个很小的RCAB（因为2020.Attention is Not All You Need: Pure Attention Loses Rank Doubly Exponentially with Depth这篇论文说没有skip connection和MLP，self-attention layers啥也不是，所以我们考虑再后面再加一个类似FFN/MLP的小CNN）。
 
+25. 需要把所有基于Transformer的模型改俩个地方，一个是给Transformer进数据的时候图像或者feature map要先经过（Image-to-tokens 模块）先缩小再分patch。见CeiT论文2021.Incorporating Convolution Designs into Visual Transformers和这个文章：https://zhuanlan.zhihu.com/p/361112935
+另一个就是用CPVT这篇文章提出的这个模块来自动生成一个位置编码加在原输入patch序列后再给Transformer。https://mp.weixin.qq.com/s/T5rq--w3WDJk26L72sMBOQ 和 https://zhuanlan.zhihu.com/p/353229685
+这两个改动除了给现在要新做的基于Transformer的MRI SR网络用以外 应该也加在TTSR MRI SR里面。特别是第二个，好像现在TTSR MRI SR没有位置编码这个模块吧？
+
+
 
 ### 第一篇中长期还要做的是
 1. ~~完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。~~
