@@ -73,6 +73,10 @@ DASR分析：https://mp.weixin.qq.com/s/YrgXlF6jbDt6LRCUA_c7Eg
 DASR代码：https://github.com/LongguangWang/DASR
 paper：https://arxiv.org/abs/1812.04240
 
+27. 根据新发现的原来一直使用的2D层内降采的方式从MRI HR生成MRI LR的方案的问题，我们设计了一种3D层内降采的方案从MRI HR生成MRI LR的方案。具体要做的事情如下：首先对公共数据集分别进行“2D层内降采从MRI HR生成MRI LR(每一层数据normalization --> 2D FFT --> 降采 --> 2D IFFT --> 每一层数据normalization)"和“3D层内降采从MRI HR生成MRI LR(整个volumn数据normalization --> 3D FFT --> 降采 --> 3D IFFT --> 整个volumn数据normalization)"。之后再用RCAN MRI SR网络分别用"2D层内降采生成的MRI LR数据"和"3D层内降采生成的MRI LR数据"来训练并test效果，理论上应该看到3D层内降采生成的MRI LR数据可以生成质量更高的MRI SR数据。同时再把原来使用的RCAN的各种网络结构上进行修改的变种方案重新用“3D层内降采生成的MRI LR数据”重新跑一下看看是否有哪些模型效果可以有提升。最后写一篇论文，包括如下contribution：
+a). 我们提出一种”模拟真实MRI机器进行3D层内降采生成的MRI LR数据的3D降采模型”，该降采模型相对于“模拟真实MRI机器进行2D层内降采生成的MRI LR数据的2D降采模型”在相同的SOTA SR网络模型上可以得到更好的恢复效果。所以我们propose用3D层内降采替代2D层内降采。
+b). 我们提出了基于RCAN的变种MRI SR网络模型（之前各种实验过的网络模型再跑一下，哪些效果好就用哪些），结合3D层内降采模型生成的MRI LR来恢复MRI SR图像，相比原始的SOTA RCAN MRI SR得到了更好的效果。
+
 
 ### 第一篇中长期还要做的是
 1. ~~完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。~~
