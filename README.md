@@ -56,7 +56,7 @@ c). option to add long skip connection outside the entire network model to only 
 
 20. 我们自己的HR reference网络，也应该让HR reference经过小波变换，然后只保留高频部分进入网络帮助LR做SR。方案一：对于我们自己的HR reference网络可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention一起组成multi-head self-attention。
 
-21. 设计一个通用的“外挂”型纵向切面抓取feature的Transformer（详见23）。因为MRI数据其实应该为3D数据，所以在相邻的几层间应该有可用的信息来帮助提升分辨率。所以在任何一个现有的2D横切面MRI数据的SR网络（e.g. RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）基础上都可以再增加一个单独的branch，这个branch读进2D LR MRI图像在原始3D图像中对应的前后N层（e.g.前后5层）的数据，在纵向切面（2N层上）用Transformer抓取feature，之后将这些feature在upsampling前与主branch（e.g. 原始RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）得到的feature map来fuse到一起再过Upsampling生成MRI SR。
+21. 设计一个通用的“外挂”型纵向切面抓取feature的Transformer。因为MRI数据其实应该为3D数据，所以在相邻的几层间应该有可用的信息来帮助提升分辨率。所以在任何一个现有的2D横切面MRI数据的SR网络（e.g. RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）基础上都可以再增加一个单独的branch，这个branch读进2D LR MRI图像在原始3D图像中对应的前后N层（e.g.前后5层）的数据，在纵向切面（2N层上）用Transformer抓取feature，之后将这些feature在upsampling前与主branch（e.g. 原始RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）得到的feature map来fuse到一起再过Upsampling生成MRI SR。
 
 22. 直接对SR和HR求KL散度loss。我们在做object detection时候有时候不直接估计Bounding box，而是先估计一个feature map或者说一个heat map（就是一个n, 1, h, w的矩阵），然后从这个heatmap提取K个最大值作为估计Object的中心点。所以这种时候估计heatmap的loss function一般都是用BCE loss，表示每个pixel有多大概率是Object的中心。所以这里其实就是把heatmap作为一个概率性的分布表征，求取Ground truth对应的那个概率性分布表征n, 1, h, w的矩阵和估计的那个概率性分布表征n, 1, h, w的矩阵的相似性。BCE loss其实就是KL散度的一种特殊情况。那对于我们的MRI SR任务，其实也是在求取Ground truth对应的那个概率性分布表征n, 1, h, w的矩阵和估计的那个概率性分布表征n, 1, h, w的矩阵的相似性，所以我们是不是可以直接把比如KL散度这种表示俩种分布相似性的准则做loss?
 
@@ -76,6 +76,11 @@ paper：https://arxiv.org/abs/1812.04240
 27. 根据新发现的原来一直使用的2D层内降采的方式从MRI HR生成MRI LR的方案的问题，我们设计了一种3D层内降采的方案从MRI HR生成MRI LR的方案。具体要做的事情如下：首先对公共数据集分别进行“2D层内降采从MRI HR生成MRI LR(每一层数据normalization --> 2D FFT --> 降采 --> 2D IFFT --> 每一层数据normalization)"和“3D层内降采从MRI HR生成MRI LR(整个volumn数据normalization --> 3D FFT --> 降采 --> 3D IFFT --> 整个volumn数据normalization)"。之后再用RCAN MRI SR网络分别用"2D层内降采生成的MRI LR数据"和"3D层内降采生成的MRI LR数据"来训练并test效果，理论上应该看到3D层内降采生成的MRI LR数据可以生成质量更高的MRI SR数据。同时再把原来使用的RCAN的各种网络结构上进行修改的变种方案重新用“3D层内降采生成的MRI LR数据”重新跑一下看看是否有哪些模型效果可以有提升。最后写一篇论文，包括如下contribution：
 a). 我们提出一种”模拟真实MRI机器进行3D层内降采生成的MRI LR数据的3D降采模型”，该降采模型相对于“模拟真实MRI机器进行2D层内降采生成的MRI LR数据的2D降采模型”在相同的SOTA SR网络模型上可以得到更好的恢复效果。所以我们propose用3D层内降采替代2D层内降采。
 b). 我们提出了基于RCAN的变种MRI SR网络模型（之前各种实验过的网络模型再跑一下，哪些效果好就用哪些），结合3D层内降采模型生成的MRI LR来恢复MRI SR图像，相比原始的SOTA RCAN MRI SR得到了更好的效果。
+
+28. 另外，我们还提出了一种3D层间降采的方案，该方案模拟MRI机器进行层间降采。我们可以把层间降采得到的3D MRI LR数据直接放入RCAN中恢复SR。理论上可以得到相比于同样降采倍数下(所以也就是同样的measurement time)的2D层内降采或者3D层内降采得到的MRI LR数据恢复出的MRI SR更好的效果。
+
+29. 对于一个3D MRI HR，我们可以同时做3D层内降采和3D层间降采的MRI LR，比如降采关系是2x2x2。那我们可以考虑这么做，沿着每一个方向都横切一次（就是把一个方向作为channel，另外俩个方向作为H, W），这样就有3个方向的2D图像了，然后我们分别用3个RCAN的结构去抓取feature之后放大，出来的3个feature maps放到Transformer里面fuse一下出来直接和3D MRI HR求loss来训练网络。
+这个3个方向分别做2D conv的思路其实在处理radar的3D数据上有人这么做object detection，效果还不错。这样不需要用3D conv。
 
 
 ### 第一篇中长期还要做的是
