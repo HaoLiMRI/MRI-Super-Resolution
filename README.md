@@ -82,6 +82,20 @@ b). 我们提出了基于RCAN的变种MRI SR网络模型（之前各种实验过
 29. 对于一个3D MRI HR，我们可以同时做3D层内降采和3D层间降采的MRI LR，比如降采关系是2x2x2。那我们可以考虑这么做，沿着每一个方向都横切一次（就是把一个方向作为channel，另外俩个方向作为H, W），这样就有3个方向的2D图像了，然后我们分别用3个RCAN的结构去抓取feature之后放大，出来的3个feature maps放到Transformer里面fuse一下出来直接和3D MRI HR求loss来训练网络。
 这个3个方向分别做2D conv的思路其实在处理radar的3D数据上有人这么做object detection，效果还不错。这样不需要用3D conv。
 
+30. 最新的一个idea：以上所有使用Transformer的部分，都可以考虑用2021年5月5号到7号提出的几种“只使用纯MLP构成的参数量远远小于Transformer的另一种”非self-attention”的机制替换Transformer”，可以得到类似（或更好）的效果（但参数量远远小于Transformer）。这里可以考虑使用的基于纯MLP的最新方案（见：https://mp.weixin.qq.com/s/WwEgHv4b_kkO3b-aP0ovfQ）
+包括:
+1). 2021.External Attention。见论文：2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks。
+https://github.com/MenghaoGuo/-EANet
+2). 2021.RepMLP: Re-parameterizing Convolutions into Fully-connected Layers for Image Recognition
+https://github.com/DingXiaoH/RepMLP
+3). 2021.Do You Even Need Attention: A Stack of Feed-Forward Layers Does Surprisingly Well on ImageNet
+https://github.com/lukemelas/do-you-even-need-attention
+除了上面提到的直接用基于纯MLP的attention替换Transformer，我们还可以考虑比如：
+a). 同时搞个xxx attention和基于纯MLP的attention级联并联或者weight相乘之类的结构。
+b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结构之后的FFN，相当于就是self-attention和基于纯MLP的attention级联了。
+
+
+
 
 ### 第一篇中长期还要做的是
 1. ~~完成基于U-Net框架的MRI SR dual domain branch，把dual domain branch用以上所有实现的"Channel and Spatial Attention Block"替换CA Lyaer从而组成新的RCSAB，然后多个RCSAB构成新的RG，每个RG去替换U-Net原始框架中的每一层。然后跑一下这种U-Net构架下的上面相同的各种实验。~~
