@@ -94,6 +94,12 @@ https://github.com/lukemelas/do-you-even-need-attention
 a). 同时搞个xxx attention和基于纯MLP的attention级联并联或者weight相乘之类的结构。
 b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结构之后的FFN，相当于就是self-attention和基于纯MLP的attention级联了。
 
+31. 做HR reference based Transformer MRI SR网络模型。这个idea有两种实现方案：
+1). 直接把LR经过RCAN + upsampling之后的feature map和HR reference经过RCAN提取的feature map给fuse到一起(cat)之后，直接放入ViT论文中使用的Transformer encoder结构中，生成MRI SR结果。
+2). 参考TTSR，用类似的方案，只对HR reference的数据过Transformer抓取HR reference和上采样的LR之间的相关性再乘在HR reference数据上。具体方案如下: 可以用HR reference生成V，下采样再上采样的HR reference生成Q，上采样的LR生成K，然后经过multi-head attention得到一个feauture map，再把这个feature map和LR数据经过RCAN + upsampling之后得到的feature map给fuse到一块，再经过Norm + MLP生成MRI SR结果（整体上还是对ViT中设计的Transformer encoder结构的修改！）。
+
+32. 在TTSR MRI上做一个小的修改。在每个soft-attention后加上一个external attention(MLP + Norm + MLP)，看一看效果是不是更好。
+
 
 
 
