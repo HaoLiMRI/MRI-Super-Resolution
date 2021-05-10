@@ -56,7 +56,7 @@ c). option to add long skip connection outside the entire network model to only 
 
 20. 我们自己的HR reference网络，也应该让HR reference经过小波变换，然后只保留高频部分进入网络帮助LR做SR。方案一：对于我们自己的HR reference网络可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention一起组成multi-head self-attention。
 
-21. 设计一个通用的“外挂”型纵向切面抓取feature的Transformer。因为MRI数据其实应该为3D数据，所以在相邻的几层间应该有可用的信息来帮助提升分辨率。所以在任何一个现有的2D横切面MRI数据的SR网络（e.g. RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）基础上都可以再增加一个单独的branch，这个branch读进2D LR MRI图像在原始3D图像中对应的前后N层（e.g.前后5层）的数据，在纵向切面（2N层上）用Transformer抓取feature，之后将这些feature在upsampling前与主branch（e.g. 原始RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）得到的feature map来fuse到一起再过Upsampling生成MRI SR。
+21. 设计一个通用的“外挂”型纵向切面抓取feature的Transformer。因为MRI数据其实应该为3D数据，所以在相邻的几层间应该有可用的信息来帮助提升分辨率。所以在任何一个现有的2D横切面MRI数据的SR网络（e.g. RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）基础上都可以再增加一个单独的branch，这个branch读进2D LR MRI图像在原始3D图像中对应的前后N层（e.g.前后5层）的数据，在纵向切面（2N层上）用Transformer抓取feature，之后将这些feature在upsampling前与主branch（e.g. 原始RCAN MRI SR, TTSR MRI SR, Wavelet TTSR MRI SR）得到的feature map来fuse到一起再过Upsampling生成MRI SR。这里这个Transformer可以用ViT的Transformer encoder结构设计！
 
 22. 直接对SR和HR求KL散度loss。我们在做object detection时候有时候不直接估计Bounding box，而是先估计一个feature map或者说一个heat map（就是一个n, 1, h, w的矩阵），然后从这个heatmap提取K个最大值作为估计Object的中心点。所以这种时候估计heatmap的loss function一般都是用BCE loss，表示每个pixel有多大概率是Object的中心。所以这里其实就是把heatmap作为一个概率性的分布表征，求取Ground truth对应的那个概率性分布表征n, 1, h, w的矩阵和估计的那个概率性分布表征n, 1, h, w的矩阵的相似性。BCE loss其实就是KL散度的一种特殊情况。那对于我们的MRI SR任务，其实也是在求取Ground truth对应的那个概率性分布表征n, 1, h, w的矩阵和估计的那个概率性分布表征n, 1, h, w的矩阵的相似性，所以我们是不是可以直接把比如KL散度这种表示俩种分布相似性的准则做loss?
 
