@@ -14,7 +14,7 @@ Version: 1.2.0(Stable Version, even deformable conv works at least for RCAN netw
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210507
+This is the current version we are working on, in 20210511
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) use RCAN or U-Net as main framework, for image single branch network.
@@ -77,6 +77,7 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
         阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
     33) option to use SSIM map guided pixel-wise loss. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
     34) option to use external-attention. Which is a pure MLP based 'self-attention'. See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' for more detail.
+    35) option to use involution conv.
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
@@ -87,6 +88,7 @@ Some feature or bug fixing which have already been planed/started but still not 
         HR reference based network。不支持其他配置时的HR reference based network。注意：现在gradient_map_dual_domain时用HR reference based network还有问题，会out of memory。
     4) 另外，现在option to use HR reference with self-attention in the end这个方案如果在网络用self-attention，则会out of memory。
     5) option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image这个选项现阶段仅支持非HR Reference based的网络结构。
+    6) option to use involution conv, still has bugs which makes the loss as nan. 
 
 
 We will plan to support other features:
@@ -206,6 +208,7 @@ from torch.autograd import Variable
 import torchvision as tv
 import torchvision.transforms as transforms
 # from torchvision.transforms import ToPILImage
+from einops import rearrange
 import matplotlib.pyplot as plt
 from math import exp
 import numpy as np
@@ -246,7 +249,7 @@ EPOCH_NUM = 1
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
 Maintain_Same_Size = False # stand for whether we want the output image has same size or NOT(e.g. larger size) as input image, e.g. set as Ture when apply for MRI motion artifact reduction
-Use_SSIM_L1_Loss = True # stand for whether we want use SSIM L1 loss in the total loss function
+Use_SSIM_L1_Loss = False # stand for whether we want use SSIM L1 loss in the total loss function
 Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
 Use_Negative_TV_Loss = True # stand for whether we want to use "1/(total variation + 1.000e-10) loss"(on SR , for providing over smoothing)
@@ -277,7 +280,7 @@ args = {'use_HR_reference' : True,
         
         'scale': 2, 'number_of_progressive_stage': 1,
 
-        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'gradient_operator': 'sobel', 
+        'conv_layer_type': 'involution', 'activation_function_type': 'ReLU', 'gradient_operator': 'sobel', 
         
         'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
         'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
@@ -310,7 +313,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # args['scale'] = 2, stands for scale factor used in one upsampler, e.g. 2, 4
 # args['number_of_progressive_stage'] = 2, stands for number of stages(number of "MRI_SR_Dual_Domain_2D network"), e.g. 1, 2, 3, to ultilize progressive upsampling
 
-# args['conv_layer_type'] = 'default_conv', stands for type of conv layer, e.g. 'default_conv', 'coord_conv', 'deformable_conv', 'py_conv'
+# args['conv_layer_type'] = 'default_conv', stands for type of conv layer, e.g. 'default_conv', 'coord_conv', 'deformable_conv', 'py_conv', 'involution'
 # args['activation_function_type'] = 'ReLU', stands for type of activation function, e.g. 'ReLU'. 'Sine', 'FReLU', 'Dynamic_ReLU_Type_A', 'Dynamic_ReLU_Type_B'
 # arg['gradient_operator'] = ['sobel'] # stand for which gradient operator we want use for calculating gradient map, e.g. 'sobel', 'canny'
 
@@ -1521,6 +1524,65 @@ def deformable_conv(in_channels, out_channels, kernel_size, bias = True):
         padding = (kernel_size//2), bias=bias)
 
 
+"Involution Conv Layer"
+"""
+2021.Involution: Inverting the Inherence of Convolution for Visual Recognition
+"""
+class Involution(nn.Module):
+    """
+    Implementation of `Involution: Inverting the Inherence of Convolution for Visual Recognition`.
+    """
+    def __init__(self, in_channels, out_channels, groups=1, kernel_size=3, stride=1, reduction_ratio=2):
+        super().__init__()
+        channels_reduced = max(1, in_channels // reduction_ratio)
+        padding = kernel_size // 2
+        self.reduce = nn.Sequential(
+            nn.Conv2d(in_channels, channels_reduced, 1),
+            nn.BatchNorm2d(channels_reduced),
+            nn.ReLU(inplace=True))
+        self.span = nn.Conv2d(channels_reduced, kernel_size * kernel_size * groups, 1)
+        self.unfold = nn.Unfold(kernel_size, padding=padding, stride=stride)
+        self.resampling = None if in_channels == out_channels else nn.Conv2d(in_channels, out_channels, 1)
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.groups = groups
+
+    @classmethod
+    def get_name(cls):
+        """
+        Return this layer name.
+        Returns:
+            str: layer name.
+        """
+        return 'Involution'
+
+    def forward(self, input_tensor):
+        """
+        Calculate Involution.
+        override function from PyTorch.
+        """
+        _, _, height, width = input_tensor.size()
+        if self.stride > 1:
+            out_size = lambda x: (x + 2 * self.padding - self.kernel_size) // self.stride + 1
+            height, width = out_size(height), out_size(width)
+        uf_x = rearrange(self.unfold(input_tensor), 'b (g d k j) (h w) -> b g d (k j) h w',
+                         g=self.groups, k=self.kernel_size, j=self.kernel_size, h=height, w=width)
+        if self.stride > 1:
+            input_tensor = F.adaptive_avg_pool2d(input_tensor, (height, width))
+        kernel = rearrange(self.span(self.reduce(input_tensor)), 'b (k j g) h w -> b g (k j) h w',
+                           k=self.kernel_size, j=self.kernel_size)
+        out = rearrange(tc.einsum('bgdxhw, bgxhw -> bgdhw', uf_x, kernel), 'b g d h w -> b (g d) h w')
+        if self.resampling:
+            out = self.resampling(out)
+        return out.contiguous()
+
+def involution(in_channels, out_channels, kernel_size, bias = True):
+    return Involution(
+        in_channels, out_channels, groups=1, kernel_size = kernel_size,
+        stride=1, reduction_ratio=2)
+
+
 "Sine Activation Function"
 """
 2020.Implicit Neural Representations with Periodic Activation Functions. https://arxiv.org/abs/2006.09661
@@ -2310,6 +2372,8 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             conv = deformable_conv
         elif args['conv_layer_type'] == 'py_conv':
             conv = py_conv
+        elif args['conv_layer_type'] == 'involution':
+            conv = involution
 
         if args['activation_function_type'] == 'ReLU':
             act = nn.ReLU(True)
@@ -2691,6 +2755,8 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             conv = deformable_conv
         elif args['conv_layer_type'] == 'py_conv':
             conv = py_conv
+        elif args['conv_layer_type'] == 'involution':
+            conv = involution
 
         if args['activation_function_type'] == 'ReLU':
             act = nn.ReLU(True)
@@ -3119,6 +3185,8 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             conv_for_HR_reference_branch = deformable_conv
         elif args['conv_layer_type'] == 'py_conv':
             conv_for_HR_reference_branch = py_conv
+        elif args['conv_layer_type'] == 'involution':
+            conv_for_HR_reference_branch = involution
 
         if args['activation_function_type'] == 'ReLU':
             act_for_HR_reference_branch = nn.ReLU(True)
