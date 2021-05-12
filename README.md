@@ -100,7 +100,7 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 
 32. 在TTSR MRI上做一个小的修改。在每个soft-attention后加上一个external attention(MLP + Norm + MLP)，看一看效果是不是更好。
 
-
+33. uncertainty for MRI SR. 用估计出来的uncertainty(variance) map来表示生成的MRI SR图像每一个pixel的confidence level. 我们需要的是估计一整个SR图的每一个小块对应的variance信息，怎么做？还需要再讨论.
 
 
 ### 第一篇中长期还要做的是
