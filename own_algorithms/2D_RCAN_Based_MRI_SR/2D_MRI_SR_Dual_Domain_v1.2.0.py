@@ -77,7 +77,7 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
         阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
     33) option to use SSIM map guided pixel-wise loss. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
     34) option to use external-attention. Which is a pure MLP based 'self-attention'. See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' for more detail.
-    35) option to use involution conv.
+    35) option to use involution conv(but still has some bugs when using involution conv).
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
@@ -268,7 +268,7 @@ plot_the_wavelets_transform_data_of_input_image = False
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
 args = {'use_HR_reference' : True, 
         'use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser': True,
-        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'CBAM',
+        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'external_attention',
         'channel_and_spatial_attention_mode_for_HR_reference_fuser': 'parallel_mode',
 
         'main_network_framework': 'RCAN', 'type_of_network': 'image_single_domain', 'long_skip_connection_to_reconstruct_residual_part_only': False,
@@ -292,7 +292,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
 # args['use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser'] = True, stands for whether we select to use attention when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. True, False
-# args['channel_and_spatial_attention_framework_for_HR_reference_fuser'] = 'self_attention', stands for which channel and spatial framework is used when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'CBAM', 'self_attention'
+# args['channel_and_spatial_attention_framework_for_HR_reference_fuser'] = 'self_attention', stands for which channel and spatial framework is used when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'CBAM', 'self_attention', 'external_attention'
 # args['channel_and_spatial_attention_mode_for_HR_reference_fuser'] = 'parallel_mode', stands for which end to end channel and spatial block to use when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'sequential_mode', 'parallel_mode'
 
 # args['main_network_framework'] = 'RCAN', stands for which main network framework to use, e.g. 'U_Net', 'RCAN'
