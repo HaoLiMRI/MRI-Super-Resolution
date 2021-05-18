@@ -94,6 +94,7 @@ https://github.com/DingXiaoH/RepMLP
 3). 2021.Do You Even Need Attention: A Stack of Feed-Forward Layers Does Surprisingly Well on ImageNet
 https://github.com/lukemelas/do-you-even-need-attention
 4). 2021.Pay Attention to MLPs(gMLP，这个据说性能非常好，远超MLP-Mixer和ResMLP)
+https://github.com/lucidrains/g-mlp-pytorch
 除了上面提到的直接用基于纯MLP的attention替换Transformer，我们还可以考虑比如：
 a). 同时搞个xxx attention和基于纯MLP的attention级联并联或者weight相乘之类的结构。
 b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结构之后的FFN，相当于就是self-attention和基于纯MLP的attention级联了。
