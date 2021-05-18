@@ -77,8 +77,10 @@ paper：https://arxiv.org/abs/1812.04240
 27. 根据新发现的原来一直使用的2D层内降采的方式从MRI HR生成MRI LR的方案的问题，我们设计了一种3D层内降采的方案从MRI HR生成MRI LR的方案。具体要做的事情如下：首先对公共数据集分别进行“2D层内降采从MRI HR生成MRI LR(每一层数据normalization --> 2D FFT --> 降采 --> 2D IFFT --> 每一层数据normalization)"和“3D层内降采从MRI HR生成MRI LR(整个volumn数据normalization --> 3D FFT --> 降采 --> 3D IFFT --> 整个volumn数据normalization)"。之后再用RCAN MRI SR网络分别用"2D层内降采生成的MRI LR数据"和"3D层内降采生成的MRI LR数据"来训练并test效果，理论上应该看到3D层内降采生成的MRI LR数据可以生成质量更高的MRI SR数据。同时再把原来使用的RCAN的各种网络结构上进行修改的变种方案重新用“3D层内降采生成的MRI LR数据”重新跑一下看看是否有哪些模型效果可以有提升。最后写一篇论文，包括如下contribution：
 a). 我们提出一种”模拟真实MRI机器进行3D层内降采生成的MRI LR数据的3D降采模型”，该降采模型相对于“模拟真实MRI机器进行2D层内降采生成的MRI LR数据的2D降采模型”在相同的SOTA SR网络模型上可以得到更好的恢复效果。所以我们propose用3D层内降采替代2D层内降采。
 b). 我们提出了基于RCAN的变种MRI SR网络模型（之前各种实验过的网络模型再跑一下，哪些效果好就用哪些），结合3D层内降采模型生成的MRI LR来恢复MRI SR图像，相比原始的SOTA RCAN MRI SR得到了更好的效果。
+c). 我们一次放入N层的3D层内降采模型生成的MRI LR，把这N层作为RCAN网络的2D conv filter处理的channel数来处理。这么操作可以得到比输入单层3D层内降采模型生成的MRI LR更好的恢复效果。这种操作可以理解为self-reference，从self-reference的角度来解释与写论文。
 
-28. 另外，我们还提出了一种3D层间降采的方案，该方案模拟MRI机器进行层间降采。我们可以把层间降采得到的3D MRI LR数据直接放入RCAN中恢复SR。理论上可以得到相比于同样降采倍数下(所以也就是同样的measurement time)的2D层内降采或者3D层内降采得到的MRI LR数据恢复出的MRI SR更好的效果。
+28. 另外，我们还提出了一种3D层间降采的方案，该方案模拟MRI机器进行层间降采。我们可以把层间降采得到的3D MRI LR数据直接放入RCAN中恢复SR。理论上可以得到相比于同样降采倍数下(所以也就是同样的measurement time)的2D层内降采或者3D层内降采得到的MRI LR数据恢复出的MRI SR更好的效果。 
+同样的我们也可以一次放入N层的3D层间降采模型生成的MRI LR，把这N层作为RCAN网络的2D conv filter处理的channel数来处理。这么操作可以得到比输入单层3D层间降采模型生成的MRI LR更好的恢复效果。这种操作可以理解为做ensemble，从该角度来解释与写论文。
 
 29. 对于一个3D MRI HR，我们可以同时做3D层内降采和3D层间降采的MRI LR，比如降采关系是2x2x2。那我们可以考虑这么做，沿着每一个方向都横切一次（就是把一个方向作为channel，另外俩个方向作为H, W），这样就有3个方向的2D图像了，然后我们分别用3个RCAN的结构去抓取feature之后放大，出来的3个feature maps放到Transformer里面fuse一下出来直接和3D MRI HR求loss来训练网络。
 这个3个方向分别做2D conv的思路其实在处理radar的3D数据上有人这么做object detection，效果还不错。这样不需要用3D conv。
@@ -98,6 +100,7 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 31. 做HR reference based Transformer MRI SR网络模型。这个idea有两种实现方案：
 1). 直接把LR经过RCAN + upsampling之后的feature map和HR reference经过RCAN提取的feature map给fuse到一起(cat)之后，直接放入ViT论文中使用的Transformer encoder结构中，生成MRI SR结果。
 2). 参考TTSR，用类似的方案，只对HR reference的数据过Transformer抓取HR reference和上采样的LR之间的相关性再乘在HR reference数据上。具体方案如下: 可以用HR reference生成V，下采样再上采样的HR reference生成Q，上采样的LR生成K，然后经过multi-head attention得到一个feauture map，再把这个feature map和LR数据经过RCAN + upsampling之后得到的feature map给fuse到一块，再经过Norm + MLP生成MRI SR结果（整体上还是对ViT中设计的Transformer encoder结构的修改！）。
+在此基础上，可以对1),2)中的ViT encoder模块实现的Transformer再做修改，用最新的RVT（2021.Rethinking the Design Principles of Robust Vision Transformer）替换。
 
 32. 在TTSR MRI上做一个小的修改。在每个soft-attention后加上一个external attention(MLP + Norm + MLP)，看一看效果是不是更好。
 
