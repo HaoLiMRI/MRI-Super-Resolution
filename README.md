@@ -109,9 +109,13 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 33. uncertainty for MRI SR. 用估计出来的uncertainty(variance) map来表示生成的MRI SR图像每一个pixel的confidence level. 我们需要的是估计一整个SR图的每一个小块对应的variance信息，具体怎么实现？还没有考虑清楚！还需要再讨论.
 现在已知的object detection和segmentation中加入uncertainty的方案有4种，每种方案都已经试着转化为应用在MRI SR任务上应该如何操作了，如下：
 我看了一下object detection里面的思路，总结了大概4种可以加入variance的方案：
+
 1). 随机dropout训练好的模型得到多个SR结果，统计每个像素的均值和方差得到variance。今天给你发的那篇MRI segmentation with uncertainty就是这么搞的。见论文:2020.Brain Tumor Segmentation using 3D-CNNs with Uncertainty Estimation
+
 2). 对LR数据进行采样，多次用不同采样的LR数据训练得到多个模型，于是得到多个预测SR结果，统计每个像素的均值和方差得到variance。
+
 3). 对HR的每一个像素的ground truth值都当做dirac分布，然后把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。然后通过minimize KL散度的方式得到一个MSE loss的变形，用这个loss来训练网络从而可以预测每个像素的方差。见论文：2019.Bounding Box Regression with Uncertainty for Accurate Object Detection
+
 4). 对HR的每一个像素的ground truth值都当做dirac分布，然后把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。但这里不再是用minimize KL散度的方式得到一个MSE loss的变形，而是直接认为当每个像素的ground truth和估计出的每个像素的均值方差表示的高斯分布很接近时候，ground truth的像素值代入用该均值和方差表示的高斯pdf函数应该Maximize，所以求sum(-log(Gaussian_pdf(i))),i表示每个像素。用这种方案得到每个像素的方差。见论文：Gaussian YOLOv3: An Accurate and Fast Object Detector Using Localization
 Uncertainty for Autonomous Driving
 
