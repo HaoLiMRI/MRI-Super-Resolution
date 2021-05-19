@@ -87,8 +87,8 @@ c). 我们一次放入N层的3D层内降采模型生成的MRI LR，把这N层作
 
 30. 最新的一个idea：以上所有使用Transformer的部分，都可以考虑用2021年5月5号到7号提出的几种“只使用纯MLP构成的参数量远远小于Transformer的另一种”非self-attention”的机制替换Transformer”，可以得到类似（或更好）的效果（但参数量远远小于Transformer）。这里可以考虑使用的基于纯MLP的最新方案（见：https://mp.weixin.qq.com/s/WwEgHv4b_kkO3b-aP0ovfQ）
 包括:
-1). 2021.External Attention。见论文：2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks。
-https://github.com/MenghaoGuo/-EANet
+1). ~~2021.External Attention。见论文：2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks。
+https://github.com/MenghaoGuo/-EANet~~ 已加入代码，还没有跑。
 2). 2021.RepMLP: Re-parameterizing Convolutions into Fully-connected Layers for Image Recognition
 https://github.com/DingXiaoH/RepMLP
 3). 2021.Do You Even Need Attention: A Stack of Feed-Forward Layers Does Surprisingly Well on ImageNet
@@ -107,6 +107,16 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 32. 在TTSR MRI上做一个小的修改。在每个soft-attention后加上一个external attention(MLP + Norm + MLP)，看一看效果是不是更好。
 
 33. uncertainty for MRI SR. 用估计出来的uncertainty(variance) map来表示生成的MRI SR图像每一个pixel的confidence level. 我们需要的是估计一整个SR图的每一个小块对应的variance信息，具体怎么实现？还没有考虑清楚！还需要再讨论.
+
+
+### 近期主要的写代码的任务集中在：
+31.(1) ViT Encoder和RVT的Transformer模块的加入。
+
+33. uncertainty modeling for MRI SR。
+
+30.(4) gMLP模块的加入。
+
+26. Self-Supervised Learning for MRI SR。
 
 
 ### 第一篇中长期还要做的是
