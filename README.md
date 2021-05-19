@@ -116,7 +116,7 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 
 3). 对HR的每一个像素的ground truth值都当做dirac分布，然后把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。然后通过minimize KL散度的方式得到一个MSE loss的变形，用这个loss来训练网络从而可以预测每个像素的方差。见论文：2019.Bounding Box Regression with Uncertainty for Accurate Object Detection
 
-4). 对HR的每一个像素的ground truth值都当做dirac分布，然后把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。但这里不再是用minimize KL散度的方式得到一个MSE loss的变形，而是直接认为当每个像素的ground truth和估计出的每个像素的均值方差表示的高斯分布很接近时候，ground truth的像素值代入用该均值和方差表示的高斯pdf函数应该Maximize，所以求sum(-log(Gaussian_pdf(i))),i表示每个像素。用这种方案得到每个像素的方差。见论文：Gaussian YOLOv3: An Accurate and Fast Object Detector Using Localization
+4). 把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。但这里不再是用minimize KL散度的方式得到一个MSE loss的变形，而是直接认为当每个像素的ground truth和估计出的每个像素的均值方差表示的高斯分布很接近时候，ground truth的像素值代入用该均值和方差表示的高斯pdf函数应该Maximize，所以求sum(-log(Gaussian_pdf(i))),i表示每个像素。用这种方案得到每个像素的方差。见论文：Gaussian YOLOv3: An Accurate and Fast Object Detector Using Localization
 Uncertainty for Autonomous Driving
 
 
