@@ -108,7 +108,7 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 
 33. uncertainty for MRI SR. 用估计出来的uncertainty(variance) map来表示生成的MRI SR图像每一个pixel的confidence level. 我们需要的是估计一整个SR图的每一个小块对应的variance信息，具体怎么实现？还没有考虑清楚！还需要再讨论.
 现在已知的object detection和segmentation中加入uncertainty的方案有4种，每种方案都已经试着转化为应用在MRI SR任务上应该如何操作了，如下：
-我看了一下object detection里面的思路，总结了大概4种可以加入variance的方案：
+总结了大概4种可以加入variance的方案：
 
 1). 随机dropout训练好的模型得到多个SR结果，统计每个像素的均值和方差得到variance。今天给你发的那篇MRI segmentation with uncertainty就是这么搞的。见论文:2020.Brain Tumor Segmentation using 3D-CNNs with Uncertainty Estimation
 
