@@ -123,6 +123,7 @@ elif cfg.boxloss == 'KL':
 4). 把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。但这里不再是用minimize KL散度的方式得到一个MSE loss的变形，而是直接认为当每个像素的ground truth和估计出的每个像素的均值方差表示的高斯分布很接近时候，ground truth的像素值代入用该均值和方差表示的高斯pdf函数应该Maximize，所以求sum(-log(Gaussian_pdf(i))),i表示每个像素。用这种方案得到每个像素的方差。见论文：Gaussian YOLOv3: An Accurate and Fast Object Detector Using Localization
 Uncertainty for Autonomous Driving
 
+5). 目前网络，使用多层输入多层输出的数据，比如7层输入7层输出，每一层在测试时会出现在volume中的不同位置，所以可以用同一层在不同volume中的测试结果计算均值和variance。
 
 ### 近期主要的写代码的任务集中在：
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
