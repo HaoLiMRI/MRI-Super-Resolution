@@ -125,6 +125,12 @@ Uncertainty for Autonomous Driving
 
 5). 目前网络，使用多层输入多层输出的数据，比如7层输入7层输出，每一层在测试时会出现在volume中的不同位置，所以可以用同一层在不同volume中的测试结果计算均值和variance。
 
+34. 设计一个基于纯ViT Transformer Encoder或者gMLP + Upsamling的MRI SR模型。方案如下： 由于ViT Transformer Encoder或者gMLP模块中patch_size控制了输入该模块的feature map被“缩小(降采样)”的比例，例如patch_size = 2则H, W都会分别被降采样1/2,，所以可以设计一个用N个ViT Transformer Encoder或者gMLP构成的N个“U-Net encoder layer”，不断的降采样。然后再用upsampling升起来，前面的feature map给concat到后面upsampling的每一层的feature map，最后得到MRI SR的结果。
+这个方案实现时候可以用：
+a). ViT Transformer Encoder
+b). 其他某种Transformer模块替代ViT
+c). gMLP
+
 ### 近期主要的写代码的任务集中在：
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
 
@@ -133,6 +139,8 @@ Uncertainty for Autonomous Driving
 30.(4) gMLP模块的加入。
 
 26. Self-Supervised Learning for MRI SR。
+
+34. 基于纯ViT Transformer Encoder或者gMLP + Upsamling的MRI SR模型。
 
 
 ### 第一篇中长期还要做的是
