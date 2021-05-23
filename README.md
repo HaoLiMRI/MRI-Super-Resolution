@@ -130,7 +130,7 @@ Uncertainty for Autonomous Driving
 a). ViT Transformer Encoder + Upsampler
 b). 其他某种Transformer模块替代ViT + Upsampler
 c). gMLP + Upsampler
-d). 像Swin Transformer那种思路纯用Transformer实现downsampling和upsampling，我们也可以纯使用gMLP来实现downsampling和upsampling，换言之做一个只有gMLP based downsampling和gMLP based upsampling的MRI SR。
+d). 像Swin Transformer那种思路纯用Transformer实现downsampling和upsampling，我们也可以纯使用gMLP来实现downsampling和upsampling，换言之做一个只有gMLP based downsampling和gMLP based upsampling的MRI SR。单独做一个.py
 
 ### 近期主要的写代码的任务集中在：
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
