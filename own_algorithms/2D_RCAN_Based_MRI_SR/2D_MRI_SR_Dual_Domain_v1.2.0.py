@@ -78,7 +78,7 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
     33) option to use SSIM map guided pixel-wise loss. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
     34) option to use external-attention. Which is a pure MLP based 'self-attention'. See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' for more detail.
     35) option to use involution conv(but still has some bugs when using involution conv).
-    36) (working in progress,还没有完成！)option to use gMLP or aMLP, which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
+    36) option to use gMLP or aMLP, which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
