@@ -110,27 +110,31 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 现在已知的object detection和segmentation中加入uncertainty的方案有4种，每种方案都已经试着转化为应用在MRI SR任务上应该如何操作了，如下：
 总结了大概4种可以加入variance的方案：
 
-1). 随机dropout训练好的模型得到多个SR结果，统计每个像素的均值和方差得到variance。今天给你发的那篇MRI segmentation with uncertainty就是这么搞的。见论文:2020.Brain Tumor Segmentation using 3D-CNNs with Uncertainty Estimation
+	1). 随机dropout训练好的模型得到多个SR结果，统计每个像素的均值和方差得到variance。今天给你发的那篇MRI segmentation with uncertainty就是这么搞的。见论文:2020.Brain Tumor Segmentation using 3D-CNNs with Uncertainty Estimation
 
-2). 对LR数据进行采样，多次用不同采样的LR数据训练得到多个模型，于是得到多个预测SR结果，统计每个像素的均值和方差得到variance。
+	2). 对LR数据进行采样，多次用不同采样的LR数据训练得到多个模型，于是得到多个预测SR结果，统计每个像素的均值和方差得到variance。
 
-3). 对HR的每一个像素的ground truth值都当做dirac分布，然后把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。然后通过minimize KL散度的方式得到一个MSE loss的变形，用这个loss来训练网络从而可以预测每个像素的方差。见论文：2019.Bounding Box Regression with Uncertainty for Accurate Object Detection. 该KL loss的代码如下：
-elif cfg.boxloss == 'KL':
-        l1_loss = respond_bbox * bbox_loss_scale * (
-                torch.exp(-pred_vari) * smooth_loss(target=label_coor, input=pred_coor) + 0.5 * pred_vari) * cfg.l1scale
-        bbox_loss = l1_loss
+	3). 对HR的每一个像素的ground truth值都当做dirac分布，然后把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。然后通过minimize KL散度的方式得到一个MSE loss的变形，用这个loss来训练网络从而可以预测每个像素的方差。见论文：2019.Bounding Box Regression with Uncertainty for Accurate Object Detection. 该KL loss的代码如下：
+	elif cfg.boxloss == 'KL':
+		l1_loss = respond_bbox * bbox_loss_scale * (
+			torch.exp(-pred_vari) * smooth_loss(target=label_coor, input=pred_coor) + 0.5 * pred_vari) * cfg.l1scale
+		bbox_loss = l1_loss
 
-4). 把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。但这里不再是用minimize KL散度的方式得到一个MSE loss的变形，而是直接认为当每个像素的ground truth和估计出的每个像素的均值方差表示的高斯分布很接近时候，ground truth的像素值代入用该均值和方差表示的高斯pdf函数应该Maximize，所以求sum(-log(Gaussian_pdf(i))),i表示每个像素。用这种方案得到每个像素的方差。见论文：Gaussian YOLOv3: An Accurate and Fast Object Detector Using Localization
+	4). 把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。但这里不再是用minimize KL散度的方式得到一个MSE loss的变形，而是直接认为当每个像素的ground truth和估计出的每个像素的均值方差表示的高斯分布很接近时候，ground truth的像素值代入用该均值和方差表示的高斯pdf函数应该Maximize，所以求sum(-log(Gaussian_pdf(i))),i表示每个像素。用这种方案得到每个像素的方差。见论文：Gaussian YOLOv3: An Accurate and Fast Object Detector Using Localization
 Uncertainty for Autonomous Driving
 
-5). 目前网络，使用多层输入多层输出的数据，比如7层输入7层输出，每一层在测试时会出现在volume中的不同位置，所以可以用同一层在不同volume中的测试结果计算均值和variance。
+	5). 目前网络，使用多层输入多层输出的数据，比如7层输入7层输出，每一层在测试时会出现在volume中的不同位置，所以可以用同一层在不同volume中的测试结果计算均值和variance。
 
 34. 设计一个基于纯ViT Transformer Encoder或者gMLP + Upsamling的MRI SR模型。方案如下： 由于ViT Transformer Encoder或者gMLP模块中patch_size控制了输入该模块的feature map被“缩小(降采样)”的比例，例如patch_size = 2则H, W都会分别被降采样1/2,，所以可以设计一个用N个ViT Transformer Encoder或者gMLP构成的N个“U-Net encoder layer”，不断的降采样。然后再用upsampling升起来，前面的feature map给concat到后面upsampling的每一层的feature map，最后得到MRI SR的结果。
 这个方案实现时候可以用：
-a). ViT Transformer Encoder + Upsampler
-b). 其他某种Transformer模块替代ViT + Upsampler
-c). gMLP + Upsampler
-d). 像Swin Transformer那种思路纯用Transformer实现downsampling和upsampling，我们也可以纯使用gMLP来实现downsampling和upsampling，换言之做一个只有gMLP based downsampling和gMLP based upsampling的MRI SR。单独做一个.py
+	
+	a). ViT Transformer Encoder + Upsampler
+	
+	b). 其他某种Transformer模块替代ViT + Upsampler
+	
+	c). gMLP + Upsampler
+	
+	d). 像Swin Transformer那种思路纯用Transformer实现downsampling和upsampling，我们也可以纯使用gMLP来实现downsampling和upsampling，换言之做一个只有gMLP based downsampling和gMLP based upsampling的MRI SR。单独做一个.py
 完成(a)--(d)中的每一项之后，可以像用3D conv替换2D conv那样把2D模块改为3D模块（例如像TransUNet那篇论文一样，使用3D ViT Transformer Encoder而不是原版的2D ViT Transformer Encoder）。
 
 ### 近期主要的写代码的任务集中在：
