@@ -137,6 +137,8 @@ Uncertainty for Autonomous Driving
 	d). 像Swin Transformer那种思路纯用Transformer实现downsampling和upsampling，我们也可以纯使用gMLP来实现downsampling和upsampling，换言之做一个只有gMLP based downsampling和gMLP based upsampling的MRI SR。单独做一个.py
 
 	完成(a)--(d)中的每一项之后，可以像用3D conv替换2D conv那样把2D模块改为3D模块（例如像TransUNet那篇论文一样，使用3D ViT Transformer Encoder而不是原版的2D ViT Transformer Encoder）。
+	
+35. 准备好MICCAI比赛用的brats数据集，把之前成功的网络模型从单一的MRI SR任务扩展到MRI SR + Segmentation + Uncertainty for Segmentation Purpose。这样做成一个完整的输入MRI LR生成最后分割之后的结果并带有uncertainty描述分割是否准确的end to end solution framework。
 
 ### 近期主要的写代码的任务集中在：
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
