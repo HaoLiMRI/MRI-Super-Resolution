@@ -128,15 +128,17 @@ Uncertainty for Autonomous Driving
 34. 设计一个基于纯ViT Transformer Encoder或者gMLP + Upsamling的MRI SR模型。方案如下： 由于ViT Transformer Encoder或者gMLP模块中patch_size控制了输入该模块的feature map被“缩小(降采样)”的比例，例如patch_size = 2则H, W都会分别被降采样1/2,，所以可以设计一个用N个ViT Transformer Encoder或者gMLP构成的N个“U-Net encoder layer”，不断的降采样。然后再用upsampling升起来，前面的feature map给concat到后面upsampling的每一层的feature map，最后得到MRI SR的结果。
 这个方案实现时候可以用：
 	
-	a). ViT Transformer Encoder + Upsampler
+	a). ViT Transformer Encoder downsampler + pixel shuffle Upsampler
 	
 	b). 其他某种Transformer模块替代ViT + Upsampler
 	
-	c). gMLP + Upsampler
+	c). gMLP downsampler + pixel shuffle Upsampler
 	
-	d). 像Swin Transformer那种思路纯用Transformer实现downsampling和upsampling，我们也可以纯使用gMLP来实现downsampling和upsampling，换言之做一个只有gMLP based downsampling和gMLP based upsampling的MRI SR。单独做一个.py
+	d). gMLP downsampler + gMLP based upsampler
+	
+	e). 像Swin Transformer那种思路纯用Transformer实现downsampling和upsampling，我们也可以纯使用gMLP来实现downsampling和upsampling，换言之做一个只有gMLP based downsampling和gMLP based upsampling的MRI SR。单独做一个.py
 
-	完成(a)--(d)中的每一项之后，可以像用3D conv替换2D conv那样把2D模块改为3D模块（例如像TransUNet那篇论文一样，使用3D ViT Transformer Encoder而不是原版的2D ViT Transformer Encoder）。
+	完成(a)--(e)中的每一项之后，可以像用3D conv替换2D conv那样把2D模块改为3D模块（例如像TransUNet那篇论文一样，使用3D ViT Transformer Encoder而不是原版的2D ViT Transformer Encoder）。
 	
 35. 准备好MICCAI比赛用的brats数据集，把之前成功的网络模型从单一的MRI SR任务扩展到MRI SR + Segmentation + Uncertainty for Segmentation Purpose。这样做成一个完整的输入MRI LR生成最后分割之后的结果并带有uncertainty描述分割是否准确的end to end solution framework。
 
