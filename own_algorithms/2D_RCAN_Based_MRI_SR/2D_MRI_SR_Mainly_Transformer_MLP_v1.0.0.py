@@ -13,9 +13,11 @@ Version: 1.0.0
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210525
+This is the current version we are working on, in 20210527
 This is a demo code of U_Net_Based_MRI_SR_Transformer_MLP_2D. in this version we have already support following items:
-    1)  use gMLP or aMLP based U-Net for MRI SR. gMLP which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
+    1)  use gMLP or aMLP based downsampler and pixel shuffle based upsampler in U-Net for MRI SR. gMLP which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
+    2)  use gMLP based upsampler to replace pixel shuffle based upsampler. 
+
 
 
 
@@ -119,6 +121,7 @@ plot_the_wavelets_transform_data_of_input_image = False
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
 args = {'use_HR_reference' : False, 
         'n_colors': 1, 'n_dim': 128, 'LR_image_size': 32,
+        'type_of_upsampler': 'gMLP_based_upsampler',
         
         'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
         'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
@@ -131,6 +134,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
 # args['n_colors'] = 1, stands for number of channels of input image, e.g. 1 for MRI image, 3 for RGB image.
 # args['n_dim'] = 128, stands for number of dimension in the gMLP.
+# args['type_of_upsampler'] = 'conv_based_upsampler', stands for type of upsampler, e.g. 'conv_based_upsampler', 'gMLP_based_upsampler'
 # arg['optimizer'] = ['Adam'] # stand for which optimizer we want use for training, e.g. 'Adam', 'SGD_with_momentum', 'look_ahead'
 # arg['learning_rate_decay_method'] = ['cosine_learning_rate_decay'] # stand for which learning rate decay method we want use for training, e.g. 'cosine_learning_rate_decay', 'multi_step_learning_rate', 'step_learning_rate', 'cosine_learning_rate_warm_restarts'
 
@@ -1156,22 +1160,50 @@ class U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
         n_colors = args['n_colors'] # number of channels going of input of entire model.
         LR_image_size = args['LR_image_size'] # size of LR image.
         n_dim = args['n_dim'] # number of dimension we expect to use for gMLP.
+        type_of_upsampler = args['type_of_upsampler']
         
         self.fisrt_u_net_layer = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = n_dim, channels = n_colors, attn_dim = 2)
         self.second_u_net_layer = gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
         self.third_u_net_layer = gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
         self.forth_u_net_layer = gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
 
-        self.fisrt_upsampling_layer = Upsampler(n_feats = n_dim)
-        self.second_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
-        self.third_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
-        self.forth_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
-        if Maintain_Same_Size == True:
-            self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+        if type_of_upsampler == 'conv_based_upsampler':
+            self.fisrt_upsampling_layer = Upsampler(n_feats = n_dim)
+            self.second_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.third_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.forth_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            if Maintain_Same_Size == True:
+                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+            else:
+                self.fifth_upsampling_layer = Upsampler(n_feats = n_dim, reduce_number_of_channels_in_half = False)
+                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+        elif type_of_upsampler == 'gMLP_based_upsampler':
+            self.fisrt_upsampling_layer = nn.Sequential(*[
+                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.second_upsampling_layer = nn.Sequential(*[
+                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.third_upsampling_layer = nn.Sequential(*[
+                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.forth_upsampling_layer = nn.Sequential(*[
+                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            if Maintain_Same_Size == True:
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
+            else:
+                self.fifth_upsampling_layer = nn.Sequential(*[
+                    gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2),
+                    nn.PixelShuffle(upscale_factor = 2)
+                ])
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
         else:
-            self.fifth_upsampling_layer = Upsampler(n_feats = n_dim, reduce_number_of_channels_in_half = False)
-            self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
-
+            raise ValueError("Not supported type of upsampler!")
 
     def forward(self, x):
         # U-Net framework.
