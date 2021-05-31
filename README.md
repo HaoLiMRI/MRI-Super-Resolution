@@ -130,7 +130,7 @@ Uncertainty for Autonomous Driving
 	
 	a). ViT Transformer Encoder downsampler + pixel shuffle Upsampler
 	
-	b). 其他某种Transformer模块替代ViT + Upsampler
+	b). 其他某种Transformer模块替代ViT + Upsampler，比如使用Swin Transformer
 	
 	c). gMLP downsampler + pixel shuffle Upsampler
 	
