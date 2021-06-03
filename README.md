@@ -148,15 +148,16 @@ Uncertainty for Autonomous Driving
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
 31.(3) 用RVT或者ResT替换ViT Encoder。
 
-33. uncertainty modeling for MRI SR。
-
 30.(4) gMLP模块的加入。
-
-26. Self-Supervised Learning for MRI SR。
 
 34. 
 (c)(d) 基于纯gMLP Downsampling + gMLP Upsamling的UNet MRI SR模型。
 (f) 基于纯ResTransformer Downsampling + gMLP Upsamling的UNet MRI SR模型。
+
+33. uncertainty modeling for MRI SR。
+
+26. Self-Supervised Learning（contrastive learning） for MRI SR。可以令MRI SR任务不需要HR的ground truth。这样可以不需要实测的大量高清MRI数据就可以对模型进行训练，也是一个非常有意义的让MRI SR技术变的实际可用的方向。
+
 
 
 ### 第一篇中长期还要做的是
