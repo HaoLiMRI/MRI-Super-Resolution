@@ -9,7 +9,7 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.0.0
+Version: 1.2.0
 """
 "-------------------------------------------------------------------------------------------------"
 """
@@ -126,8 +126,8 @@ plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
 args = {'use_HR_reference' : True, 
-        'HR_reference_framework': 'gMLP_without_information_exchange',
-        'n_colors': 1, 'n_dim': 128, 'LR_image_size': 64,
+        'HR_reference_framework': 'gMLP_with_information_exchange',
+        'n_colors': 1, 'LR_image_size': 64,
         'type_of_upsampler': 'gMLP_based_upsampler',
         
         'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
@@ -141,7 +141,6 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
 # args['HR_reference_framework'] = 'gMLP_without_information_exchange', stands for what kind of HR reference framework we use, e.g. 'gMLP_without_information_exchange', 'gMLP_with_information_exchange', 'ResT_without_information_exchange', 'ResT_with_information_exchange'.
 # args['n_colors'] = 1, stands for number of channels of input image, e.g. 1 for MRI image, 3 for RGB image.
-# args['n_dim'] = 128, stands for number of dimension in the gMLP.
 # args['type_of_upsampler'] = 'conv_based_upsampler', stands for type of upsampler, e.g. 'conv_based_upsampler', 'gMLP_based_upsampler'
 # arg['optimizer'] = ['Adam'] # stand for which optimizer we want use for training, e.g. 'Adam', 'SGD_with_momentum', 'look_ahead'
 # arg['learning_rate_decay_method'] = ['cosine_learning_rate_decay'] # stand for which learning rate decay method we want use for training, e.g. 'cosine_learning_rate_decay', 'multi_step_learning_rate', 'step_learning_rate', 'cosine_learning_rate_warm_restarts'
@@ -999,7 +998,7 @@ class gMLPVision(nn.Module):
         image_size = 32,
         patch_size = 1,
         dim = 512,          # Input feature's patch embedding dimension. See figure 1 in paper: 2021.Pay Attention to MLPs.
-        depth = 3,          # Number of gMLP layers, L. See figure 1 in paper: 2021.Pay Attention to MLPs.
+        depth = 2,          # Number of gMLP layers, L. See figure 1 in paper: 2021.Pay Attention to MLPs.
         ff_mult = 4,
         channels = 3,
         attn_dim = None,    # For tiny attention using.
@@ -1128,6 +1127,135 @@ class SpatialGatingUnit(nn.Module):
 
 
 
+class gMLPVisionInfoExchange(nn.Module):
+    def __init__(
+        self,
+        *,
+        image_size = 32,
+        patch_size = 1,
+        dim = 512,          # Input feature's patch embedding dimension. See figure 1 in paper: 2021.Pay Attention to MLPs.
+        depth = 2,          # Number of gMLP layers, L. See figure 1 in paper: 2021.Pay Attention to MLPs.
+        ff_mult = 4,
+        channels = 3,
+        attn_dim = None,    # For tiny attention using.
+        prob_survival = 1.
+    ):
+        super().__init__()
+        assert (image_size % patch_size) == 0, 'image size must be divisible by the patch size'
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.dim = dim
+        self.depth = depth
+
+        dim_ff = dim * ff_mult      # Hidden dimension?
+        num_patches = (image_size // patch_size) ** 2
+
+        # Patch embedding: Generate N tokens, where N is the num_patches, equals to h*w/(patch_size**2). Each token is a vector with dimension (1, dim).
+        self.to_patch_embed = nn.Sequential(
+            Rearrange('b c (h p1) (w p2) -> b (h w) (c p1 p2)', p1 = patch_size, p2 = patch_size),
+            nn.Linear(channels * patch_size ** 2, dim)
+        )   # Size of the output from this module is (batch_size, num_patches, dim).
+
+        self.prob_survival = prob_survival
+
+        self.gmlp_residual_block = []
+        for i in range(depth):
+            self.gmlp_residual_block.append( GatingMlpResidualBlockInfoExchange(dim, dim_ff, num_patches, attn_dim) )
+
+    def feature_mapping(self, x):
+        x = x.view(
+            x.size(0),
+            int(self.image_size / self.patch_size),
+            int(self.image_size / self.patch_size),
+            self.dim,
+        )
+        x = x.permute(0, 3, 1, 2).contiguous()
+        return x
+
+    def forward(self, x, injected_key):
+        x = self.to_patch_embed(x)      # (B, C, H, W) --> (B, N, dim) where N equal to H*W/(patch_size**2)
+        """ layers = self.layers if not self.training else dropout_layers(self.layers, self.prob_survival) """
+        output_key_for_hr_reference_branch = []
+        if injected_key == None:
+            injected_key == [None]*self.depth
+        for i in range(self.depth):
+            x, output_key_for_hr_reference_branch.append( self.gmlp_residual_block[i](x, injected_key[i]) )     # (B, N, dim) --> (B, N, dim)
+        x = self.feature_mapping(x)     # (B, N, dim) --> (B, dim, H/patch_size, W/patch_size)
+        return x, output_key_for_hr_reference_branch
+
+# helper classes
+class AttentionForGmlpInfoExchange(nn.Module):
+    def __init__(self, dim_in, dim_out, dim_inner, causal = False):
+        super().__init__()
+        self.scale = dim_inner ** -0.5
+        self.causal = causal
+        self.to_qkv = nn.Linear(dim_in, dim_inner * 3, bias = False)
+        self.to_out = nn.Linear(dim_inner, dim_out)
+
+    def forward(self, x, injected_key = None):
+        device = x.device
+
+        q, k, v = self.to_qkv(x).chunk(3, dim = -1)
+        if injected_key != None:
+            k = injected_key
+        sim = tc.einsum('b i d, b j d -> b i j', q, k) * self.scale
+
+        if self.causal:
+            mask = tc.ones(sim.shape[-2:], device = device).triu(1).bool()
+            sim.masked_fill_(mask[None, ...], -tc.finfo(q.dtype).max)
+
+        attn = sim.softmax(dim = -1)
+        out = tc.einsum('b i j, b j d -> b i d', attn, v)
+        return self.to_out(out), k
+
+class SpatialGatingUnitInfoExchange(nn.Module):
+    def __init__(self, dim, dim_seq, attn_dim = None, causal = False):
+        super().__init__()
+        self.causal = causal
+        self.norm = nn.LayerNorm(dim)
+        self.proj = nn.Conv1d(dim_seq, dim_seq, 1)
+        self.attn = AttentionForGmlpInfoExchange(dim * 2, dim, attn_dim, causal) if exists(attn_dim) else None
+        nn.init.zeros_(self.proj.weight)
+        nn.init.constant_(self.proj.bias, 1.)
+
+    def forward(self, x, injected_key = None):
+        device = x.device
+
+        res, gate = x.chunk(2, dim = -1)
+        gate = self.norm(gate)
+
+        weight, bias = self.proj.weight, self.proj.bias
+        if self.causal:
+            mask = tc.ones(weight.shape[:2], device = device).triu_(1).bool()
+            weight = weight.masked_fill(mask[..., None], 0.)
+
+        gate = F.conv1d(gate, weight, bias)
+
+        if exists(self.attn):
+            outcome, output_key = self.attn(x, injected_key)
+            gate += outcome
+        return gate * res, output_key
+
+class GatingMlpResidualBlockInfoExchange(nn.Module):
+    def __init__(self, dim, dim_ff, num_patches, attn_dim):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.proj_1 = nn.Linear(dim, dim_ff*2)
+        self.activation = nn.GELU()
+        self.spatial_gating_unit = SpatialGatingUnitInfoExchange(dim_ff, num_patches, attn_dim)
+        self.proj_2 = nn.Linear(dim_ff, dim)
+
+    def forward(self, x, injected_key = None):
+        shorcut = x
+        x = self.norm(x)
+        x = self.proj_1(x)
+        x = self.activation(x)
+        x, output_key = self.spatial_gating_unit(x, injected_key)
+        x = self.proj_2(x)
+        return x + shorcut, output_key
+
+
+
 "Upsampler Module, implemented by employeed of sub-pixel conv"
 class Upsampler(nn.Sequential):
     """
@@ -1141,13 +1269,13 @@ class Upsampler(nn.Sequential):
         super(Upsampler, self).__init__()
         if reduce_number_of_channels_in_half == False:
             self.upsampler = nn.Sequential(*[
-                nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                nn.Conv2d(n_feats, n_feats, kernel_size = 3, padding=1, stride=1),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
         else: # reduce_number_of_channels_in_half == True
             self.upsampler = nn.Sequential(*[
                 nn.Conv2d(n_feats, n_feats//2, kernel_size = 3, padding=1, stride=1),
-                nn.Conv2d(n_feats//2, n_feats * 2, kernel_size = 3, padding=1, stride=1),
+                nn.Conv2d(n_feats//2, n_feats//2, kernel_size = 3, padding=1, stride=1),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
 
@@ -1167,49 +1295,48 @@ class U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
 
         n_colors = args['n_colors'] # number of channels going of input of entire model.
         LR_image_size = args['LR_image_size'] # size of LR image.
-        n_dim = args['n_dim'] # number of dimension we expect to use for gMLP.
         type_of_upsampler = args['type_of_upsampler']
         
-        self.fisrt_u_net_layer = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = n_dim, channels = n_colors, attn_dim = 2)
-        self.second_u_net_layer = gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
-        self.third_u_net_layer = gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
-        self.forth_u_net_layer = gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
+        self.fisrt_u_net_layer = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = 16, channels = n_colors, attn_dim = 2)
+        self.second_u_net_layer = gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = 64, channels = 16, attn_dim = 2)
+        self.third_u_net_layer = gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = 256, channels = 64, attn_dim = 2)
+        self.forth_u_net_layer = gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = 1024, channels = 256, attn_dim = 2)
 
         if type_of_upsampler == 'conv_based_upsampler':
-            self.fisrt_upsampling_layer = Upsampler(n_feats = n_dim)
-            self.second_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
-            self.third_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
-            self.forth_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.fisrt_upsampling_layer = Upsampler(n_feats = 1024)
+            self.second_upsampling_layer = Upsampler(n_feats = 256*2, reduce_number_of_channels_in_half = True)
+            self.third_upsampling_layer = Upsampler(n_feats = 64*2, reduce_number_of_channels_in_half = True)
+            self.forth_upsampling_layer = Upsampler(n_feats = 16*2, reduce_number_of_channels_in_half = True)
             if Maintain_Same_Size == True:
-                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+                self.last_channel_reduce_layer = nn.Conv2d(4, n_colors, kernel_size = 3, padding=1, stride=1)
             else:
-                self.fifth_upsampling_layer = Upsampler(n_feats = n_dim, reduce_number_of_channels_in_half = False)
-                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+                self.fifth_upsampling_layer = Upsampler(n_feats = 4, reduce_number_of_channels_in_half = False)
+                self.last_channel_reduce_layer = nn.Conv2d(1, n_colors, kernel_size = 3, padding=1, stride=1)
         elif type_of_upsampler == 'gMLP_based_upsampler':
             self.fisrt_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 1024, channels = 1024, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.second_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 256, channels = 2*256, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.third_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 64, channels = 2*64, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.forth_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = 16, channels = 2*16, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             if Maintain_Same_Size == True:
-                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = 4, attn_dim = 2)
             else:
                 self.fifth_upsampling_layer = nn.Sequential(*[
-                    gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2),
+                    gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4, channels = 4, attn_dim = 2),
                     nn.PixelShuffle(upscale_factor = 2)
                 ])
-                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = 1, attn_dim = 2)
         else:
             raise ValueError("Not supported type of upsampler!")
 
@@ -1225,10 +1352,12 @@ class U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
         y3 = self.third_upsampling_layer(tc.cat((x2, y2), dim = 1))
         y4 = self.forth_upsampling_layer(tc.cat((x1, y3), dim = 1))
         if Maintain_Same_Size == True:
-            sr = self.last_channel_reduce_layer(y4)
+            """ sr = self.last_channel_reduce_layer(y4) """
+            sr = y4
         else:
             y5 = self.fifth_upsampling_layer(y4)
-            sr = self.last_channel_reduce_layer(y5)
+            """ sr = self.last_channel_reduce_layer(y5) """
+            sr = y5
         return sr
 
 
@@ -1243,69 +1372,82 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
 
         n_colors = args['n_colors'] # number of channels going of input of entire model.
         LR_image_size = args['LR_image_size'] # size of LR image.
-        n_dim = args['n_dim'] # number of dimension we expect to use for gMLP.
         type_of_upsampler = args['type_of_upsampler']
-        HR_reference_framework = args['HR_reference_framework']
+        self.HR_reference_framework = args['HR_reference_framework']
 
-        if HR_reference_framework == 'gMLP_without_information_exchange':
-            if Maintain_Same_Size == True:
-                raise ValueError("Size of HR reference and LR are same, not supported yet!")
-            else:
-                self.first_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size*2, patch_size = 2, dim = n_dim, channels = n_colors, attn_dim = 2)
-                self.second_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
-                self.last_layer_in_reference_branch_for_unet_decoder = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2)
-        elif HR_reference_framework == 'gMLP_with_information_exchange':
-            pass
-        
-        self.fisrt_u_net_layer = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = n_dim, channels = n_colors, attn_dim = 2)
-        self.second_u_net_layer = gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
-        self.third_u_net_layer = gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
-        self.forth_u_net_layer = gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
+        if self.HR_reference_framework == 'gMLP_without_information_exchange':
+            self.fisrt_u_net_layer = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = 16, channels = n_colors, attn_dim = 2)
+        elif self.HR_reference_framework == 'gMLP_with_information_exchange':
+            self.fisrt_u_net_layer = gMLPVisionInfoExchange(image_size = LR_image_size, patch_size = 2, dim = 16, channels = n_colors, attn_dim = 2)
+        self.second_u_net_layer = gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = 64, channels = 16, attn_dim = 2)
+        self.third_u_net_layer = gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = 256, channels = 64, attn_dim = 2)
+        self.forth_u_net_layer = gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = 1024, channels = 256, attn_dim = 2)
 
         if type_of_upsampler == 'conv_based_upsampler':
-            self.fisrt_upsampling_layer = Upsampler(n_feats = n_dim)
-            self.second_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
-            self.third_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
-            self.forth_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.fisrt_upsampling_layer = Upsampler(n_feats = 1024)
+            self.second_upsampling_layer = Upsampler(n_feats = 256*2, reduce_number_of_channels_in_half = True)
+            self.third_upsampling_layer = Upsampler(n_feats = 64*2, reduce_number_of_channels_in_half = True)
+            self.forth_upsampling_layer = Upsampler(n_feats = 16*2, reduce_number_of_channels_in_half = True)
             if Maintain_Same_Size == True:
-                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+                self.last_channel_reduce_layer = nn.Conv2d(4, n_colors, kernel_size = 3, padding=1, stride=1)
             else:
-                self.fifth_upsampling_layer = Upsampler(n_feats = n_dim, reduce_number_of_channels_in_half = False)
-                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+                self.fifth_upsampling_layer = Upsampler(n_feats = 4, reduce_number_of_channels_in_half = False)
+                self.last_channel_reduce_layer = nn.Conv2d(1, n_colors, kernel_size = 3, padding=1, stride=1)
         elif type_of_upsampler == 'gMLP_based_upsampler':
             self.fisrt_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 1024, channels = 1024, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.second_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 256, channels = 2*256, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.third_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 64, channels = 2*64, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.forth_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = 16, channels = 2*16, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             if Maintain_Same_Size == True:
-                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = 4, attn_dim = 2)
             else:
-                self.fifth_upsampling_layer_gMLP_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2)
+                if self.HR_reference_framework == 'gMLP_without_information_exchange':
+                    self.fifth_upsampling_layer_gMLP_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4, channels = 4, attn_dim = 2)
+                elif self.HR_reference_framework == 'gMLP_with_information_exchange':
+                    self.fifth_upsampling_layer_gMLP_layer = gMLPVisionInfoExchange(image_size = LR_image_size, patch_size = 1, dim = 4, channels = 4, attn_dim = 2)
                 self.fifth_upsampling_layer_upsampling_layer = nn.PixelShuffle(upscale_factor = 2)
-                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = 1, attn_dim = 2)
         else:
             raise ValueError("Not supported type of upsampler!")
 
+        if self.HR_reference_framework == 'gMLP_without_information_exchange':
+            if Maintain_Same_Size == True:
+                raise ValueError("Size of HR reference and LR are same, not supported yet!")
+            else:
+                self.first_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size*2, patch_size = 2, dim = n_colors, channels = n_colors, attn_dim = 2)
+                self.second_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = 16, channels = n_colors, attn_dim = 2)
+                self.last_layer_in_reference_branch_for_unet_decoder = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4, channels = n_colors, attn_dim = 2)
+        elif self.HR_reference_framework == 'gMLP_with_information_exchange':
+            if Maintain_Same_Size == True:
+                raise ValueError("Size of HR reference and LR are same, not supported yet!")
+            else:
+                self.first_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size*2, patch_size = 2, dim = n_colors, channels = n_colors, attn_dim = 2)
+                self.second_layer_in_reference_branch_for_unet_encoder = gMLPVisionInfoExchange(image_size = LR_image_size, patch_size = 2, dim = 16, channels = n_colors, attn_dim = 2)
+                self.last_layer_in_reference_branch_for_unet_decoder = gMLPVisionInfoExchange(image_size = LR_image_size, patch_size = 1, dim = 4, channels = n_colors, attn_dim = 2)
+
     def forward(self, x, hr_reference):
-        # MRI HR reference branch in U-Net framework.
+        # First layer of MRI HR reference branch in U-Net framework.
         hr_reference1 = self.first_layer_in_reference_branch_for_unet_encoder(hr_reference)
-        hr_reference2 = self.second_layer_in_reference_branch_for_unet_encoder(hr_reference1)
-        hr_reference3 = self.last_layer_in_reference_branch_for_unet_decoder(hr_reference1)
 
         # MRI LR branch(main branch) in U-Net framework.
-        x1 = self.fisrt_u_net_layer(x)
+        if self.HR_reference_framework == 'gMLP_without_information_exchange':
+            x1 = self.fisrt_u_net_layer(x)
+            hr_reference2 = self.second_layer_in_reference_branch_for_unet_encoder(hr_reference1)
+        elif self.HR_reference_framework == 'gMLP_with_information_exchange':
+            x1, list_of_key_from_lr_info_first_downsampling_layer = self.fisrt_u_net_layer(x, injected_key = [None]*2)
+            hr_reference2, _ = self.second_layer_in_reference_branch_for_unet_encoder(hr_reference1, list_of_key_from_lr_info_first_downsampling_layer)
         x2 = self.second_u_net_layer(x1 + hr_reference2)
         x3 = self.third_u_net_layer(x2)
         x4 = self.forth_u_net_layer(x3)
@@ -1315,12 +1457,18 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
         y3 = self.third_upsampling_layer(tc.cat((x2, y2), dim = 1))
         y4 = self.forth_upsampling_layer(tc.cat((x1, y3), dim = 1))
         if Maintain_Same_Size == True:
-            sr = self.last_channel_reduce_layer(y4)
+            """ sr = self.last_channel_reduce_layer(y4) """
+            sr = y4
         else:
-            y5 = self.fifth_upsampling_layer_gMLP_layer(y4)
-            y6 = self.fifth_upsampling_layer_upsampling_layer(y5 + hr_reference3)
-            sr = self.last_channel_reduce_layer(y6)
-
+            if self.HR_reference_framework == 'gMLP_without_information_exchange':
+                y5 = self.fifth_upsampling_layer_gMLP_layer(y4)
+                hr_reference3 = self.last_layer_in_reference_branch_for_unet_decoder(hr_reference1)
+            elif self.HR_reference_framework == 'gMLP_with_information_exchange':
+                y5, list_of_key_from_lr_info_fifth_upsampling_layer = self.fifth_upsampling_layer_gMLP_layer(y4, injected_key = [None]*2)
+                hr_reference3, _ = self.last_layer_in_reference_branch_for_unet_decoder(hr_reference1, list_of_key_from_lr_info_fifth_upsampling_layer)
+            y5 = self.fifth_upsampling_layer_upsampling_layer(y5 + hr_reference3)
+            """ sr = self.last_channel_reduce_layer(y5) """
+            sr = y5
         return sr
 
 
