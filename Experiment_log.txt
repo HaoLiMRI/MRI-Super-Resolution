@@ -6,6 +6,6 @@ Data		Network								Dataset					Result
 2021.05.24	RCAN-based 3D reconstruction v1.0.2     			HCP 300 datasets, 3D 2x1 128x3		Done, val ssim 0.9636 psnr 39.5738
 2021.05.28	RCAN-based 3D reconstruction v1.0.2     			HCP 300 datasets, 3D 2x2 128x3		Done, val ssim 0.9459 psnr 37.9158
 2021.06.01	RCAN-based 3D reconstruction v1.0.2    				HCP 100 datasets, 3D 1x2 128x3		Done, val ssim 0.9685 psnr 40.3262
-2021.06.01 	RCAN-based with parallel self-attention in RCAB 		HCP 100 datasets, 3D 2x1 128x1		Failed, ssim loss was negative
-2021.06.01	RCAN-based with sequential self-attention in RCAB		HCP 100 datasets, 3D 2x1 128x1		On going
+2021.06.01 	RCAN-based with parallel self-attention in RCAB v1.2.2	HCP 100 datasets, 3D 2x1 128x1		Failed, ssim loss was negative
+2021.06.01	RCAN-based with sequential self-attention in RCABv1.2.2	HCP 100 datasets, 3D 2x1 128x1		On going
 2021.05.26	gMLP U-Net v1.0.2						HCP 100 datasets, 3D 2x1 128x1		On going
