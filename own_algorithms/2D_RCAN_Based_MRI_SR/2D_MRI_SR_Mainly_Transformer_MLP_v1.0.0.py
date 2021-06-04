@@ -13,10 +13,16 @@ Version: 1.0.0
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210527
+This is the current version we are working on, in 20210604
 This is a demo code of U_Net_Based_MRI_SR_Transformer_MLP_2D. in this version we have already support following items:
-    1)  use gMLP or aMLP based downsampler and pixel shuffle based upsampler in U-Net for MRI SR. gMLP which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
-    2)  use gMLP based upsampler to replace pixel shuffle based upsampler. 
+    1)  use gMLP or aMLP based downsampler and conv based upsampler in U-Net for MRI SR. gMLP which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
+    2)  use gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR. 
+    3)  Simple version(i.e.gMLP_without_information_exchange) HR reference(e.g. T2 modality HR MRI data) assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
+    4)  (working in progress,还没有完成！)Complicated version(using information from MRI LR data as key for tiny attention in aMLP for HR reference branch, i.e.gMLP_with_information_exchange) HR reference(e.g. T2 modality HR MRI data) 
+        assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
+    5)  (working in progress,还没有完成！)use ResTransformer based downsampler and pixel shuffle based upsampler in U-Net for MRI SR. See 2021.ResT:An Efficient Transformer for Visual Recognition.
+    6)  (working in progress,还没有完成！)use ResTransformer based downsampler and ResTransformer upsampler in U-Net for MRI SR.
+    7)  (working in progress,还没有完成！)HR reference(e.g. T2 modality HR MRI data) assisted "ResTransformer based downsampler and ResTransformer upsampler in U-Net for MRI SR".
 
 
 
@@ -119,8 +125,9 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
-args = {'use_HR_reference' : False, 
-        'n_colors': 1, 'n_dim': 128, 'LR_image_size': 32,
+args = {'use_HR_reference' : True, 
+        'HR_reference_framework': 'gMLP_without_information_exchange',
+        'n_colors': 1, 'n_dim': 128, 'LR_image_size': 64,
         'type_of_upsampler': 'gMLP_based_upsampler',
         
         'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
@@ -132,6 +139,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
                     'ssim_luminance_weight': 2, 'ssim_contrast_weight': 2, 'ssim_structure_weight': 4}
 
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
+# args['HR_reference_framework'] = 'gMLP_without_information_exchange', stands for what kind of HR reference framework we use, e.g. 'gMLP_without_information_exchange', 'gMLP_with_information_exchange', 'ResT_without_information_exchange', 'ResT_with_information_exchange'.
 # args['n_colors'] = 1, stands for number of channels of input image, e.g. 1 for MRI image, 3 for RGB image.
 # args['n_dim'] = 128, stands for number of dimension in the gMLP.
 # args['type_of_upsampler'] = 'conv_based_upsampler', stands for type of upsampler, e.g. 'conv_based_upsampler', 'gMLP_based_upsampler'
@@ -1225,10 +1233,105 @@ class U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
 
 
 
+"gMLP or Transformer based U-Net for Super Resolution MRI"
+class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
+    """
+    U-Net framework in this code, consists of each Transformer layer/gMLP as one layer of encoder in U-Net.
+    """
+    def __init__(self, args):
+        super(HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D, self).__init__()
+
+        n_colors = args['n_colors'] # number of channels going of input of entire model.
+        LR_image_size = args['LR_image_size'] # size of LR image.
+        n_dim = args['n_dim'] # number of dimension we expect to use for gMLP.
+        type_of_upsampler = args['type_of_upsampler']
+        HR_reference_framework = args['HR_reference_framework']
+
+        if HR_reference_framework == 'gMLP_without_information_exchange':
+            if Maintain_Same_Size == True:
+                raise ValueError("Size of HR reference and LR are same, not supported yet!")
+            else:
+                self.first_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size*2, patch_size = 2, dim = n_dim, channels = n_colors, attn_dim = 2)
+                self.second_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
+                self.last_layer_in_reference_branch_for_unet_decoder = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2)
+        elif HR_reference_framework == 'gMLP_with_information_exchange':
+            pass
+        
+        self.fisrt_u_net_layer = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = n_dim, channels = n_colors, attn_dim = 2)
+        self.second_u_net_layer = gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
+        self.third_u_net_layer = gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
+        self.forth_u_net_layer = gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = n_dim, channels = n_dim, attn_dim = 2)
+
+        if type_of_upsampler == 'conv_based_upsampler':
+            self.fisrt_upsampling_layer = Upsampler(n_feats = n_dim)
+            self.second_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.third_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.forth_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            if Maintain_Same_Size == True:
+                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+            else:
+                self.fifth_upsampling_layer = Upsampler(n_feats = n_dim, reduce_number_of_channels_in_half = False)
+                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+        elif type_of_upsampler == 'gMLP_based_upsampler':
+            self.fisrt_upsampling_layer = nn.Sequential(*[
+                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.second_upsampling_layer = nn.Sequential(*[
+                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.third_upsampling_layer = nn.Sequential(*[
+                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.forth_upsampling_layer = nn.Sequential(*[
+                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = 4*n_dim, channels = 2*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            if Maintain_Same_Size == True:
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
+            else:
+                self.fifth_upsampling_layer_gMLP_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4*n_dim, channels = n_dim, attn_dim = 2)
+                self.fifth_upsampling_layer_upsampling_layer = nn.PixelShuffle(upscale_factor = 2)
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
+        else:
+            raise ValueError("Not supported type of upsampler!")
+
+    def forward(self, x, hr_reference):
+        # MRI HR reference branch in U-Net framework.
+        hr_reference1 = self.first_layer_in_reference_branch_for_unet_encoder(hr_reference)
+        hr_reference2 = self.second_layer_in_reference_branch_for_unet_encoder(hr_reference1)
+        hr_reference3 = self.last_layer_in_reference_branch_for_unet_decoder(hr_reference1)
+
+        # MRI LR branch(main branch) in U-Net framework.
+        x1 = self.fisrt_u_net_layer(x)
+        x2 = self.second_u_net_layer(x1 + hr_reference2)
+        x3 = self.third_u_net_layer(x2)
+        x4 = self.forth_u_net_layer(x3)
+
+        y1 = self.fisrt_upsampling_layer(x4)
+        y2 = self.second_upsampling_layer(tc.cat((x3, y1), dim = 1))
+        y3 = self.third_upsampling_layer(tc.cat((x2, y2), dim = 1))
+        y4 = self.forth_upsampling_layer(tc.cat((x1, y3), dim = 1))
+        if Maintain_Same_Size == True:
+            sr = self.last_channel_reduce_layer(y4)
+        else:
+            y5 = self.fifth_upsampling_layer_gMLP_layer(y4)
+            y6 = self.fifth_upsampling_layer_upsampling_layer(y5 + hr_reference3)
+            sr = self.last_channel_reduce_layer(y6)
+
+        return sr
+
+
+
 
 
 device=tc.device("cuda" if use_cuda else "cpu")
-our_model_mri_sr_2d = U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
+if args['use_HR_reference'] == False:
+    our_model_mri_sr_2d = U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
+else:   # args['use_HR_reference'] == True:
+    our_model_mri_sr_2d = HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
 
 
 # Weight initialization using He initialization.
@@ -1240,7 +1343,7 @@ if tc.cuda.device_count()>1:
     our_model_mri_sr_2d=nn.DataParallel(our_model_mri_sr_2d)
 our_model_mri_sr_2d.to(device)
 
-print('this is our U_Net_Based_MRI_SR_Transformer_MLP_2D: ', our_model_mri_sr_2d)
+print('this is our model: ', our_model_mri_sr_2d)
 
 feature_extractor = FeatureExtractor().to(device)
 print('this is our FeatureExtractor: ', feature_extractor)
@@ -1401,7 +1504,7 @@ for epoch in range(EPOCH_NUM):
 
             "forward prop"
             # outputs = our_resnext(inputs).double() #-- numpy arrays are 64-bit floating point and will be converted to torch.DoubleTensor standardly. Now, if you use them with your model, you'll need to make sure that your model parameters are also Double
-            img_outputs, secondary_branch_outputs, network_model_type = our_model_mri_sr_2d(inputs, references) #-- or using default float as type, however remember to cast the input from Double to Float            
+            img_outputs = our_model_mri_sr_2d(inputs, references) #-- or using default float as type, however remember to cast the input from Double to Float            
             # print(outputs.size())
             # print('the forward pass has been went')
 
