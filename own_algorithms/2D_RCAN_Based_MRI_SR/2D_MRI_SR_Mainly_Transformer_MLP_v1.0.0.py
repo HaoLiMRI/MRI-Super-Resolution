@@ -1160,7 +1160,8 @@ class gMLPVisionInfoExchange(nn.Module):
 
         self.gmlp_residual_block = []
         for i in range(depth):
-            self.gmlp_residual_block.append( GatingMlpResidualBlockInfoExchange(dim, dim_ff, num_patches, attn_dim) )
+            # I have to add .to('cuda') here, otherwise it will lead to strang problem "Tensor for argument #3 ‘mat2’ is on CPU, but expected it to be on GPU" later when calling gmlp_residual_block.
+            self.gmlp_residual_block.append( GatingMlpResidualBlockInfoExchange(dim, dim_ff, num_patches, attn_dim).to('cuda') )
 
     def feature_mapping(self, x):
         x = x.view(
