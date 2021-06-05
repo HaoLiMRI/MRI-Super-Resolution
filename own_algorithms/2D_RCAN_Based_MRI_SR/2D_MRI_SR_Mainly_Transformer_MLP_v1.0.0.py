@@ -126,7 +126,7 @@ plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
 args = {'use_HR_reference' : True, 
-        'HR_reference_framework': 'gMLP_with_information_exchange',
+        'HR_reference_framework': 'gMLP_without_information_exchange',
         'n_colors': 1, 'LR_image_size': 64,
         'type_of_upsampler': 'gMLP_based_upsampler',
         
@@ -931,7 +931,7 @@ class FFT_K_SPACE(nn.Module):
         # Take in image x at time domain and fetch the k space data at frequency domain. 
         # See https://pytorch.org/docs/stable/generated/torch.rfft.html#torch.rfft
         # Beware the shape of input for irfft in our case should be (N, C, H, W)
-        k_space_result = tc.rfft(x, signal_ndim = 2, onesided = False)
+        k_space_result = tc.fft.fftn(x, dim = (-3,-2,-1))
         return k_space_result
 """ class FFT_K_SPACE(nn.Module):
     def __init__(self):
@@ -1686,16 +1686,16 @@ for epoch in range(EPOCH_NUM):
 
         if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
             k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(
-                create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq[:,:,:,:,0], 
-                create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,0]) + 
+                create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq.real, 
+                create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.real) + 
                 loss_function_MSE(
-                    create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq[:,:,:,:,1], 
-                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,1]))
+                    create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq.imag, 
+                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.imag))
         else:
-            k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]) + loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+            k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq.real, HR_freq.real) + loss_function_MSE(SR_freq.imag, HR_freq.imag))
         k_space_freq_loss_training += k_space_freq_loss.item()
-#            print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
-#            print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+#            print(loss_function_MSE(SR_freq.real, HR_freq.real))
+#            print(loss_function_MSE(SR_freq.imag, HR_freq.imag))
         """ print("k_space_freq_loss: ", k_space_freq_loss) """
 
         HR_ssim_weighted, HR_ssim = SSIM_function(labels, labels)
