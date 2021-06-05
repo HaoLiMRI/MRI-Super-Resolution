@@ -13,12 +13,12 @@ Version: 1.2.0
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210604
+This is the current version we are working on, in 20210605
 This is a demo code of U_Net_Based_MRI_SR_Transformer_MLP_2D. in this version we have already support following items:
     1)  use gMLP or aMLP based downsampler and conv based upsampler in U-Net for MRI SR. gMLP which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
     2)  use gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR. 
     3)  Simple version(i.e.gMLP_without_information_exchange) HR reference(e.g. T2 modality HR MRI data) assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
-    4)  (working in progress,还没有完成！)Complicated version(using information from MRI LR data as key for tiny attention in aMLP for HR reference branch, i.e.gMLP_with_information_exchange) HR reference(e.g. T2 modality HR MRI data) 
+    4)  Complicated version(using information from MRI LR data as key for tiny attention in aMLP for HR reference branch, i.e.gMLP_with_information_exchange) HR reference(e.g. T2 modality HR MRI data) 
         assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
     5)  (working in progress,还没有完成！)use ResTransformer based downsampler and pixel shuffle based upsampler in U-Net for MRI SR. See 2021.ResT:An Efficient Transformer for Visual Recognition.
     6)  (working in progress,还没有完成！)use ResTransformer based downsampler and ResTransformer upsampler in U-Net for MRI SR.
@@ -126,7 +126,7 @@ plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
 args = {'use_HR_reference' : True, 
-        'HR_reference_framework': 'gMLP_without_information_exchange',
+        'HR_reference_framework': 'gMLP_with_information_exchange',
         'n_colors': 1, 'LR_image_size': 64,
         'type_of_upsampler': 'gMLP_based_upsampler',
         
@@ -1177,10 +1177,14 @@ class gMLPVisionInfoExchange(nn.Module):
         x = self.to_patch_embed(x)      # (B, C, H, W) --> (B, N, dim) where N equal to H*W/(patch_size**2)
         """ layers = self.layers if not self.training else dropout_layers(self.layers, self.prob_survival) """
         output_key_for_hr_reference_branch = []
-        if injected_key == None:
-            injected_key == [None]*self.depth
-        for i in range(self.depth):
-            x, output_key_for_hr_reference_branch.append( self.gmlp_residual_block[i](x, injected_key[i]) )     # (B, N, dim) --> (B, N, dim)
+        if injected_key == None or injected_key[0] == None:
+            for i in range(self.depth):
+                x, output_key = self.gmlp_residual_block[i](x, None)        # (B, N, dim) --> (B, N, dim)
+                output_key_for_hr_reference_branch.append(output_key)       # append output_key from MRI LR information.
+        else:
+            for i in range(self.depth):
+                x, output_key = self.gmlp_residual_block[i](x, injected_key[i])     # (B, N, dim) --> (B, N, dim)
+                output_key_for_hr_reference_branch.append(output_key)       # append output_key from MRI HR Ref information, although such output_key will NOT be used.
         x = self.feature_mapping(x)     # (B, N, dim) --> (B, dim, H/patch_size, W/patch_size)
         return x, output_key_for_hr_reference_branch
 
@@ -1447,7 +1451,7 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
             x1 = self.fisrt_u_net_layer(x)
             hr_reference2 = self.second_layer_in_reference_branch_for_unet_encoder(hr_reference1)
         elif self.HR_reference_framework == 'gMLP_with_information_exchange':
-            x1, list_of_key_from_lr_info_first_downsampling_layer = self.fisrt_u_net_layer(x, injected_key = [None]*2)
+            x1, list_of_key_from_lr_info_first_downsampling_layer = self.fisrt_u_net_layer(x, injected_key = None)
             hr_reference2, _ = self.second_layer_in_reference_branch_for_unet_encoder(hr_reference1, list_of_key_from_lr_info_first_downsampling_layer)
         x2 = self.second_u_net_layer(x1 + hr_reference2)
         x3 = self.third_u_net_layer(x2)
