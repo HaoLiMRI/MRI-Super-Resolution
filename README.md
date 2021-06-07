@@ -144,7 +144,7 @@ Uncertainty for Autonomous Driving
 	
 35. 准备好MICCAI比赛用的brats数据集，把之前成功的网络模型从单一的MRI SR任务扩展到MRI SR + Segmentation + Uncertainty for Segmentation Purpose。这样做成一个完整的输入MRI LR生成最后分割之后的结果并带有uncertainty描述分割是否准确的end to end solution framework。
 
-36. 设计基于余弦相似度的k space fftloss。
+36. 设计基于余弦相似度的k space fftloss。给每个网络都加上这个试一下。
 
 ### 近期主要的写代码的任务集中在：
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
@@ -156,7 +156,9 @@ Uncertainty for Autonomous Driving
 (c)(d) 基于纯gMLP Downsampling + gMLP Upsamling的UNet MRI SR模型。
 (f) 基于纯ResTransformer Downsampling + gMLP Upsamling的UNet MRI SR模型。
 
-36. 设计基于余弦相似度的k space fftloss。
+36. 设计基于余弦相似度的k space fftloss。给每个网络都加上这个
+
+做一个conv UNet实现SR作为baseline。
 
 33. uncertainty modeling for MRI SR。
 
