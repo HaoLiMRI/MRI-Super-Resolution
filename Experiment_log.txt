@@ -12,7 +12,7 @@ Data		Network								Dataset					Result							Device
 2021.06.04	RCAN with HR ref v1.2.2						HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.6432			GV100
 2021.06.07	gMLP U-Net with simple HR ref v1.0.4				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9571 psnr 38.6680			A6000
 2021.06.08	gMLP U-Net with info-exchange HR ref v1.0.4			HCP 100 datasets, 3D 2x1 128x1		Break at epoch 36, val ssim 0.9566 psnr 38.3368		A6000
-2021.06.08	RCAN-based 3D reconstruction v1.0.2				HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9638 psnr 39.7288			A6000
+2021.06.08	RCAN-based 3D reconstruction v1.0.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9638 psnr 39.7288			A6000
 2021.06.10	RCAN CBAM v1.2.2						HCP 100 datasets, 3D 2x1 128x1		On going						GV100
 2021.06.11	gMLP U-Net v1.0.2						HCP 300 datasets, 3D 2x1 128x1		On going						A6000
 2021.06.11	RCAN with sequential external attention				HCP 100 datasets, 3D 2x1 128x1		On going						A6000
