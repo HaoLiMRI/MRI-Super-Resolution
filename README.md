@@ -146,6 +146,12 @@ Uncertainty for Autonomous Driving
 
 36. 设计基于余弦相似度的k space fftloss。给每个网络都加上这个试一下。
 
+37. 把现在的HR reference的gMLP的reference branch重新修改如下：
+(a). 只在encoder使用HR reference branch，跑这个实验
+(b). 只在decoder使用HR reference branch，跑这个实验
+根据这些结果再决定HR Reference based EfficientTransformerBlock的UNet的HR reference branch怎么实现。
+
+
 ### 近期主要的写代码的任务集中在：
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
 31.(3) 用RVT或者ResT替换ViT Encoder。
