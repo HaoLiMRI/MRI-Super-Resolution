@@ -9,20 +9,20 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.2.0
+Version: 2.0.0
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210605
+This is the current version we are working on, in 20210612
 This is a demo code of U_Net_Based_MRI_SR_Transformer_MLP_2D. in this version we have already support following items:
     1)  use gMLP or aMLP based downsampler and conv based upsampler in U-Net for MRI SR. gMLP which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
     2)  use gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR. 
     3)  Simple version(i.e.gMLP_without_information_exchange) HR reference(e.g. T2 modality HR MRI data) assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
     4)  Complicated version(using information from MRI LR data as key for tiny attention in aMLP for HR reference branch, i.e.gMLP_with_information_exchange) HR reference(e.g. T2 modality HR MRI data) 
         assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
-    5)  (working in progress,还没有完成！)use ResTransformer based downsampler and pixel shuffle based upsampler in U-Net for MRI SR. See 2021.ResT:An Efficient Transformer for Visual Recognition.
-    6)  (working in progress,还没有完成！)use ResTransformer based downsampler and ResTransformer upsampler in U-Net for MRI SR.
-    7)  (working in progress,还没有完成！)HR reference(e.g. T2 modality HR MRI data) assisted "ResTransformer based downsampler and ResTransformer upsampler in U-Net for MRI SR".
+    5)  (working in progress,还没有完成！)use EfficientTransformerBlock in ResTransformer based downsampler and conv based upsampler in U-Net for MRI SR. See 2021.ResT:An Efficient Transformer for Visual Recognition.
+    6)  (working in progress,还没有完成！)use EfficientTransformerBlock in ResTransformer based downsampler and EfficientTransformerBlock in ResTransformer upsampler in U-Net for MRI SR.
+    7)  (working in progress,还没有完成！)HR reference(e.g. T2 modality HR MRI data) assisted "EfficientTransformerBlock in ResTransformer based downsampler and EfficientTransformerBlock in ResTransformer upsampler in U-Net for MRI SR".
 
 
 
@@ -74,6 +74,7 @@ import torchvision.transforms as transforms
 from einops import rearrange
 from einops.layers.torch import Rearrange, Reduce
 from random import randrange
+from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 import matplotlib.pyplot as plt
 from math import exp
 import numpy as np
@@ -125,9 +126,10 @@ plot_the_k_space_data_of_input_image = False
 plot_the_wavelets_transform_data_of_input_image = False
 
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
-args = {'use_HR_reference' : True, 
+args = {'use_HR_reference' : False,
         'HR_reference_framework': 'gMLP_with_information_exchange',
-        'n_colors': 1, 'LR_image_size': 64,
+        'basic_block' : 'gMLP',
+        'n_colors': 1, 'efficient_transformer': 32,
         'type_of_upsampler': 'gMLP_based_upsampler',
         
         'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
@@ -140,6 +142,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
 # args['HR_reference_framework'] = 'gMLP_without_information_exchange', stands for what kind of HR reference framework we use, e.g. 'gMLP_without_information_exchange', 'gMLP_with_information_exchange', 'ResT_without_information_exchange', 'ResT_with_information_exchange'.
+# args['basic_block'] = 'efficient_transformer', stands for the selected basic block of U-Net, e.g. 'efficient_transformer', 'gMLP'
 # args['n_colors'] = 1, stands for number of channels of input image, e.g. 1 for MRI image, 3 for RGB image.
 # args['type_of_upsampler'] = 'conv_based_upsampler', stands for type of upsampler, e.g. 'conv_based_upsampler', 'gMLP_based_upsampler'
 # arg['optimizer'] = ['Adam'] # stand for which optimizer we want use for training, e.g. 'Adam', 'SGD_with_momentum', 'look_ahead'
@@ -1261,6 +1264,176 @@ class GatingMlpResidualBlockInfoExchange(nn.Module):
 
 
 
+"EfficientTransformerBlock in ResTransformer. See paper: 2021.ResT:An Efficient Transformer for Visual Recognition"
+class EfficientTransformerBlock(nn.Module):
+    # EMSA block in ResTransformer. See section 2.2.Efficient Transformer Block and equation (5) in paper: 2021.ResT:An Efficient Transformer for Visual Recognition
+    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None,
+                 act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, apply_transform=True):
+        super().__init__()
+        self.norm1 = norm_layer(dim)
+        self.attn = EMSA(
+            dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
+            sr_ratio=sr_ratio, apply_transform=apply_transform)
+        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
+        self.norm2 = norm_layer(dim)
+        mlp_hidden_dim = int(dim * mlp_ratio)
+        self.mlp = MlpInEfficientTransformerBlock(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer)
+
+    def forward(self, x, H, W):
+        # Following code stands for equation (5) in paper:2021.ResT:An Efficient Transformer for Visual Recognition.
+        x = x + self.attn(self.norm1(x), H, W)
+        x = x + self.mlp(self.norm2(x))
+        return x
+
+class MlpInEfficientTransformerBlock(nn.Module):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU):
+        super().__init__()
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        self.fc1 = nn.Linear(in_features, hidden_features)
+        self.act = act_layer()
+        self.fc2 = nn.Linear(hidden_features, out_features)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.fc2(x)
+        return x
+
+class EMSA(nn.Module):
+    # Effiecient Multi-head Self-Attention module. See figure 3 and equation (4) in paper:2021.ResT:An Efficient Transformer for Visual Recognition.
+    def __init__(self,
+                 dim,
+                 num_heads=8,
+                 qkv_bias=False,
+                 qk_scale=None,
+                 sr_ratio=1,
+                 apply_transform=True):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = qk_scale or head_dim ** -0.5
+
+        self.q = nn.Linear(dim, dim, bias=qkv_bias)
+        self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
+        self.proj = nn.Linear(dim, dim)
+
+        self.sr_ratio = sr_ratio
+        if sr_ratio > 1:
+            self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio+1, stride=sr_ratio, padding=sr_ratio // 2, groups=dim)
+            self.sr_norm = nn.LayerNorm(dim)
+
+        self.apply_transform = apply_transform and num_heads > 1
+        if self.apply_transform:
+            self.transform_conv = nn.Conv2d(self.num_heads, self.num_heads, kernel_size=1, stride=1)
+            self.transform_norm = nn.InstanceNorm2d(self.num_heads)
+
+    def forward(self, x, H, W):
+        B, N, C = x.shape
+        q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+        if self.sr_ratio > 1:
+            x_ = x.permute(0, 2, 1).reshape(B, C, H, W)
+            x_ = self.sr(x_).reshape(B, C, -1).permute(0, 2, 1)
+            x_ = self.sr_norm(x_)
+            kv = self.kv(x_).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        else:
+            kv = self.kv(x).reshape(B, N, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        k, v = kv[0], kv[1]
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        if self.apply_transform:
+            attn = self.transform_conv(attn)
+            attn = attn.softmax(dim=-1)
+            attn = self.transform_norm(attn)
+        else:
+            attn = attn.softmax(dim=-1)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        return x
+
+class PatchEmbed(nn.Module):
+    # Image to Patch Embedding. See section 2.3. Patch Embedding in paper:2021.ResT:An Efficient Transformer for Visual Recognition.
+    def __init__(self, patch_size=16, in_ch=3, out_ch=768, with_pos=False, for_upsampling = False):
+        super().__init__()
+        self.patch_size = to_2tuple(patch_size)
+        self.for_upsampling = for_upsampling
+        if for_upsampling == False:
+            self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=patch_size+1, stride=patch_size, padding=patch_size // 2)
+        else: # for_upsampling == True
+            self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=patch_size+1, stride=patch_size//2, padding=patch_size // 2)
+        self.norm = nn.BatchNorm2d(out_ch)
+
+        self.with_pos = with_pos
+        if self.with_pos:
+            self.pos = PA(out_ch)
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        x = self.conv(x)
+        x = self.norm(x)
+        if self.with_pos:
+            x = self.pos(x)
+        x = x.flatten(2).transpose(1, 2)
+        if self.for_upsampling == False:
+            H, W = H // self.patch_size[0], W // self.patch_size[1]
+        else: # self.for_upsampling == True
+            H, W = H // (self.patch_size[0]//2), W // (self.patch_size[1]//2)
+        return x, (H, W)
+
+class PA(nn.Module):
+    # Pixel-wise attention positioning encoding.
+    def __init__(self, dim):
+        super().__init__()
+        self.pa_conv = nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=dim)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        # Following code stands for equation (8) in paper:2021.ResT:An Efficient Transformer for Visual Recognition.
+        return x * self.sigmoid(self.pa_conv(x))
+
+class GL(nn.Module):
+    # Group linear positioning encoding.
+    def __init__(self, dim):
+        super().__init__()
+        self.gl_conv = nn.Conv2d(dim, dim, kernel_size=3, padding=1, groups=dim)
+
+    def forward(self, x):
+        # Following code stands for equation (7) in paper:2021.ResT:An Efficient Transformer for Visual Recognition.
+        return x + self.gl_conv(x)
+
+class BasicStem(nn.Module):
+    # Convert input data from (B, 1, H, W) to (B, C, H/2, W/2)
+    def __init__(self, in_ch=1, out_ch=32, with_pos=True):
+        super(BasicStem, self).__init__()
+        hidden_ch = out_ch // 2
+        self.conv1 = nn.Conv2d(in_ch, hidden_ch, kernel_size=3, stride=1, padding=1, bias=False)
+        #self.norm1 = nn.BatchNorm2d(hidden_ch)
+        self.conv2 = nn.Conv2d(hidden_ch, hidden_ch, kernel_size=3, stride=1, padding=1, bias=False)
+        #self.norm2 = nn.BatchNorm2d(hidden_ch)
+        self.conv3 = nn.Conv2d(hidden_ch, out_ch, kernel_size=3, stride=2, padding=1, bias=False)
+
+        self.act = nn.ReLU(inplace=True)
+        self.with_pos = with_pos
+        if self.with_pos:
+            self.pos = PA(out_ch)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        #x = self.norm1(x)
+        x = self.act(x)
+
+        x = self.conv2(x)
+        #x = self.norm2(x)
+        x = self.act(x)
+
+        x = self.conv3(x)
+        if self.with_pos:
+            x = self.pos(x)
+        return x
+
+
+
 "Upsampler Module, implemented by employeed of sub-pixel conv"
 class Upsampler(nn.Sequential):
     """
@@ -1290,10 +1463,12 @@ class Upsampler(nn.Sequential):
 
 
 
-"gMLP or Transformer based U-Net for Super Resolution MRI"
+
+
+"gMLP based U-Net for Super Resolution MRI"
 class U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
     """
-    U-Net framework in this code, consists of each Transformer layer/gMLP as one layer of encoder in U-Net.
+    U-Net framework in this code, consists of each gMLP as one layer in U-Net.
     """
     def __init__(self, args):
         super(U_Net_Based_MRI_SR_Transformer_MLP_2D, self).__init__()
@@ -1367,10 +1542,12 @@ class U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
 
 
 
-"gMLP or Transformer based U-Net for Super Resolution MRI"
+
+
+"HR reference gMLP based U-Net for Super Resolution MRI"
 class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
     """
-    U-Net framework in this code, consists of each Transformer layer/gMLP as one layer of encoder in U-Net.
+    U-Net framework in this code, consists of each gMLP as one layer in U-Net, with HR reference as auxiliary branch.
     """
     def __init__(self, args):
         super(HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D, self).__init__()
@@ -1480,11 +1657,163 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
 
 
 
+"Efficient Transformer based U-Net for Super Resolution MRI. See paper 2021.ResT:An Efficient Transformer for Visual Recognition for detail"
+class Efficient_Transformer_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
+    """
+    Input arguments:
+        embed_dims: Stands for number of output channel from last effiecient transformer block and number of input channel for next effiecient transformer block.
+        num_heads: Stands for how many heads are used in efficient multi-head self-attention block.
+        depths: Stands for how many EfficientTransformerBlock are used in each stage. See figure 2 of paper:2021.ResT:An Efficient Transformer for Visual Recognition for detail(depth is L1, L2, L3, L4 in figure 2).
+    """
+    def __init__(self, args, embed_dims=[16, 64, 256, 1024, 1024, 256, 64, 16],
+                 num_heads=[1, 2, 4, 8, 8, 4, 2, 1], mlp_ratios=[4, 4, 4, 4, 4, 4, 4, 4], 
+                 qkv_bias=False, qk_scale=None,
+                 depths=[2, 2, 2, 2, 2, 2, 2, 2], sr_ratios=[8, 4, 2, 1, 1, 2, 4, 8],
+                 norm_layer=nn.LayerNorm, apply_transform=True):
+        super().__init__()
+        self.depths = depths
+        self.apply_transform = apply_transform
+
+        # Efficient transformer block based encoder.
+        self.stem = BasicStem(in_ch=args['n_colors'], out_ch=embed_dims[0], with_pos=True)  # See figure 2 of ResT paper for more detail regarding stem.
+
+        self.patch_embed_2 = PatchEmbed(patch_size=2, in_ch=embed_dims[0], out_ch=embed_dims[1], with_pos=True) # Patch embedding for stage 2.
+        self.patch_embed_3 = PatchEmbed(patch_size=2, in_ch=embed_dims[1], out_ch=embed_dims[2], with_pos=True) # Patch embedding for stage 3.
+        self.patch_embed_4 = PatchEmbed(patch_size=2, in_ch=embed_dims[2], out_ch=embed_dims[3], with_pos=True) # Patch embedding for stage 4.
+
+        self.stage1 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[0], num_heads[0], mlp_ratios[0], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[0], apply_transform=apply_transform)
+            for i in range(self.depths[0])])
+
+        self.stage2 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[1], num_heads[1], mlp_ratios[1], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[1], apply_transform=apply_transform)
+            for i in range(self.depths[1])])
+
+        self.stage3 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[2], num_heads[2], mlp_ratios[2], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[2], apply_transform=apply_transform)
+            for i in range(self.depths[2])])
+
+        self.stage4 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[3], num_heads[3], mlp_ratios[3], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[3], apply_transform=apply_transform)
+            for i in range(self.depths[3])])
+
+        # Efficient transformer block based decoder.
+        self.patch_embed_upsampling_1 = PatchEmbed(patch_size=2, in_ch=embed_dims[4], out_ch=embed_dims[4], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 1.
+        self.patch_embed_upsampling_2 = PatchEmbed(patch_size=2, in_ch=embed_dims[5]*2, out_ch=embed_dims[5], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 2.
+        self.patch_embed_upsampling_3 = PatchEmbed(patch_size=2, in_ch=embed_dims[6]*2, out_ch=embed_dims[6], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 3.
+        self.patch_embed_upsampling_4 = PatchEmbed(patch_size=2, in_ch=embed_dims[7]*2, out_ch=embed_dims[7], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 4.
+        self.patch_embed_upsampling_5 = PatchEmbed(patch_size=2, in_ch=embed_dims[7]//4, out_ch=embed_dims[7]//4, with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 5.
+
+        self.pixel_shuffle_upsampler_1 = nn.PixelShuffle(upscale_factor = 2)
+        self.pixel_shuffle_upsampler_2 = nn.PixelShuffle(upscale_factor = 2)
+        self.pixel_shuffle_upsampler_3 = nn.PixelShuffle(upscale_factor = 2)
+        self.pixel_shuffle_upsampler_4 = nn.PixelShuffle(upscale_factor = 2)
+        self.pixel_shuffle_upsampler_5 = nn.PixelShuffle(upscale_factor = 2)
+
+        self.upsampling_stage_1 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[4], num_heads[4], mlp_ratios[4], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[4], apply_transform=apply_transform)
+            for i in range(self.depths[4])])
+        
+        self.upsampling_stage_2 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[5], num_heads[5], mlp_ratios[5], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[5], apply_transform=apply_transform)
+            for i in range(self.depths[5])])
+
+        self.upsampling_stage_3 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[6], num_heads[6], mlp_ratios[6], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[6], apply_transform=apply_transform)
+            for i in range(self.depths[6])])
+
+        self.upsampling_stage_4 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[7], num_heads[7], mlp_ratios[7], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[7], apply_transform=apply_transform)
+            for i in range(self.depths[7])])
+
+        self.upsampling_stage_5 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[7]//4, num_heads[7], mlp_ratios[7], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[7], apply_transform=apply_transform)
+            for i in range(self.depths[7])])
+
+    def forward(self, x):
+        lr = x
+        x = self.stem(x)
+        B, _, H, W = x.shape
+        x = x.flatten(2).permute(0, 2, 1)
+
+        # encoder(downsampling) stage 1
+        for blk in self.stage1: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x_downsampling_1 = x.permute(0, 2, 1).reshape(B, -1, H, W)
+
+        # encoder(downsampling) stage 2
+        x, (H, W) = self.patch_embed_2(x_downsampling_1)
+        for blk in self.stage2: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x_downsampling_2 = x.permute(0, 2, 1).reshape(B, -1, H, W)
+
+        # encoder(downsampling) stage 3
+        x, (H, W) = self.patch_embed_3(x_downsampling_2)
+        for blk in self.stage3: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x_downsampling_3 = x.permute(0, 2, 1).reshape(B, -1, H, W)
+
+        # encoder(downsampling) stage 4
+        x, (H, W) = self.patch_embed_4(x_downsampling_3)
+        for blk in self.stage4: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+
+        # decoder(upampling) stage 1
+        x, (H, W) = self.patch_embed_upsampling_1(x)
+        for blk in self.upsampling_stage_1: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+        x_upampling_1 = self.pixel_shuffle_upsampler_1(x)
+
+        # decoder(upampling) stage 2
+        x, (H, W) = self.patch_embed_upsampling_2(tc.cat((x_upampling_1, x_downsampling_3), dim = 1))
+        for blk in self.upsampling_stage_2: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+        x_upampling_2 = self.pixel_shuffle_upsampler_2(x)
+
+        # decoder(upampling) stage 3
+        x, (H, W) = self.patch_embed_upsampling_3(tc.cat((x_upampling_2, x_downsampling_2), dim = 1))
+        for blk in self.upsampling_stage_3: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+        x_upampling_3 = self.pixel_shuffle_upsampler_3(x)
+
+        # decoder(upampling) stage 4
+        x, (H, W) = self.patch_embed_upsampling_4(tc.cat((x_upampling_3, x_downsampling_1), dim = 1))
+        for blk in self.upsampling_stage_4: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+        x_upampling_4 = self.pixel_shuffle_upsampler_4(x)
+
+        """ x_upampling_4 = x_upampling_4 + lr  # If we want to just recover the "residual of sr" rather than the sr directly, then need this line of code. """
+
+        # decoder(upampling) stage 5
+        x, (H, W) = self.patch_embed_upsampling_5(x_upampling_4)
+        for blk in self.upsampling_stage_5: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+        sr = self.pixel_shuffle_upsampler_5(x)
+
+        return sr
+
+
+
+
+
 device=tc.device("cuda" if use_cuda else "cpu")
 if args['use_HR_reference'] == False:
-    our_model_mri_sr_2d = U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
+    if args['basic_block'] == 'efficient_transformer':
+        our_model_mri_sr_2d = Efficient_Transformer_Based_MRI_SR_Transformer_MLP_2D(args)
+    elif args['basic_block'] == 'gMLP':
+        our_model_mri_sr_2d = U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
 else:   # args['use_HR_reference'] == True:
-    our_model_mri_sr_2d = HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
+    if args['basic_block'] == 'efficient_transformer':
+        pass
+    elif args['basic_block'] == 'gMLP':
+        our_model_mri_sr_2d = HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
+
 
 
 # Weight initialization using He initialization.
