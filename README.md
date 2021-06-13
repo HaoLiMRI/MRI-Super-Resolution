@@ -149,7 +149,10 @@ Uncertainty for Autonomous Driving
 37. 把现在的HR reference的gMLP的reference branch重新修改如下：
 (a). 只在encoder使用HR reference branch，跑这个实验
 (b). 只在decoder使用HR reference branch，跑这个实验
-根据这些结果再决定HR Reference based EfficientTransformerBlock的UNet的HR reference branch怎么实现。
+
+另外还需要对不带HR reference的gMLPUNet试一下只恢复SR的residual会不会效果更好，即在最后生成的部分加上最开始进来的MRI LR图像。
+
+根据这些结果再决定HR Reference based EfficientTransformerBlock的UNet的HR reference branch怎么实现。以及只有EfficientTransformerBlock的UNet直接恢复SR还是恢复SR的residual。
 
 
 ### 近期主要的写代码的任务集中在：
