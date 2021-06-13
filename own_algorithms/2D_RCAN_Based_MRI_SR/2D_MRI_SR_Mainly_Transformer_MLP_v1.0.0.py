@@ -20,7 +20,7 @@ This is a demo code of U_Net_Based_MRI_SR_Transformer_MLP_2D. in this version we
     3)  Simple version(i.e.gMLP_without_information_exchange) HR reference(e.g. T2 modality HR MRI data) assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
     4)  Complicated version(using information from MRI LR data as key for tiny attention in aMLP for HR reference branch, i.e.gMLP_with_information_exchange) HR reference(e.g. T2 modality HR MRI data) 
         assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
-    5)  (working in progress,还没有完成！)use EfficientTransformerBlock in ResTransformer based downsampler and conv based upsampler in U-Net for MRI SR. See 2021.ResT:An Efficient Transformer for Visual Recognition.
+    5)  use EfficientTransformerBlock in ResTransformer based downsampler and conv based upsampler in U-Net for MRI SR. See 2021.ResT:An Efficient Transformer for Visual Recognition.
     6)  (working in progress,还没有完成！)use EfficientTransformerBlock in ResTransformer based downsampler and EfficientTransformerBlock in ResTransformer upsampler in U-Net for MRI SR.
     7)  (working in progress,还没有完成！)HR reference(e.g. T2 modality HR MRI data) assisted "EfficientTransformerBlock in ResTransformer based downsampler and EfficientTransformerBlock in ResTransformer upsampler in U-Net for MRI SR".
 
