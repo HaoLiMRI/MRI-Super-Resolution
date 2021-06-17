@@ -154,6 +154,10 @@ Uncertainty for Autonomous Driving
 
 根据这些结果再决定HR Reference based EfficientTransformerBlock的UNet的HR reference branch怎么实现。以及只有EfficientTransformerBlock的UNet直接恢复SR还是恢复SR的residual。
 
+38. 有可能前后带上CNN(conv)效果要比纯gMLP或者纯efficient transformer的UNet效果好，因为conv可以抓取locality information。所以首先我们需要把efficient transformer based UNet的upsampling部分都用conv替换efficient transformer看看效果是不是有提升。之后再仔细分析重新设计一个CNN和gMLP混合或者CNN和efficient transformer混合的UNet(例如在最前和最后都用RCAB模块)。
+
+39. 对所有的gMLP和efficient transformer相关的模型再跑cross modality translation任务。
+
 
 ### 近期主要的写代码的任务集中在：
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
