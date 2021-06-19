@@ -119,6 +119,8 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 		l1_loss = respond_bbox * bbox_loss_scale * (
 			torch.exp(-pred_vari) * smooth_loss(target=label_coor, input=pred_coor) + 0.5 * pred_vari) * cfg.l1scale
 		bbox_loss = l1_loss
+		
+	note: 对这个方案，我们可以考虑不对每一个SR image的pixel都求variance，而是只对当前SR image中那些SSIM Map中值小于一定threshold的pixel求variance。这个threhold可以设为当前SSIM map中所有元素的均值减去一倍或者二倍的方差。
 
 	4). 把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。但这里不再是用minimize KL散度的方式得到一个MSE loss的变形，而是直接认为当每个像素的ground truth和估计出的每个像素的均值方差表示的高斯分布很接近时候，ground truth的像素值代入用该均值和方差表示的高斯pdf函数应该Maximize，所以求sum(-log(Gaussian_pdf(i))),i表示每个像素。用这种方案得到每个像素的方差。见论文：Gaussian YOLOv3: An Accurate and Fast Object Detector Using Localization
 Uncertainty for Autonomous Driving
