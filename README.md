@@ -126,6 +126,9 @@ b). 再比如用基于纯MLP的attention替换掉Transformer中self-attention结
 Uncertainty for Autonomous Driving
 
 	5). 目前网络，使用多层输入多层输出的数据，比如7层输入7层输出，每一层在测试时会出现在volume中的不同位置，所以可以用同一层在不同volume中的测试结果计算均值和variance。
+	
+	6). 用目前的test数据，计算每个像素在所有图之间sr与hr只差的分布，看看每个像素的分布是否有规律。
+	
 
 34. 设计一个基于纯ViT Transformer Encoder或者gMLP + Upsamling的U-Net framework MRI SR模型。方案如下： 由于ViT Transformer Encoder或者gMLP模块中patch_size控制了输入该模块的feature map被“缩小(降采样)”的比例，例如patch_size = 2则H, W都会分别被降采样1/2,，所以可以设计一个用N个ViT Transformer Encoder或者gMLP构成的N个“U-Net encoder layer”，不断的降采样。然后再用upsampling升起来，前面的feature map给concat到后面upsampling的每一层的feature map，最后得到MRI SR的结果。
 这个方案实现时候可以用：
