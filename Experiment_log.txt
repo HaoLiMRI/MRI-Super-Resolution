@@ -4,7 +4,7 @@ Data		Network								Dataset					Result							Device
 2021.05.19	RCAN-based 3D reconstruction v1.0.2				HCP 300 datasets, 3D 2x2 128x1		Done, val ssim 0.9364 psnr 37.1622			A6000
 2021.05.21	RCAN-based 3D reconstruction v1.0.2				HCP 300 datasets, 3D 1x2 128x1		Done, val ssim 0.9560 psnr 38.9387			A6000
 2021.05.24	RCAN-based 3D reconstruction v1.0.2				HCP 300 datasets, 3D 2x1 128x3		Done, val ssim 0.9636 psnr 39.5738			GV100
-2021.05.27	gMLP+conv upsampling v1.0.2						    HCP 300 datasets, 3D 2x1 128x3		Break, val ssim 0.9608 					A6000
+2021.05.27	gMLP+conv upsampling v1.0.2				HCP 300 datasets, 3D 2x1 128x3		Break, val ssim 0.9608 					A6000
 2021.05.28	RCAN-based 3D reconstruction v1.0.2				HCP 300 datasets, 3D 2x2 128x3		Done, val ssim 0.9459 psnr 37.9158			GV100
 2021.06.01	RCAN-based 3D reconstruction v1.0.2				HCP 100 datasets, 3D 1x2 128x3		Done, val ssim 0.9685 psnr 40.3262			A6000
 2021.06.01 	RCAN-based with parallel self-attention in RCAB v1.2.2		HCP 100 datasets, 3D 2x1 128x1		Failed, ssim loss was negative				GV100
