@@ -19,7 +19,7 @@ Data		Network								Dataset					Result							Device
 2021.06.11	RCAN with sequential external attention				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9638 psnr 39.6287			A6000
 2021.06.14	ResT U-Net v1.0.5						HCP 300 datasets, 3D 2x1 128x1		On going						A6000
 2021.06.16	RCAN with Cosine Similarity loss v1.0.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9635? psnr 39.5?, training log lost	A6000
-2021.06.18	ResT+conv upsampling v1.0.5						    HCP 100 datasets, 3D 2x1 128x1		On going						A6000
+2021.06.18	ResT+conv upsampling v1.0.5				HCP 100 datasets, 3D 2x1 128x1		On going						A6000
 
 
 
