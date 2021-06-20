@@ -14,7 +14,7 @@ Version: 1.2.0(Stable Version, even deformable conv works at least for RCAN netw
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210206
+This is the current version we are working on, in 20210523
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) use RCAN or U-Net as main framework, for image single branch network.
@@ -76,6 +76,9 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
     32) option to use Gradient map guided pixel-wise loss. SR和HR分别求gradient map，再相减得到一个gradient map差的矩阵，再把这个gradient map差的矩阵从(H * W)变为(1 * HW)，然后再过一个softmax，再变回H * W，然后把得到的矩
         阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
     33) option to use SSIM map guided pixel-wise loss. SR和HR求SSIM map，再用1减这个SSIM map得到一个矩阵当做pixel-wise L1 loss的weight来元素乘在L1 loss的pixel上。
+    34) option to use external-attention. Which is a pure MLP based 'self-attention'. See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' for more detail.
+    35) option to use involution conv(but still has some bugs when using involution conv).
+    36) option to use gMLP or aMLP, which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
@@ -86,9 +89,10 @@ Some feature or bug fixing which have already been planed/started but still not 
         HR reference based network。不支持其他配置时的HR reference based network。注意：现在gradient_map_dual_domain时用HR reference based network还有问题，会out of memory。
     4) 另外，现在option to use HR reference with self-attention in the end这个方案如果在网络用self-attention，则会out of memory。
     5) option to add long skip connection outside the entire network model to only reconstruct the residual part of HR MRI image这个选项现阶段仅支持非HR Reference based的网络结构。
+    6) option to use involution conv, still has bugs which makes the loss as nan. 
 
 
-we will plan to support other features:
+We will plan to support other features:
     1) multi-kernel size deformable conv in different paths and fuse together, see [26] for similar idea
     2) kernel size wise attention[25] for multi-kernel size deformable conv
     3) multi-kernel size dilated conv in different paths and fuse together[26]
@@ -122,9 +126,13 @@ we will plan to support other features:
     13) 看懂PC（Phase Congruency）怎么算，把这个指标做loss项。 参考论文：2011.FSIM: A Feature Similarity Index for Image Quality Assessment 参考代码：https://github.com/sunxirui310/FSIM-FSIMc-matlab/blob/master/FSIM.m
     14) 受paper: 2019.Local Relation Networks for Image Recognition中figure2的启发，那个图它引入了一个什么geometry prior，然后说要对each spatial position来做self-attention。我们可以像它这样，但不对每一个spatial position来做，
         而是在option to use HR reference with self-attention in the end方案实现using HR reference with self-attention in the end那样最后做self-attention的部分引入一个比如LR的图的Gradient map像它这个geometry prior一样加到self-attention里面。
-    15) 我们的HR reference based网络也应该让它经过小波变换，然后只保留高频部分进入网络帮助LR做SR。无论对于自己的HR reference网络还是TTSR都可以这样做下,对于TTSR则可以直接对HR Reference
-        做小波变换保留3个高频分量放在3个channel上面进入LTE。对于我们自己的HR reference网络则可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量各自过self-attention
-        一起组成multi-head self-attention。
+    15) 还是我们自己的HR reference网络，也应该让HR reference经过小波变换，然后只保留高频部分进入网络帮助LR做SR。方案一：对于我们自己的HR reference网络可以考虑对HR reference数据做DWT（小波变换），只保留3个高频分量。
+        然后对LR数据像“Inverse-wavelet-only RCAN”这个idea一样处理，直接用网络试图从LR数据生成HR图像的小波分量，然后把用网络对LR数据生成的3个高频小波分量和FR reference做DWT得到的3个HR reference的高频分量进行fusion。
+        最后再把LR数据用网络试图直接生成的一个低频分量和fuse后的3个高频分量一起做IDWT（小波反变换）恢复2x SR图像。如果是4x则用progressive构架重复2次2x放大的该方案。
+    16) 还是我们自己的HR reference网络，也应该让HR reference经过小波变换，然后只保留高频部分进入网络帮助LR做SR。方案二：对于我们自己的HR reference网络可以考虑把LR复制3份，分别于HR reference的小波变换的3个高频分量
+        各自过self-attention一起组成multi-head self-attention。
+
+
 
 
 We also fixed bugs from previous versions, typical ones like:
@@ -201,6 +209,9 @@ from torch.autograd import Variable
 import torchvision as tv
 import torchvision.transforms as transforms
 # from torchvision.transforms import ToPILImage
+from einops import rearrange
+from einops.layers.torch import Rearrange, Reduce
+from random import randrange
 import matplotlib.pyplot as plt
 from math import exp
 import numpy as np
@@ -236,12 +247,12 @@ since = time.perf_counter()
 0. Configure all parameter
 """""""""""""""""""""""""""""""""""""""""""""
 # --------------------------- configuration of support parameters --------------------------- #
-batch_size = 6
+batch_size = 1
 EPOCH_NUM = 1
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
 Maintain_Same_Size = False # stand for whether we want the output image has same size or NOT(e.g. larger size) as input image, e.g. set as Ture when apply for MRI motion artifact reduction
-Use_SSIM_L1_Loss = True # stand for whether we want use SSIM L1 loss in the total loss function
+Use_SSIM_L1_Loss = False # stand for whether we want use SSIM L1 loss in the total loss function
 Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
 Use_Negative_TV_Loss = True # stand for whether we want to use "1/(total variation + 1.000e-10) loss"(on SR , for providing over smoothing)
@@ -260,19 +271,19 @@ plot_the_wavelets_transform_data_of_input_image = False
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
 args = {'use_HR_reference' : True, 
         'use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser': True,
-        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'CBAM',
+        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'gMLP',
         'channel_and_spatial_attention_mode_for_HR_reference_fuser': 'parallel_mode',
 
         'main_network_framework': 'RCAN', 'type_of_network': 'image_single_domain', 'long_skip_connection_to_reconstruct_residual_part_only': False,
         
         'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True,
-        'channel_and_spatial_attention_framework': 'CBAM', 'channel_and_spatial_attention_mode': 'sequential_mode',
+        'channel_and_spatial_attention_framework': 'gMLP', 'channel_and_spatial_attention_mode': 'sequential_mode',
 
         'n_colors': 1, 'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 
         
         'scale': 2, 'number_of_progressive_stage': 1,
 
-        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'gradient_operator': 'sobel', 
+        'conv_layer_type': 'involution', 'activation_function_type': 'ReLU', 'gradient_operator': 'sobel', 
         
         'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
         'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
@@ -284,7 +295,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
 # args['use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser'] = True, stands for whether we select to use attention when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. True, False
-# args['channel_and_spatial_attention_framework_for_HR_reference_fuser'] = 'self_attention', stands for which channel and spatial framework is used when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'CBAM', 'self_attention'
+# args['channel_and_spatial_attention_framework_for_HR_reference_fuser'] = 'self_attention', stands for which channel and spatial framework is used when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'CBAM', 'self_attention', 'external_attention', 'gMLP'
 # args['channel_and_spatial_attention_mode_for_HR_reference_fuser'] = 'parallel_mode', stands for which end to end channel and spatial block to use when fusing the feature maps from HR reference and LR MRI image in the last stage, e.g. 'sequential_mode', 'parallel_mode'
 
 # args['main_network_framework'] = 'RCAN', stands for which main network framework to use, e.g. 'U_Net', 'RCAN'
@@ -293,7 +304,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 
 # args['use_channel_and_spatial_attention_inside_upsampler'] = True, stands for whether we use channel and spatial attention block inside upsampler, e.g. True, False
 # args['use_channel_and_spatial_attention_inside_RCAB'] = True, stands for whether we use channel and spatial attention block inside RCAB to replace CALayer, e.g. True, False
-# args['channel_and_spatial_attention_framework'] = 'self_attention', stands for which channel and spatial framework is used in the code, e.g. 'CBAM', 'self_attention'
+# args['channel_and_spatial_attention_framework'] = 'self_attention', stands for which channel and spatial framework is used in the code, e.g. 'CBAM', 'self_attention', 'external_attention', 'gMLP'
 # args['channel_and_spatial_attention_mode'] = 'sequential_mode', stands for which end to end channel and spatial block to use, e.g. 'sequential_mode', 'parallel_mode'
 
 # args['n_colors'] = 1, stands for number of channels of input image, e.g. 1 for MRI image, 3 for RGB image.
@@ -305,7 +316,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
 # args['scale'] = 2, stands for scale factor used in one upsampler, e.g. 2, 4
 # args['number_of_progressive_stage'] = 2, stands for number of stages(number of "MRI_SR_Dual_Domain_2D network"), e.g. 1, 2, 3, to ultilize progressive upsampling
 
-# args['conv_layer_type'] = 'default_conv', stands for type of conv layer, e.g. 'default_conv', 'coord_conv', 'deformable_conv', 'py_conv'
+# args['conv_layer_type'] = 'default_conv', stands for type of conv layer, e.g. 'default_conv', 'coord_conv', 'deformable_conv', 'py_conv', 'involution'
 # args['activation_function_type'] = 'ReLU', stands for type of activation function, e.g. 'ReLU'. 'Sine', 'FReLU', 'Dynamic_ReLU_Type_A', 'Dynamic_ReLU_Type_B'
 # arg['gradient_operator'] = ['sobel'] # stand for which gradient operator we want use for calculating gradient map, e.g. 'sobel', 'canny'
 
@@ -1516,6 +1527,65 @@ def deformable_conv(in_channels, out_channels, kernel_size, bias = True):
         padding = (kernel_size//2), bias=bias)
 
 
+"Involution Conv Layer"
+"""
+2021.Involution: Inverting the Inherence of Convolution for Visual Recognition
+"""
+class Involution(nn.Module):
+    """
+    Implementation of `Involution: Inverting the Inherence of Convolution for Visual Recognition`.
+    """
+    def __init__(self, in_channels, out_channels, groups=1, kernel_size=3, stride=1, reduction_ratio=2):
+        super().__init__()
+        channels_reduced = max(1, in_channels // reduction_ratio)
+        padding = kernel_size // 2
+        self.reduce = nn.Sequential(
+            nn.Conv2d(in_channels, channels_reduced, 1),
+            nn.BatchNorm2d(channels_reduced),
+            nn.ReLU(inplace=True))
+        self.span = nn.Conv2d(channels_reduced, kernel_size * kernel_size * groups, 1)
+        self.unfold = nn.Unfold(kernel_size, padding=padding, stride=stride)
+        self.resampling = None if in_channels == out_channels else nn.Conv2d(in_channels, out_channels, 1)
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.groups = groups
+
+    @classmethod
+    def get_name(cls):
+        """
+        Return this layer name.
+        Returns:
+            str: layer name.
+        """
+        return 'Involution'
+
+    def forward(self, input_tensor):
+        """
+        Calculate Involution.
+        override function from PyTorch.
+        """
+        _, _, height, width = input_tensor.size()
+        if self.stride > 1:
+            out_size = lambda x: (x + 2 * self.padding - self.kernel_size) // self.stride + 1
+            height, width = out_size(height), out_size(width)
+        uf_x = rearrange(self.unfold(input_tensor), 'b (g d k j) (h w) -> b g d (k j) h w',
+                         g=self.groups, k=self.kernel_size, j=self.kernel_size, h=height, w=width)
+        if self.stride > 1:
+            input_tensor = F.adaptive_avg_pool2d(input_tensor, (height, width))
+        kernel = rearrange(self.span(self.reduce(input_tensor)), 'b (k j g) h w -> b g (k j) h w',
+                           k=self.kernel_size, j=self.kernel_size)
+        out = rearrange(tc.einsum('bgdxhw, bgxhw -> bgdhw', uf_x, kernel), 'b g d h w -> b (g d) h w')
+        if self.resampling:
+            out = self.resampling(out)
+        return out.contiguous()
+
+def involution(in_channels, out_channels, kernel_size, bias = True):
+    return Involution(
+        in_channels, out_channels, groups=1, kernel_size = kernel_size,
+        stride=1, reduction_ratio=2)
+
+
 "Sine Activation Function"
 """
 2020.Implicit Neural Representations with Periodic Activation Functions. https://arxiv.org/abs/2006.09661
@@ -1860,6 +1930,219 @@ class SelfAttentionBasedChannelAndSpatialAttention(nn.Module):
 
 
 
+"External-Attention based Spatial Attention, is a pure MLP based 'self-attention'. See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' for more detail."
+class ExternalAttentionBasedSpatialAttention(nn.Module):
+    """
+    See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' 
+            and https://mp.weixin.qq.com/s/L75TsIkB0h_GxQ6fDiVKOQ
+            for more detail.
+    """
+    def __init__(self, in_channel):
+        super(ExternalAttentionBasedSpatialAttention, self).__init__()
+        self.k = 32 
+        self.first_conv = nn.Conv2d(in_channel, in_channel, 1)
+        self.k_linear = nn.Conv1d(in_channel, self.k, 1, bias=False)    # MLP_1
+        self.v_linear = nn.Conv1d(self.k, in_channel, 1, bias=False)    # MLP_2
+        self.softmax = nn.Softmax(dim = -1)     # Normalization over space H*W for spatial-wise usage.
+
+    def forward(self, x):
+        idn = x[:]
+        b, c, h, w = x.size()
+        x = self.first_conv(x)
+        x = x.view(b, c, -1) # b, c, n 
+        attn = self.k_linear(x) # b, c, n
+        attn = self.softmax(attn)
+        attn = attn / (attn.sum(dim=1, keepdim=True) + 1e-9)    # Normalization over channel C.
+        x = self.v_linear(attn) # b, c, n 
+        x = x.view(b, c, h, w)
+        x = x + idn 
+        return x
+
+"External-Attention based Channel Attention, is an alternative external-attention but with softmax over channel C(NOT over space H*W). "
+class ExternalAttentionBasedChannelAttention(nn.Module):
+    """
+    Almost same as External-Attention, but softmax over channel C and normalization over space H*W.
+    """
+    def __init__(self, in_channel):
+        super(ExternalAttentionBasedChannelAttention, self).__init__()
+        self.k = 32 
+        self.first_conv = nn.Conv2d(in_channel, in_channel, 1)
+        self.k_linear = nn.Conv1d(in_channel, self.k, 1, bias=False)    # MLP_1
+        self.v_linear = nn.Conv1d(self.k, in_channel, 1, bias=False)    # MLP_2
+        self.softmax = nn.Softmax(dim = -2)     # Softmax over space C for channel-wise usage.
+
+    def forward(self, x):
+        idn = x[:]
+        b, c, h, w = x.size()
+        x = self.first_conv(x)
+        x = x.view(b, c, -1) # b, c, n 
+        attn = self.k_linear(x) # b, c, n
+        attn = self.softmax(attn)
+        attn = attn / (attn.sum(dim=-1, keepdim=True) + 1e-9)   # Normalization over space H*W.
+        x = self.v_linear(attn) # b, c, n 
+        x = x.view(b, c, h, w)
+        x = x + idn 
+        return x
+
+"External-Attention based End to End Channel and Spatial Attention Block, Either Sequential or Parallel for Channel and Spatial Attention"
+class ExternalAttentionBasedChannelAndSpatialAttention(nn.Module):
+    def __init__(self, in_channel, channel_and_spatial_attention_mode = 'sequential_mode'):
+        super(ExternalAttentionBasedChannelAndSpatialAttention, self).__init__()
+        self.external_attention_channel_attention = ExternalAttentionBasedChannelAttention(in_channel)
+        self.external_attention_spatial_attention = ExternalAttentionBasedSpatialAttention(in_channel)
+        self.external_attention_based_channel_and_spatial_attention_mode = channel_and_spatial_attention_mode
+    
+    def forward(self, x):
+        if self.external_attention_based_channel_and_spatial_attention_mode == 'sequential_mode':
+            x = self.external_attention_channel_attention(x)
+            x = self.external_attention_spatial_attention(x)
+            return x
+        elif self.external_attention_based_channel_and_spatial_attention_mode == 'parallel_mode':
+            channel_attention_output = self.external_attention_channel_attention(x)
+            spatial_attention_output = self.external_attention_spatial_attention(x)
+            return channel_attention_output + spatial_attention_output
+        else:
+            raise ValueError("Not supported channel and spatial attention mode yet")
+
+
+
+"gMLP or aMLP, which is another 'pure MLP' or 'pure MLP with tiny attention' module. See paper: '2021.Pay Attention to MLPs' for more info."
+class gMLPVision(nn.Module):
+    def __init__(
+        self,
+        *,
+        image_size = 64,
+        patch_size = 1,
+        dim = 512,          # Input feature's patch embedding dimension. See figure 1 in paper: 2021.Pay Attention to MLPs.
+        depth = 3,          # Number of gMLP layers, L. See figure 1 in paper: 2021.Pay Attention to MLPs.
+        ff_mult = 4,
+        channels = 3,
+        attn_dim = None,    # For tiny attention using.
+        prob_survival = 1.
+    ):
+        super().__init__()
+        assert (image_size % patch_size) == 0, 'image size must be divisible by the patch size'
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.dim = dim
+        
+        dim_ff = dim * ff_mult      # Hidden dimension?
+        num_patches = (image_size // patch_size) ** 2
+
+        # Patch embedding: Generate N tokens, where N is the num_patches, equals to h*w/(patch_size**2). Each token is a vector with dimension (1, dim).
+        self.to_patch_embed = nn.Sequential(
+            Rearrange('b c (h p1) (w p2) -> b (h w) (c p1 p2)', p1 = patch_size, p2 = patch_size),
+            nn.Linear(channels * patch_size ** 2, dim)
+        )   # Size of the output from this module is (batch_size, num_patches, dim).
+
+        self.prob_survival = prob_survival
+
+        self.layers = nn.ModuleList([ResidualForGmlp(nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, dim_ff * 2),
+            nn.GELU(),
+            SpatialGatingUnit(dim_ff, num_patches, attn_dim),
+            nn.Linear(dim_ff, dim)
+        )) for i in range(depth)])
+        
+    def feature_mapping(self, x):
+        x = x.view(
+            x.size(0),
+            int(self.image_size / self.patch_size),
+            int(self.image_size / self.patch_size),
+            self.dim,
+        )
+        x = x.permute(0, 3, 1, 2).contiguous()
+        return x
+
+    def forward(self, x):
+        x = self.to_patch_embed(x)      # (B, C, H, W) --> (B, N, dim) where N equal to H*W/(patch_size**2)
+        """ layers = self.layers if not self.training else dropout_layers(self.layers, self.prob_survival) """
+        layers = self.layers
+        x = nn.Sequential(*layers)(x)   # (B, N, dim) --> (B, N, dim)
+        x = self.feature_mapping(x)     # (B, N, dim) --> (B, dim, H/patch_size, W/patch_size)
+        return x
+
+# functions
+def exists(val):
+    return val is not None
+
+def dropout_layers(layers, prob_survival):
+    if prob_survival == 1:
+        return layers
+
+    num_layers = len(layers)
+    to_drop = tc.zeros(num_layers).uniform_(0., 1.) > prob_survival
+
+    # make sure at least one layer makes it
+    if all(to_drop):
+        rand_index = randrange(num_layers)
+        to_drop[rand_index] = False
+
+    layers = [layer for (layer, drop) in zip(layers, to_drop) if not drop]
+    return layers
+
+# helper classes
+class ResidualForGmlp(nn.Module):
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x):
+        return self.fn(x) + x
+
+class AttentionForGmlp(nn.Module):
+    def __init__(self, dim_in, dim_out, dim_inner, causal = False):
+        super().__init__()
+        self.scale = dim_inner ** -0.5
+        self.causal = causal
+
+        self.to_qkv = nn.Linear(dim_in, dim_inner * 3, bias = False)
+        self.to_out = nn.Linear(dim_inner, dim_out)
+
+    def forward(self, x):
+        device = x.device
+        q, k, v = self.to_qkv(x).chunk(3, dim = -1)
+        sim = tc.einsum('b i d, b j d -> b i j', q, k) * self.scale
+
+        if self.causal:
+            mask = tc.ones(sim.shape[-2:], device = device).triu(1).bool()
+            sim.masked_fill_(mask[None, ...], -tc.finfo(q.dtype).max)
+
+        attn = sim.softmax(dim = -1)
+        out = tc.einsum('b i j, b j d -> b i d', attn, v)
+        return self.to_out(out)
+
+class SpatialGatingUnit(nn.Module):
+    def __init__(self, dim, dim_seq, attn_dim = None, causal = False):
+        super().__init__()
+        self.causal = causal
+
+        self.norm = nn.LayerNorm(dim)
+        self.proj = nn.Conv1d(dim_seq, dim_seq, 1)
+        self.attn = AttentionForGmlp(dim * 2, dim, attn_dim, causal) if exists(attn_dim) else None
+        nn.init.zeros_(self.proj.weight)
+        nn.init.constant_(self.proj.bias, 1.)
+
+    def forward(self, x):
+        device = x.device
+
+        res, gate = x.chunk(2, dim = -1)
+        gate = self.norm(gate)
+
+        weight, bias = self.proj.weight, self.proj.bias
+        if self.causal:
+            mask = tc.ones(weight.shape[:2], device = device).triu_(1).bool()
+            weight = weight.masked_fill(mask[..., None], 0.)
+
+        gate = F.conv1d(gate, weight, bias)
+
+        if exists(self.attn):
+            gate += self.attn(x)
+        return gate * res
+
+
+
 "Residual Channel Attention Block (RCAB)"
 class RCAB(nn.Module):
     """
@@ -1892,6 +2175,10 @@ class RCAB(nn.Module):
                 modules_body.append(ChannelAndSpatialAttention(in_channel = n_feat, reduction = reduction, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)) # use CBAM attention block
             elif channel_and_spatial_attention_framework == 'self_attention':
                 modules_body.append(SelfAttentionBasedChannelAndSpatialAttention(in_channel = n_feat, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)) # use self_attention based channel and spatial attention block
+            elif channel_and_spatial_attention_framework == 'external_attention':
+                modules_body.append(ExternalAttentionBasedChannelAndSpatialAttention(in_channel = n_feat, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode)) # use external_attention based channel and spatial attention block
+            elif channel_and_spatial_attention_framework == 'gMLP':
+                modules_body.append(gMLPVision(channels = n_feat, attn_dim = 2)) # use gMLP based channel and spatial attention block
             else:
                 raise ValueError("Not supported channel and spatial attention framework! Please select either 'CBAM' or 'self_attention'")
 
@@ -2145,6 +2432,18 @@ class Upsampler(nn.Sequential):
                         SelfAttentionBasedChannelAndSpatialAttention(in_channel = n_feats * 4, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
                         nn.PixelShuffle(scale)
                     ])
+                elif channel_and_spatial_attention_framework == 'external_attention':
+                    self.upsampler = nn.Sequential(*[
+                        nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                        ExternalAttentionBasedChannelAndSpatialAttention(in_channel = n_feats * 4, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                        nn.PixelShuffle(scale)
+                    ])
+                elif channel_and_spatial_attention_framework == 'gMLP':
+                    self.upsampler = nn.Sequential(*[
+                        nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                        gMLPVision(channels = n_feats * 4, attn_dim = 2),
+                        nn.PixelShuffle(scale)
+                    ])
                 else:
                     raise ValueError("Not supported channel and spatial attention framework! Please select either 'CBAM' or 'self_attention'")
         elif scale == 4:
@@ -2172,6 +2471,24 @@ class Upsampler(nn.Sequential):
                         nn.PixelShuffle(2),
                         nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
                         SelfAttentionBasedChannelAndSpatialAttention(in_channel = n_feats * 4, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                        nn.PixelShuffle(2),
+                    ])
+                elif channel_and_spatial_attention_framework == 'external_attention':
+                    self.upsampler = nn.Sequential(*[
+                        nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                        ExternalAttentionBasedChannelAndSpatialAttention(in_channel = n_feats * 4, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                        nn.PixelShuffle(2),
+                        nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                        ExternalAttentionBasedChannelAndSpatialAttention(in_channel = n_feats * 4, channel_and_spatial_attention_mode = channel_and_spatial_attention_mode),
+                        nn.PixelShuffle(2),
+                    ])
+                elif channel_and_spatial_attention_framework == 'gMLP':
+                    self.upsampler = nn.Sequential(*[
+                        nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                        gMLPVision(channels = n_feats * 4, attn_dim = 2),
+                        nn.PixelShuffle(2),
+                        nn.Conv2d(n_feats, n_feats * 4, kernel_size = 3, padding=1, stride=1),
+                        gMLPVision(channels = n_feats * 4, attn_dim = 2),
                         nn.PixelShuffle(2),
                     ])
                 else:
@@ -2212,6 +2529,8 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             conv = deformable_conv
         elif args['conv_layer_type'] == 'py_conv':
             conv = py_conv
+        elif args['conv_layer_type'] == 'involution':
+            conv = involution
 
         if args['activation_function_type'] == 'ReLU':
             act = nn.ReLU(True)
@@ -2234,7 +2553,7 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
         scale = args['scale'] # resize factor, e.g. 2, 4
         use_channel_and_spatial_attention_inside_upsampler = args['use_channel_and_spatial_attention_inside_upsampler'] # whether we use channel and spatial attention block inside upsampler, e.g. True, False
         use_channel_and_spatial_attention_inside_RCAB = args['use_channel_and_spatial_attention_inside_RCAB']   #  whether we use channel and spatial attention block inside RCAB to replace CALayer, e.g. True, False
-        channel_and_spatial_attention_framework = args['channel_and_spatial_attention_framework']   # which channel and spatial framework is used in the code, e.g. 'CBAM', 'self_attention'
+        channel_and_spatial_attention_framework = args['channel_and_spatial_attention_framework']   # which channel and spatial framework is used in the code, e.g. 'CBAM', 'self_attention', 'external_attention', 'gMLP'
         channel_and_spatial_attention_mode = args['channel_and_spatial_attention_mode'] # which end to end channel and spatial block to use, e.g. 'sequential_mode', 'parallel_mode'
 
         # --------------------------------------we may NOT need this section------------------------------------------------------- #
@@ -2593,6 +2912,8 @@ class U_Net_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             conv = deformable_conv
         elif args['conv_layer_type'] == 'py_conv':
             conv = py_conv
+        elif args['conv_layer_type'] == 'involution':
+            conv = involution
 
         if args['activation_function_type'] == 'ReLU':
             act = nn.ReLU(True)
@@ -3021,6 +3342,8 @@ class HR_Reference_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             conv_for_HR_reference_branch = deformable_conv
         elif args['conv_layer_type'] == 'py_conv':
             conv_for_HR_reference_branch = py_conv
+        elif args['conv_layer_type'] == 'involution':
+            conv_for_HR_reference_branch = involution
 
         if args['activation_function_type'] == 'ReLU':
             act_for_HR_reference_branch = nn.ReLU(True)
