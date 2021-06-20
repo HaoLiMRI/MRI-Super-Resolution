@@ -79,7 +79,10 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
     34) option to use external-attention. Which is a pure MLP based 'self-attention'. See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' for more detail.
     35) option to use involution conv(but still has some bugs when using involution conv).
     36) option to use gMLP or aMLP, which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
-    37) (working in progress,还没有完成！)option to use uncertainty loss to estimate the uncertainty map(pixel-wise variance of estimated MRI SR output) of MRI SR image.
+    37) option to use uncertainty loss to estimate the uncertainty map(pixel-wise variance of estimated MRI SR output) of MRI SR image.
+        注意：uncertainty KL loss相关代码已经完成，但是由于需要使用的network model在最后输出MRI SR结果时多输出一个channel的数据作为variance(或者log of variance)，
+        同时我们决定在这个版本中不修改任何network model的最后输出，所以现在的代码无法运行uncertainty KL loss。如果需要运行uncertainty KL loss，则需要更新相应的
+        network model，最后输出MRI SR结果时多输出一个channel的数据作为variance(或者log of variance)。
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
