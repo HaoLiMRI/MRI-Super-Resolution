@@ -3709,7 +3709,7 @@ for epoch in range(EPOCH_NUM):
             negative_trace_for_img_loss_training += negative_trace_for_img_loss.item()
 
         if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
-            uncertainty_kl_loss_for_img_loss = uncertainty_kl_loss(img_outputs, veraince_of_img_outputs, labels, SR_ssim_map_weighted)
+            uncertainty_kl_loss_for_img_loss = uncertainty_kl_loss(img_outputs, log_of_variance_of_img_outputs, labels, SR_ssim_map_weighted)
             uncertainty_kl_loss_for_img_loss_training += uncertainty_kl_loss_for_img_loss.item()
 
         if network_model_type == 'Secondary branch is k space branch':
@@ -3917,7 +3917,7 @@ for epoch in range(EPOCH_NUM):
                 negative_trace_for_img_loss_test = negative_trace_loss(SR_img_test, labels)
 
             if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
-                uncertainty_kl_loss_for_img_loss_test = uncertainty_kl_loss(SR_img_test, veraince_of_SR_img_test, labels, SR_ssim_map_test_weighted)
+                uncertainty_kl_loss_for_img_loss_test = uncertainty_kl_loss(SR_img_test, log_of_variance_of_SR_img_test, labels, SR_ssim_map_test_weighted)
 
             if network_model_type_test == 'Secondary branch is k space branch':
                 if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
