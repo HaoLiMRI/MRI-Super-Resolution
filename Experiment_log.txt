@@ -21,14 +21,14 @@ Data		Network								Dataset					Result							Device
 2021.06.16	RCAN with Cosine Similarity loss v1.0.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9635? psnr 39.5?, training log lost	A6000
 2021.06.16	RCAN with L1 loss v1.2.2					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.4122			
 2021.06.16	RCAN with Charbonnier loss v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9625 psnr 39.5169			
-2021.06.17	RCAN with Charbonnier,gradient v1.0.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9623 psnr 39.5596			A6000
-2021.06.18	RCAN with Charbonnier,k_space v1.0.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.4906			
-2021.06.18	RCAN with Charbonnier,ssim v1.0.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.7959			
-2021.06.18	ResT+conv v1.0.5						HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9591 psnr 38.9167			A6000
-2021.06.19	Conv gMLP v1.0.5						HCP 300 datasets, 3D 2x1 128x1		On going						A6000
-2021.06.21	RCAN with Charbonnier,gradient+ v1.0.2				HCP 100 datasets, 3D 2x1 128x1		On going						
-2021.06.21	RCAN with Charbonnier,k_space+ v1.0.2				HCP 100 datasets, 3D 2x1 128x1		On going						
-
+2021.06.17	RCAN with Charbonnier,gradient v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9623 psnr 39.5596			A6000
+2021.06.18	RCAN with Charbonnier,k_space v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.4906			
+2021.06.18	RCAN with Charbonnier,ssim v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.7959			
+2021.06.18	ResT+conv_decoder v1.0.5					HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9591 psnr 38.9167			A6000
+2021.06.19	MultiScaleExtractor+gMLP v1.0.5					HCP 300 datasets, 3D 2x1 128x1		Restarted, on going					A6000
+2021.06.21	RCAN with Charbonnier,gradient+ v1.2.2				HCP 100 datasets, 3D 2x1 128x1		On going						
+2021.06.21	RCAN with Charbonnier,k_space+ v1.2.2				HCP 100 datasets, 3D 2x1 128x1		On going						
+2021.06.21	RCAN with Charbonnier,KL v1.0.3					HCP 100 datasets, 3D 2x1 128x1		On going						A6000
 
 
 
