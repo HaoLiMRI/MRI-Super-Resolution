@@ -35,4 +35,8 @@ Data		Network								Dataset					Result							Device
 
 
 
-
+		
+2021.06.xx	RCAN with Charbonnier, SSIM					Dental					Pending
+2021.06.xx	RCAN with Charbonnier,gradient+,kspace+,ssim v1.2.2		HCP 100 datasets, 3D 2x1 128x1		Pending
+2021.06.xx	RCAN with non-selective uncertainty v1.0.5			HCP 100 datasets, 3D 2x1 128x1		Pending
+2021.06.xx	RCAN with uncertainty NLLLoss v1.0.5				HCP 100 datasets, 3D 2x1 128x1		Pending
