@@ -28,9 +28,9 @@ Data		Network								Dataset					Result							Device
 2021.06.19	gMLP+MultiScaleExtraactor v1.0.5				HCP 300 datasets, 3D 2x1 128x1		Restarted, on going					A6000
 2021.06.21	RCAN with Charbonnier,gradient+ v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9614 psnr 39.5584			
 2021.06.21	RCAN with Charbonnier, k_space+ v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9618 psnr 39.4301			
-2021.06.21	RCAN with Charbonnier, Uncertainty v1.0.3			HCP 100 datasets, 3D 2x1 128x1		On going						A6000
-2021.06.21	RCAN with Charbonnier,gradient,kspace v1.2.2			HCP 100 datasets, 3D 2x1 128x1		On going			
-2021.06.21	RCAN with Charbonnier,gradient,kspace,ssim v1.2.2		HCP 100 datasets, 3D 2x1 128x1		On going			
+2021.06.21	RCAN with Uncertainty v1.0.3					HCP 100 datasets, 3D 2x1 128x1		On going						A6000
+2021.06.22	RCAN with Charbonnier,gradient,kspace v1.2.2			HCP 100 datasets, 3D 2x1 128x1		On going			
+2021.06.22	RCAN with Charbonnier,gradient,kspace,ssim v1.2.2		HCP 100 datasets, 3D 2x1 128x1		On going			
 
 
 
