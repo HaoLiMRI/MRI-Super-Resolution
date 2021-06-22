@@ -10,11 +10,11 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.2.0(Stable Version, even deformable conv works at least for RCAN network)
+Version: 1.4.0(Stable Version, even deformable conv works at least for RCAN network)
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210523
+This is the current version we are working on, in 20210619
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) use RCAN or U-Net as main framework, for image single branch network.
@@ -79,6 +79,10 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
     34) option to use external-attention. Which is a pure MLP based 'self-attention'. See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' for more detail.
     35) option to use involution conv(but still has some bugs when using involution conv).
     36) option to use gMLP or aMLP, which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
+    37) option to use uncertainty loss to estimate the uncertainty map(pixel-wise variance of estimated MRI SR output) of MRI SR image.
+        注意：uncertainty KL loss相关代码已经完成，但是由于需要使用的network model在最后输出MRI SR结果时多输出一个channel的数据作为variance(或者log of variance)，
+        同时我们决定在这个版本中不修改任何network model的最后输出，所以现在的代码无法运行uncertainty KL loss。如果需要运行uncertainty KL loss，则需要更新相应的
+        network model，最后输出MRI SR结果时多输出一个channel的数据作为variance(或者log of variance)。
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
@@ -251,7 +255,7 @@ batch_size = 1
 EPOCH_NUM = 1
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
-Maintain_Same_Size = False # stand for whether we want the output image has same size or NOT(e.g. larger size) as input image, e.g. set as Ture when apply for MRI motion artifact reduction
+Maintain_Same_Size = False # stand for whether we want the output image has same size or NOT(e.g. larger size) as input image, e.g. set as Ture when apply for MRI motion artifact reduction, or applying through-plane downsampling MRI SR reconstruction.
 Use_SSIM_L1_Loss = False # stand for whether we want use SSIM L1 loss in the total loss function
 Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
@@ -259,6 +263,7 @@ Use_Negative_TV_Loss = True # stand for whether we want to use "1/(total variati
 Use_Negative_Trace_Loss = True # stand for whether we want to use "1/(trace(sr*hr) + 1.000e-10) loss"(on HR and SR, for increasing similarity between SR and HR)
 Use_Gradient_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use gradient map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_SSIM_Map_Guided_Pixel_Wise_Loss is True
 Use_SSIM_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use SSIM map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_Gradient_Map_Guided_Pixel_Wise_Loss is True
+Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss = True # stand for whether we let the network model to predict the variance for each pixel and use uncertainty KL loss to minimize the variance for each pixel as well.
 Use_Channel_Attention_For_Cross_Branch_Fusion = True # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
 Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
 Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
@@ -271,19 +276,19 @@ plot_the_wavelets_transform_data_of_input_image = False
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
 args = {'use_HR_reference' : True, 
         'use_channel_and_spatial_attention_inside_RCAB_for_HR_reference_fuser': True,
-        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'gMLP',
+        'channel_and_spatial_attention_framework_for_HR_reference_fuser': 'external_attention',
         'channel_and_spatial_attention_mode_for_HR_reference_fuser': 'parallel_mode',
 
         'main_network_framework': 'RCAN', 'type_of_network': 'image_single_domain', 'long_skip_connection_to_reconstruct_residual_part_only': False,
         
-        'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': True,
-        'channel_and_spatial_attention_framework': 'gMLP', 'channel_and_spatial_attention_mode': 'sequential_mode',
+        'use_channel_and_spatial_attention_inside_upsampler': False, 'use_channel_and_spatial_attention_inside_RCAB': False,
+        'channel_and_spatial_attention_framework': 'external_attention', 'channel_and_spatial_attention_mode': 'sequential_mode',
 
         'n_colors': 1, 'n_resgroups': 5, 'n_rcablocks': 5, 'n_feats': 64, 'reduction': 16, 
         
         'scale': 2, 'number_of_progressive_stage': 1,
 
-        'conv_layer_type': 'involution', 'activation_function_type': 'ReLU', 'gradient_operator': 'sobel', 
+        'conv_layer_type': 'default_conv', 'activation_function_type': 'ReLU', 'gradient_operator': 'sobel', 
         
         'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
         'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
@@ -291,6 +296,7 @@ args = {'use_HR_reference' : True,
 args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
                     'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
                     'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, 'negative_total_variation_weight': 3, 'negative_trace_weight': 3,\
+                    'uncertainty_kl_loss_weight': 1, 'use_ssim_guided_uncertainty_kl_loss' : True,
                     'ssim_luminance_weight': 2, 'ssim_contrast_weight': 2, 'ssim_structure_weight': 4}
 
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
@@ -1165,7 +1171,30 @@ class SSIMMapGuidedWeightForPixelWiseLoss(nn.Module):
         one_minus_ssim_map_weight_matrix = 1 - ssim_map_weighted
         return one_minus_ssim_map_weight_matrix
 
-        
+
+"""
+Uncertainty KL Loss. 对HR的每一个像素的ground truth值都当做dirac分布，然后把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。
+然后通过minimize KL散度的方式得到一个MSE loss的变形，用这个loss来训练网络从而可以预测每个像素的方差。
+见论文：2019.Bounding Box Regression with Uncertainty for Accurate Object Detection公式(9),(10). 
+另外，对这个方案，我们可以考虑不对每一个SR image的pixel都求variance，而是只对当前SR image中那些SSIM Map中值小于一定threshold的pixel求variance。
+这个threhold可以设为当前SSIM map中所有元素的均值减去一倍(68%置信区间)或者二倍(95%置信区间)的方差。
+"""
+class UncertaintyKlLoss(nn.Module):
+    def __init__(self, uncertainty_kl_loss_weight = 1, use_ssim_guided_uncertainty_kl_loss = True):
+        super(UncertaintyKlLoss, self).__init__()
+        self.uncertainty_kl_loss_weight = uncertainty_kl_loss_weight
+        self.use_ssim_guided_uncertainty_kl_loss = use_ssim_guided_uncertainty_kl_loss
+    
+    def forward(self, SR, log_of_variance_of_SR, HR, ssim_map):
+        if self.use_ssim_guided_uncertainty_kl_loss == False:
+            uncertainty_kl_loss = self.uncertainty_kl_loss_weight * tc.sum(tc.exp(-log_of_variance_of_SR) * tc.square(HR - SR) + 0.5 * log_of_variance_of_SR)
+        else:   # self.use_ssim_guided_uncertainty_kl_loss == True:
+            selection_matrix = tc.zeros_like(ssim_map)
+            threshold = tc.mean(ssim_map, dim = (2, 3)) - tc.std(ssim_map, dim = (2, 3))
+            selection_matrix[ssim_map < threshold] = 1
+            uncertainty_kl_loss = self.uncertainty_kl_loss_weight * tc.sum( selection_matrix * (tc.exp(-log_of_variance_of_SR) * tc.square(HR - SR) + 0.5 * log_of_variance_of_SR) )
+        return uncertainty_kl_loss
+
 
 "Pyramidal Convolution(Py_Conv) Layer"
 """
@@ -1708,7 +1737,7 @@ class FFT_K_SPACE(nn.Module):
         # Take in image x at time domain and fetch the k space data at frequency domain. 
         # See https://pytorch.org/docs/stable/generated/torch.rfft.html#torch.rfft
         # Beware the shape of input for irfft in our case should be (N, C, H, W)
-        k_space_result = tc.rfft(x, signal_ndim = 2, onesided = False)
+        k_space_result = tc.fft.fftn(x, dim = (-3,-2,-1))
         return k_space_result
 """ class FFT_K_SPACE(nn.Module):
     def __init__(self):
@@ -2011,7 +2040,7 @@ class gMLPVision(nn.Module):
     def __init__(
         self,
         *,
-        image_size = 64,
+        image_size = 32,
         patch_size = 1,
         dim = 512,          # Input feature's patch embedding dimension. See figure 1 in paper: 2021.Pay Attention to MLPs.
         depth = 3,          # Number of gMLP layers, L. See figure 1 in paper: 2021.Pay Attention to MLPs.
@@ -2025,7 +2054,7 @@ class gMLPVision(nn.Module):
         self.image_size = image_size
         self.patch_size = patch_size
         self.dim = dim
-        
+
         dim_ff = dim * ff_mult      # Hidden dimension?
         num_patches = (image_size // patch_size) ** 2
 
@@ -3487,6 +3516,8 @@ negative_tv_loss = NegativeTVLoss(negative_tv_loss_weight = args_loss_weight['ne
 
 negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_weight['negative_trace_weight']).to(device)
 
+uncertainty_kl_loss = UncertaintyKlLoss(uncertainty_kl_loss_weight = args_loss_weight['uncertainty_kl_loss_weight'], use_ssim_guided_uncertainty_kl_loss = args_loss_weight['use_ssim_guided_uncertainty_kl_loss']).to(device)
+
 # =============================================================================
 # print('The loss function is L1Loss')
 # loss_function = nn.L1Loss(size_average = False).to(device) 
@@ -3541,6 +3572,10 @@ for epoch in range(EPOCH_NUM):
     if Use_Negative_Trace_Loss == True:
         negative_trace_for_img_loss_training = 0.0
         negative_trace_for_img_loss_test = 0.0
+
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+        uncertainty_kl_loss_for_img_loss_training = 0.0
+        uncertainty_kl_loss_for_img_loss_test = 0.0
 
     k_space_branch_k_space_loss_training = 0.0
     k_space_branch_k_space_loss_test = 0.0
@@ -3637,16 +3672,16 @@ for epoch in range(EPOCH_NUM):
 
         if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
             k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(
-                create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq[:,:,:,:,0], 
-                create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,0]) + 
+                create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq.real, 
+                create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.real) + 
                 loss_function_MSE(
-                    create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq[:,:,:,:,1], 
-                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,1]))
+                    create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq.imag, 
+                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.imag))
         else:
-            k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]) + loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+            k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq.real, HR_freq.real) + loss_function_MSE(SR_freq.imag, HR_freq.imag))
         k_space_freq_loss_training += k_space_freq_loss.item()
-#            print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
-#            print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+#            print(loss_function_MSE(SR_freq.real, HR_freq.real))
+#            print(loss_function_MSE(SR_freq.imag, HR_freq.imag))
         """ print("k_space_freq_loss: ", k_space_freq_loss) """
 
         HR_ssim_weighted, HR_ssim = SSIM_function(labels, labels)
@@ -3676,16 +3711,20 @@ for epoch in range(EPOCH_NUM):
             negative_trace_for_img_loss = negative_trace_loss(img_outputs, labels)
             negative_trace_for_img_loss_training += negative_trace_for_img_loss.item()
 
+        if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+            uncertainty_kl_loss_for_img_loss = uncertainty_kl_loss(img_outputs, log_of_variance_of_img_outputs, labels, SR_ssim_map_weighted)
+            uncertainty_kl_loss_for_img_loss_training += uncertainty_kl_loss_for_img_loss.item()
+
         if network_model_type == 'Secondary branch is k space branch':
             if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                 k_space_branch_k_space_loss = args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
-                    create_2d_Gaussian_weights(window_size = secondary_branch_outputs.shape[2], num_of_samples = secondary_branch_outputs.shape[0], channel = secondary_branch_outputs.shape[1]).to(device)*secondary_branch_outputs[:,:,:,:,0], 
-                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,0]) + 
+                    create_2d_Gaussian_weights(window_size = secondary_branch_outputs.shape[2], num_of_samples = secondary_branch_outputs.shape[0], channel = secondary_branch_outputs.shape[1]).to(device)*secondary_branch_outputs.real, 
+                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.real) + 
                     loss_function_MSE(
-                        create_2d_Gaussian_weights(window_size = secondary_branch_outputs.shape[2], num_of_samples = secondary_branch_outputs.shape[0], channel = secondary_branch_outputs.shape[1]).to(device)*secondary_branch_outputs[:,:,:,:,1], 
-                        create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq[:,:,:,:,1]))
+                        create_2d_Gaussian_weights(window_size = secondary_branch_outputs.shape[2], num_of_samples = secondary_branch_outputs.shape[0], channel = secondary_branch_outputs.shape[1]).to(device)*secondary_branch_outputs.imag, 
+                        create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.imag))
             else:
-                k_space_branch_k_space_loss = args_loss_weight['k_space_branch_weight']*(loss_function_MSE(secondary_branch_outputs[:,:,:,:,0], HR_freq[:,:,:,:,0]) + loss_function_MSE(secondary_branch_outputs[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+                k_space_branch_k_space_loss = args_loss_weight['k_space_branch_weight']*(loss_function_MSE(secondary_branch_outputs.real, HR_freq.real) + loss_function_MSE(secondary_branch_outputs.imag, HR_freq.imag))
             k_space_branch_k_space_loss_training += k_space_branch_k_space_loss.item()  # Only save the value of k_space_branch_k_space_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
         elif network_model_type == 'Secondary branch is gradient map branch':
             gradient_grad_loss = args_loss_weight['gradient_grd_weight']*loss_function_L1(secondary_branch_outputs, calculate_gradient_map(labels))
@@ -3726,6 +3765,9 @@ for epoch in range(EPOCH_NUM):
         
         if Use_Negative_Trace_Loss == True:
             loss = loss + negative_trace_for_img_loss
+
+        if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+            loss = loss + uncertainty_kl_loss_for_img_loss
 
         if network_model_type == 'Secondary branch is k space branch':
             loss = loss + k_space_branch_k_space_loss
@@ -3848,13 +3890,13 @@ for epoch in range(EPOCH_NUM):
 
             if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                 k_space_freq_loss_test += args_loss_weight['k_space_weight']*(loss_function_MSE(
-                    create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq[:,:,:,:,0], 
-                    create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,0]) + 
+                    create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq.real, 
+                    create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq.real) + 
                     loss_function_MSE(
-                        create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq[:,:,:,:,1], 
-                        create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,1]))
+                        create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq.imag, 
+                        create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq.imag))
             else:
-                k_space_freq_loss_test += args_loss_weight['k_space_weight']*(loss_function_MSE(SR_test_freq[:,:,:,:,0], HR_test_freq[:,:,:,:,0])+loss_function_MSE(SR_test_freq[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))
+                k_space_freq_loss_test += args_loss_weight['k_space_weight']*(loss_function_MSE(SR_test_freq.real, HR_test_freq.real)+loss_function_MSE(SR_test_freq.imag, HR_test_freq.imag))
 #                print("k_space_freq_loss_test: ", k_space_freq_loss_test)
 
             HR_ssim_test_weighted, HR_ssim_test = SSIM_function(labels,labels)
@@ -3877,16 +3919,19 @@ for epoch in range(EPOCH_NUM):
             if Use_Negative_Trace_Loss == True:
                 negative_trace_for_img_loss_test = negative_trace_loss(SR_img_test, labels)
 
+            if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+                uncertainty_kl_loss_for_img_loss_test = uncertainty_kl_loss(SR_img_test, log_of_variance_of_SR_img_test, labels, SR_ssim_map_test_weighted)
+
             if network_model_type_test == 'Secondary branch is k space branch':
                 if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                     k_space_branch_k_space_loss_test += args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
-                        create_2d_Gaussian_weights(window_size = SR_secondary_branch_outputs_test.shape[2], num_of_samples = SR_secondary_branch_outputs_test.shape[0], channel = SR_secondary_branch_outputs_test.shape[1]).to(device)*SR_secondary_branch_outputs_test[:,:,:,:,0], 
-                        create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,0]) + 
+                        create_2d_Gaussian_weights(window_size = SR_secondary_branch_outputs_test.shape[2], num_of_samples = SR_secondary_branch_outputs_test.shape[0], channel = SR_secondary_branch_outputs_test.shape[1]).to(device)*SR_secondary_branch_outputs_test.real, 
+                        create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq.real) + 
                         loss_function_MSE(
-                            create_2d_Gaussian_weights(window_size = SR_secondary_branch_outputs_test.shape[2], num_of_samples = SR_secondary_branch_outputs_test.shape[0], channel = SR_secondary_branch_outputs_test.shape[1]).to(device)*SR_secondary_branch_outputs_test[:,:,:,:,1], 
-                            create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq[:,:,:,:,1]))
+                            create_2d_Gaussian_weights(window_size = SR_secondary_branch_outputs_test.shape[2], num_of_samples = SR_secondary_branch_outputs_test.shape[0], channel = SR_secondary_branch_outputs_test.shape[1]).to(device)*SR_secondary_branch_outputs_test.imag, 
+                            create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq.imag))
                 else:
-                    k_space_branch_k_space_loss_test += args_loss_weight['k_space_branch_weight']*(loss_function_MSE(SR_secondary_branch_outputs_test[:,:,:,:,0], HR_test_freq[:,:,:,:,0]) + loss_function_MSE(SR_secondary_branch_outputs_test[:,:,:,:,1], HR_test_freq[:,:,:,:,1]))
+                    k_space_branch_k_space_loss_test += args_loss_weight['k_space_branch_weight']*(loss_function_MSE(SR_secondary_branch_outputs_test.real, HR_test_freq.real) + loss_function_MSE(SR_secondary_branch_outputs_test.imag, HR_test_freq.imag))
             elif network_model_type_test == 'Secondary branch is gradient map branch':
                 gradient_grad_loss_test += args_loss_weight['gradient_grd_weight']*loss_function_L1(SR_secondary_branch_outputs_test, calculate_gradient_map(labels))
             elif network_model_type_test == 'Secondary branch is wavelets high frequency components branch':
@@ -3914,6 +3959,9 @@ for epoch in range(EPOCH_NUM):
             
             if Use_Negative_Trace_Loss == True:
                 loss_test = loss_test + negative_trace_for_img_loss_test
+
+            if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+                loss_test = loss_test + uncertainty_kl_loss_for_img_loss_test
 
             if network_model_type_test == 'Secondary branch is k space branch':
                 loss_test = loss_test + k_space_branch_k_space_loss_test
@@ -3946,6 +3994,9 @@ for epoch in range(EPOCH_NUM):
     if Use_Negative_Trace_Loss == True:
         negative_trace_for_img_loss_test = negative_trace_for_img_loss_test/batch_number_test
         print('negative_trace_for_img_loss_test: ', negative_trace_for_img_loss_test)
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+        uncertainty_kl_loss_for_img_loss_test = uncertainty_kl_loss_for_img_loss_test/batch_number_test
+        print('uncertainty_kl_loss_for_img_loss_test: ', uncertainty_kl_loss_for_img_loss_test)
     if network_model_type_test == 'Secondary branch is k space branch':
         k_space_branch_k_space_loss_test = k_space_branch_k_space_loss_test/batch_number_test
         print('k_space_branch_k_space_loss_test: ', k_space_branch_k_space_loss_test)
@@ -3971,6 +4022,8 @@ for epoch in range(EPOCH_NUM):
         negative_total_variation_for_img_loss_for_current_epoch = negative_total_variation_for_img_loss_training/ batch_number_training
     if Use_Negative_Trace_Loss == True:
         negative_trace_for_img_loss_for_current_epoch = negative_trace_for_img_loss_training/ batch_number_training
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+        uncertainty_kl_loss_for_img_loss_for_current_epoch = uncertainty_kl_loss_for_img_loss_training/ batch_number_training
     if network_model_type == 'Secondary branch is gradient map branch':
         gradient_grad_loss_for_current_epoch = gradient_grad_loss_training/ batch_number_training
     if network_model_type == 'Secondary branch is k space branch':
@@ -4043,6 +4096,9 @@ for epoch in range(EPOCH_NUM):
     if Use_Negative_Trace_Loss == True:
         f.write('The negative_trace_for_img_loss for epoch %d is : %f' % (epoch, negative_trace_for_img_loss_for_current_epoch))
         f.write('\n')
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+        f.write('The uncertainty_kl_loss_for_img_loss for epoch %d is : %f' % (epoch, uncertainty_kl_loss_for_img_loss_for_current_epoch))
+        f.write('\n')
     if network_model_type == 'Secondary branch is gradient map branch':
         f.write('The gradient_grad_loss for epoch %d is : %f' % (epoch, gradient_grad_loss_for_current_epoch))
         f.write('\n')
@@ -4079,6 +4135,9 @@ for epoch in range(EPOCH_NUM):
         f.write('\n')
     if Use_Negative_Trace_Loss == True:
         f.write('The negative_trace_for_img_loss_validation for epoch %d is : %f' % (epoch, negative_trace_for_img_loss_test))
+        f.write('\n')
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
+        f.write('The uncertainty_kl_loss_for_img_loss_validation for epoch %d is : %f' % (epoch, uncertainty_kl_loss_for_img_loss_test))
         f.write('\n')
     if network_model_type_test == 'Secondary branch is gradient map branch':
         f.write('The gradient_grad_loss_validation for epoch %d is : %f' % (epoch, gradient_grad_loss_test))
