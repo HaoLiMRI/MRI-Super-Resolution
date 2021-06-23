@@ -163,6 +163,11 @@ Uncertainty for Autonomous Driving
 
 39. 对所有的gMLP和efficient transformer相关的模型再跑cross modality translation任务。
 
+40. 参考CVPR2021的论文：2021.MASA-SR: Matching Acceleration and Spatial Adaptation for Reference-Based Image Super-Resolution的MEM部分的思路。我们设计一个单独的Class，这个class把LR feature map/image和等大小的SR feature map(比如都是64 x 64的矩阵)切成比如64个8x8的矩阵。再对俩者求矩阵的correlation，或者把俩者每个8x8的矩阵拉成一个vector，然后求俩个向量之间的cosine similarity，之后对于求得的一个64 x 64的score矩阵对于每一个LR的block选取对应的Ref index上score最大的那个index。再把Ref feature map中每个score最大的index的那个block和对应的LR feature map的block分别concatenate到一起。然后输出给后面的模块。如果需要参考MASA-SR论文的MEM代码，可以看
+https://github.com/dvlab-research/MASA-SR/blob/main/models/archs/MASA_arch.py
+的search函数。
+这个class可以加载到gMLP UNet，EfficientTrasnformer UNet，或者RCAN的HR Reference网络中使用，看一看效果怎么样。
+
 
 ### 近期主要的写代码的任务集中在：
 31.(1) ViT Encoder和RVT的Transformer模块的加入。
