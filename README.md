@@ -72,7 +72,7 @@ c). option to add long skip connection outside the entire network model to only 
 26. Self-supervised learning for MRI SR。 这个方向非常有意义，意义是在于可以不需要大量提供监督训练数据，即不需要ground truth。在MRI SR这个上面应该就是不需要HR的ground truth。这样可以不需要实测的大量高清数据就可以对模型进行训练，也是一个非常有意义的让MRI SR技术变的实际可用的方向。具体实现方案可以如下：受DASR论文2021.Unsupervised Degradation Representation Learning for Blind Super-Resolution启发，我们也考虑用对比学习(contrastive learning)的方案学习MRI降采的退化表达(degradation representation)。具体方案如下：取2张模拟MRI机器在k space上降采的方案生成的MRI LR图像做FFT变到频域，再经过DASR论文figure 2(a)的degradation encoder来生成各自的降采表达x in k-space和x+ in k space，再通过IFFT变为时域图像的降采表达x和x+。接着再取2张Gaussian blur或者bicubic降采的方案生成的MRI LR图像做FFT变到频域，再经过DASR论文figure 2(a)的degradation encoder来生成各自的降采表达x- in k-space和x- in k space，再通过IFFT变为时域图像的降采表达x-和x-。（关于什么是x, x+, x-见DASR论文figure 1）紧接着把DASR论文设计的DA conv layer(DASR论文figure 2(c))嵌到RCAN中然后把x, x+, x-, x-均按DASR论文figure 2(b)的方式输入带DA conv layer的RCAN做MRI SR。
 DASR分析：https://mp.weixin.qq.com/s/YrgXlF6jbDt6LRCUA_c7Eg
 DASR代码：https://github.com/LongguangWang/DASR
-paper：https://arxiv.org/abs/1812.04240
+paper：https://arxiv.org/pdf/2104.00416.pdf
 
 27. 根据新发现的原来一直使用的2D层内降采的方式从MRI HR生成MRI LR的方案的问题，我们设计了一种3D层内降采的方案从MRI HR生成MRI LR的方案。具体要做的事情如下：首先对公共数据集分别进行“2D层内降采从MRI HR生成MRI LR(每一层数据normalization --> 2D FFT --> 降采 --> 2D IFFT --> 每一层数据normalization)"和“3D层内降采从MRI HR生成MRI LR(整个volumn数据normalization --> 3D FFT --> 降采 --> 3D IFFT --> 整个volumn数据normalization)"。之后再用RCAN MRI SR网络分别用"2D层内降采生成的MRI LR数据"和"3D层内降采生成的MRI LR数据"来训练并test效果，理论上应该看到3D层内降采生成的MRI LR数据可以生成质量更高的MRI SR数据。同时再把原来使用的RCAN的各种网络结构上进行修改的变种方案重新用“3D层内降采生成的MRI LR数据”重新跑一下看看是否有哪些模型效果可以有提升。最后写一篇论文，包括如下contribution：
 a). 我们提出一种”模拟真实MRI机器进行3D层内降采生成的MRI LR数据的3D降采模型”，该降采模型相对于“模拟真实MRI机器进行2D层内降采生成的MRI LR数据的2D降采模型”在相同的SOTA SR网络模型上可以得到更好的恢复效果。所以我们propose用3D层内降采替代2D层内降采。
