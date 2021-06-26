@@ -33,9 +33,9 @@ Data		Network								Dataset					Result							Device
 2021.06.22	RCAN with Charbonnier, gradient, kspace, ssim v1.2.2		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9626 psnr 39.5216			GV100
 2021.06.23	RCAN with Charbonnier, gradient+, kspace+ v1.2.2		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9617 psnr 39.5607			GV100
 2021.06.23	Efficient transformer+MultiScaleExtraactor v1.0.5		HCP 300 datasets, 3D 2x1 128x1		On going, 18 epochs, ssim 0.9523, psnr 38.0919		A6000
-2021.06.23	RCAN with non-selective kl uncertainty v1.0.3			HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9489 psnr 37.2326			GV100
-2021.06.24	RCAN with non-selective likelihood probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		On going, 38 epochs, ssim 0.9641, psnr 39.7816		GV100
-
+2021.06.23	RCAN with Char, SSIM, non-selective uncertainty v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9489 psnr 37.2326			GV100
+2021.06.24	RCAN with Char, SSIM, non-selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		On going, 38 epochs, ssim 0.9641, psnr 39.7816		GV100
+2021.06.25	RCAN with adjusted non-selective likelihood probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Started							GV100
 
 		
 2021.06.xx	RCAN with Charbonnier, SSIM					Dental dataset				Pending							
