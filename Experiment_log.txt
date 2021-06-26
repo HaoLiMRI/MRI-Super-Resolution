@@ -32,7 +32,7 @@ Data		Network								Dataset					Result							Device
 2021.06.22	RCAN with Charbonnier, gradient, kspace v1.2.2			HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.4920			GV100
 2021.06.22	RCAN with Charbonnier, gradient, kspace, ssim v1.2.2		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9626 psnr 39.5216			GV100
 2021.06.23	RCAN with Charbonnier, gradient+, kspace+ v1.2.2		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9617 psnr 39.5607			GV100
-2021.06.23	Efficient transformer+MultiScaleExtraactor v1.0.5		HCP 300 datasets, 3D 2x1 128x1		On going, 24 epochs, ssim 0.9528, psnr 38.1808		A6000
+2021.06.23	Efficient transformer+MultiScaleExtraactor v1.0.5		HCP 300 datasets, 3D 2x1 128x1		On going, 28 epochs, ssim 0.9531, psnr 38.2000		A6000
 2021.06.23	RCAN with Char, SSIM, non-selective uncertainty v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9489 psnr 37.2326			GV100
 2021.06.24	RCAN with Char, SSIM, mean non-selective probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9641, psnr 39.7816			GV100
 2021.06.25	RCAN with Char, sum non-selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Started							GV100
