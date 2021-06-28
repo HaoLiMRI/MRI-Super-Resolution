@@ -9,20 +9,14 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 2.0.0
+Version: 1.0.0
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210612
+This is the current version we are working on, in 20210527
 This is a demo code of U_Net_Based_MRI_SR_Transformer_MLP_2D. in this version we have already support following items:
-    1)  use gMLP or aMLP based downsampler and conv based upsampler in U-Net for MRI SR. gMLP which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
-    2)  use gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR. 
-    3)  Simple version(i.e.gMLP_without_information_exchange) HR reference(e.g. T2 modality HR MRI data) assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
-    4)  Complicated version(using information from MRI LR data as key for tiny attention in aMLP for HR reference branch, i.e.gMLP_with_information_exchange) HR reference(e.g. T2 modality HR MRI data) 
-        assisted "gMLP or aMLP based downsampler and gMLP or aMLP upsampler in U-Net for MRI SR".
-    5)  use EfficientTransformerBlock in ResTransformer based downsampler and conv based upsampler in U-Net for MRI SR. See 2021.ResT:An Efficient Transformer for Visual Recognition.
-    6)  (working in progress,还没有完成！)use EfficientTransformerBlock in ResTransformer based downsampler and EfficientTransformerBlock in ResTransformer upsampler in U-Net for MRI SR.
-    7)  (working in progress,还没有完成！)HR reference(e.g. T2 modality HR MRI data) assisted "EfficientTransformerBlock in ResTransformer based downsampler and EfficientTransformerBlock in ResTransformer upsampler in U-Net for MRI SR".
+    1)  use gMLP or aMLP based downsampler and pixel shuffle based upsampler in U-Net for MRI SR. gMLP which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
+    2)  use gMLP based upsampler to replace pixel shuffle based upsampler. 
 
 
 
@@ -83,178 +77,203 @@ import math
 import os
 import time
 import scipy.io
-from torchvision.models import vgg19
 import copy
 import pickle
 
-from ultility import pytorch_ssim_l1
-from ultility import pytorch_ssim_map
-from ultility.optimizer import lookahead
+import pytorch_ssim_l1_org
+import pytorch_ssim_map
+from optimizer import lookahead
 
 "-------------------------------------------------------------------------------------------------"
 Single_GPU_training = True
 
 if Single_GPU_training == True:
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 print('boolean value to see if GPU is ready:', tc.cuda.is_available())
 print('number of GPU is', tc.cuda.device_count())
 print(tc.cuda.get_device_name(0))
 use_cuda = True
-since = time.perf_counter()
+training_start = time.perf_counter()
 
 """""""""""""""""""""""""""""""""""""""""""""
 0. Configure all parameter
 """""""""""""""""""""""""""""""""""""""""""""
 # --------------------------- configuration of support parameters --------------------------- #
-batch_size = 1
-EPOCH_NUM = 1
-Maintain_Same_Size = False # stand for whether we want the output image has same size or NOT(e.g. larger size) as input image, e.g. set as Ture when apply for MRI motion artifact reduction, or applying through-plane downsampling MRI SR reconstruction.
-Use_SSIM_L1_Loss = False # stand for whether we want use SSIM L1 loss in the total loss function
-Use_Gradient_Map_L1_Loss = True # stand for whether we want use gradient map L1 loss in the total loss function
+batch_size = 8
+EPOCH_NUM = 50
+accumulation_steps = int(8//batch_size)
+
+Maintain_in_plane_Size = False # stand for whether we want the output image has same size or NOT(e.g. larger size) as input image, e.g. set as Ture when apply for MRI motion artifact reduction, or applying through-plane downsampling MRI SR reconstruction.
+Use_kspace_loss = False # stand for using K-space MSE loss in the total loss function
+Use_SSIM_L1_Loss = True # stand for whether we want use SSIM L1 loss in the total loss function
+Use_Gradient_Map_L1_Loss = False # stand for whether we want use gradient map L1 loss in the total loss function
 Use_Gram_Matrix_L1_Loss = False # stand for whether we want use gram matrix L1 loss(between SR and HR, for increasing texture similarity between SR and HR) in the total loss function
-Use_Negative_TV_Loss = True # stand for whether we want to use "1/(total variation + 1.000e-10) loss"(on SR , for providing over smoothing)
-Use_Negative_Trace_Loss = True # stand for whether we want to use "1/(trace(sr*hr) + 1.000e-10) loss"(on HR and SR, for increasing similarity between SR and HR)
+Use_Negative_TV_Loss = False # stand for whether we want to use "1/(total variation + 1.000e-10) loss"(on SR , for providing over smoothing)
+Use_Negative_Trace_Loss = False # stand for whether we want to use "1/(trace(sr*hr) + 1.000e-10) loss"(on HR and SR, for increasing similarity between SR and HR)
 Use_Gradient_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use gradient map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_SSIM_Map_Guided_Pixel_Wise_Loss is True
 Use_SSIM_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use SSIM map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_Gradient_Map_Guided_Pixel_Wise_Loss is True
-Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
-Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
+Amplify_Small_Value_In_Gradient_Map = True # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
+Amplify_High_Frequency_Value_In_K_Space_Loss = True # stand for whether we want to amplify high frequence loss values in k space loss
+Use_Feature_Map_Loss = False # Stand for whether we want use feature map L1 loss in the total loss function
+Use_saved_model = False # Load saved network weights
+Freeze_random_seed = True # Freeze seed, so every time the network will have the same intialized weightes
+Use_ssim_map = False # Use ssim map to calculate loss
+Perform_Evaluation = True
 
-# If we want to plot some information
-plot_the_gradient_map_of_input_image = False
-plot_the_k_space_data_of_input_image = False
-plot_the_wavelets_transform_data_of_input_image = False
-
+if Use_Feature_Map_Loss == True:
+    from torchvision.models import vgg19
+    
+    
 # --------------------------- configuration of parameters for 2D_MRI_SR_Dual_Domain Reconstruct --------------------------- #
-args = {'use_HR_reference' : False,
+
+"The folder where to load the LR, HR data pair"
+folder_data_training = 'D:/Hao/SR_data/HCP_data/2x1_folds_3d_downsize_sag_128x1/training/'
+file_names_training = os.listdir(folder_data_training)
+
+folder_data_validation = 'D:/Hao/SR_data/HCP_data/2x1_folds_3d_downsize_sag_128x1/validation/'
+file_names_validation = os.listdir(folder_data_validation)
+
+folder_data_evaluation = 'D:/Hao/SR_data/HCP_data/2x1_folds_3d_downsize_sag_128x1/evaluation/'
+file_names_evaluation = os.listdir(folder_data_evaluation)
+
+"The folder for log and results"
+folder_log_path = 'D:/Hao/results/20210623_ResT_MultiScaleExtractor_128x1_2x1folds_3d_downsize_seed1_cosine_101_HCP300/'
+
+"The folder of saved network parameters"
+folder_saved_network = 'D:/Hao/results/20210619_conv_gMLP_128x1_2x1folds_3d_downsize_kspace_grad_sigma20_seed1_cosine_101_HCP300/'
+
+
+
+args = {'use_HR_reference' : False, 
         'HR_reference_framework': 'gMLP_with_information_exchange',
-        'basic_block' : 'gMLP',
-        'n_colors': 1, 'efficient_transformer': 32,
+        'basic_block' : 'MultiScaleExtrctor_ResT',
+        'n_colors': 1, 'n_dim': 16, 'LR_image_size': 64,
         'type_of_upsampler': 'gMLP_based_upsampler',
         
-        'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_warm_restarts',
+        'seed': 1, 'optimizer': 'Adam', 'learning_rate_decay_method': 'cosine_learning_rate_decay',
         'use_learning_rate_warm_up': False, 'how_many_epoch_to_be_used_for_warm_up': 10, 'initial_learning_rate_after_warm_up': 0.0001}
 
-args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_space_weight': 2, 'ssim_weight': 100, \
-                    'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
+args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 100, 'k_space_weight': 10, 'ssim_weight': 50, \
+                    'gradient_img_weight': 50, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
                     'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, 'negative_total_variation_weight': 3, 'negative_trace_weight': 3,\
-                    'ssim_luminance_weight': 2, 'ssim_contrast_weight': 2, 'ssim_structure_weight': 4}
+                    'ssim_component_weight': 2}
+
 
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
 # args['HR_reference_framework'] = 'gMLP_without_information_exchange', stands for what kind of HR reference framework we use, e.g. 'gMLP_without_information_exchange', 'gMLP_with_information_exchange', 'ResT_without_information_exchange', 'ResT_with_information_exchange'.
-# args['basic_block'] = 'efficient_transformer', stands for the selected basic block of U-Net, e.g. 'efficient_transformer', 'gMLP'
+# args['basic_block'] = 'efficient_transformer', stands for the selected basic block of U-Net, e.g. 'efficient_transformer', 'gMLP', 'MultiScaleExtrctor_gMLP', 'MultiScaleExtrctor_ResT'
 # args['n_colors'] = 1, stands for number of channels of input image, e.g. 1 for MRI image, 3 for RGB image.
+# args['n_dim'] = 128, stands for number of dimension in the gMLP.
 # args['type_of_upsampler'] = 'conv_based_upsampler', stands for type of upsampler, e.g. 'conv_based_upsampler', 'gMLP_based_upsampler'
 # arg['optimizer'] = ['Adam'] # stand for which optimizer we want use for training, e.g. 'Adam', 'SGD_with_momentum', 'look_ahead'
 # arg['learning_rate_decay_method'] = ['cosine_learning_rate_decay'] # stand for which learning rate decay method we want use for training, e.g. 'cosine_learning_rate_decay', 'multi_step_learning_rate', 'step_learning_rate', 'cosine_learning_rate_warm_restarts'
 
 
-if args['use_HR_reference'] == False and args['n_colors'] == 1:
-    """
-    The data loading pipeline for ordinary SISR MRI SR:
-    """
-    """""""""""""""""""""""""""""""""""""""""""""
-    1.1.a. MRI HR and LR Data pair preprocessing training part
-    """""""""""""""""""""""""""""""""""""""""""""
-    # =============================================================================
-    # h5py.version
-    # =============================================================================
+#if args['use_HR_reference'] == False:
+"""
+The data loading pipeline for ordinary multi-channel SISR MRI SR or RGB SISR:
+"""
+"""""""""""""""""""""""""""""""""""""""""""""
+1.1.c. MRI HR and LR Data pair preprocessing training part
+"""""""""""""""""""""""""""""""""""""""""""""
+# =============================================================================
+# h5py.version
+# =============================================================================
 
-    "The folder where to load the training LR, HR data pair"
-    folder_log_path = 'D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/data/sample_downsize_training_data_20200728'
-    file_names = os.listdir(folder_log_path)
 
-    num_low_resolution_mat_file = 0
-    num_high_resolution_groundtruth_mat_file = 0
+num_low_resolution_mat_file = 0
+num_high_resolution_groundtruth_mat_file = 0
+num_reference_mat_file = 0
 
-    for idx_file in file_names:
-        print(idx_file)
-        if 'LR_training_2' in os.path.join(folder_log_path, idx_file):
-            print('One more low resolution image set exist')
-            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-            print(np.shape(data_low_resolution))
-            print(data_low_resolution.dtype)
-            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+for idx_file in file_names_training:
+    print(idx_file)
+    if '.mat' in os.path.join(folder_data_training, idx_file):
+        print('One more low resolution image set exist')
+        num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+        print(os.path.join(folder_data_training, idx_file))
+        file_data = h5py.File(os.path.join(folder_data_training, idx_file), 'r')
+        data_low_resolution = file_data['LR'][:] #----- numpy array
+        print('Training data: Shape of LR data is: ', np.shape(data_low_resolution))
+        print(data_low_resolution.dtype)
+        torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+        torch_data_low_resolution = torch_data_low_resolution.permute(0, 1, 3, 2)
+        print('Training data: Shape of LR data in Torch is: ', np.shape(torch_data_low_resolution))
+        if num_low_resolution_mat_file == 1:
+            torch_data_low_resolution_sequence = torch_data_low_resolution
+        elif num_low_resolution_mat_file > 1:
+            print(num_low_resolution_mat_file)
+            torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+        print('Training data: Shape of LR data sequence in Torch is: ', np.shape(torch_data_low_resolution_sequence))
+#        elif 'HRGT_training' in os.path.join(folder_data_training, idx_file):
+#            print('One more high resolution groundtruth image set exist')
+        num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+#            print(os.path.join(folder_data_training, idx_file))
+#            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_data_training, idx_file), 'r')
+        data_high_resolution_groundtruth = file_data['HRGT'][:] #----- numpy array
+        print('Training data: Shape of HR data is: ', np.shape(data_high_resolution_groundtruth))
+        torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+        torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 1, 3, 2)
+        print('Training data: Shape of HR data in Torch is: ', np.shape(torch_data_high_resolution_groundtruth))
+        if num_high_resolution_groundtruth_mat_file == 1:
+            torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+        if num_high_resolution_groundtruth_mat_file > 1:
+            print(num_high_resolution_groundtruth_mat_file)
+            torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+        print('Training data: Shape of HR data sequence in Torch is: ', np.shape(torch_data_high_resolution_groundtruth_sequence))
+        if args['use_HR_reference']:
+#                print('One more reference image set exist')
+            num_reference_mat_file = num_reference_mat_file + 1
+#                print(os.path.join(folder_log_path, idx_file))
+#                file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_reference = file_data['REF'][:] #----- numpy array
+            print(np.shape(data_reference))
+            torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
             "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-    # =============================================================================
-    #         torch_data_low_resolution = tc.t(torch_data_low_resolution)
-    # =============================================================================
-    # =============================================================================
-    #         torch_data_low_resolution = torch_data_low_resolution.type(tc.DoubleTensor)
-    # =============================================================================
-            print(np.shape(torch_data_low_resolution))
-            if num_low_resolution_mat_file == 1:
-                torch_data_low_resolution_sequence = torch_data_low_resolution
-            elif num_low_resolution_mat_file > 1:
-                print(num_low_resolution_mat_file)
-                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-            print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_training_2' in os.path.join(folder_log_path, idx_file):
-            print('One more high resolution groundtruth image set exist')
-            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-            print(np.shape(data_high_resolution_groundtruth))
-            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-    # =============================================================================
-    #         torch_data_high_resolution_groundtruth = tc.t(torch_data_high_resolution_groundtruth)
-    # =============================================================================
-    # =============================================================================
-    #         torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.type(tc.DoubleTensor)
-    # =============================================================================
-            print(np.shape(torch_data_high_resolution_groundtruth))
-            if num_high_resolution_groundtruth_mat_file == 1:
-                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-            if num_high_resolution_groundtruth_mat_file > 1:
-                print(num_high_resolution_groundtruth_mat_file)
-                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-        else:
-            print('other type NOT support for now')
+            torch_data_reference = torch_data_reference.permute(0, 1, 3, 2)
+            print(np.shape(torch_data_reference))
+            if num_reference_mat_file == 1:
+                torch_data_reference_sequence = torch_data_reference
+            if num_reference_mat_file > 1:
+                print(num_reference_mat_file)
+                torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
+            print(np.shape(torch_data_reference_sequence))
+    else:
+        print('other type NOT support for now')
 
-    """Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
-    the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
-    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-    print(np.shape(torch_data_low_resolution_sequence))
-    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+"""Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
+the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
+torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.float()
+print(np.shape(torch_data_low_resolution_sequence))
+torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+if args['use_HR_reference']:
+    torch_data_reference_sequence = torch_data_reference_sequence.float()
+    print(np.shape(torch_data_reference_sequence))
+# num_training_samples = math.floor(torch_data_low_resolution_sequence.size(0))
+print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
 
-    num_training_samples = math.floor(torch_data_low_resolution_sequence.size(0))
-    #print(num_training_samples)
-    #torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
-    #torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
-    #print(np.shape(torch_data_low_resolution_training_sequence))
-    #print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
-
-    #torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
-    #torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
-    #print(np.shape(torch_data_low_resolution_test_sequence))
-    #print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
-
-    print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    1.2.a. Load MRI HR and LR Data pair training part
-    """""""""""""""""""""""""""""""""""""""""""""
-    torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence.float()
-    torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-
+"""""""""""""""""""""""""""""""""""""""""""""
+1.2.c. Load MRI HR and LR Data pair training part
+"""""""""""""""""""""""""""""""""""""""""""""
+torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence.float()
+torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+if args['use_HR_reference']:
+    torch_data_reference_training_sequence = torch_data_reference_sequence.float()
+    trainset = tc.utils.data.TensorDataset(torch_data_low_resolution_training_sequence, torch_data_high_resolution_groundtruth_training_sequence, torch_data_reference_training_sequence)
     # tc.multiprocessing.freeze_support()
-
+else:
     trainset = tc.utils.data.TensorDataset(torch_data_low_resolution_training_sequence, torch_data_high_resolution_groundtruth_training_sequence)
 
-    trainloader = tc.utils.data.DataLoader(
-                        trainset, 
-                        batch_size = batch_size,
-                        shuffle = True, 
-                        num_workers = 0)
+trainloader = tc.utils.data.DataLoader(
+                    trainset, 
+                    batch_size = batch_size,
+                    shuffle = True, 
+                    num_workers = 0,
+                    pin_memory = False,
+                    drop_last = True)
 
     #testset = tc.utils.data.TensorDataset(torch_data_low_resolution_test_sequence, torch_data_high_resolution_groundtruth_test_sequence)
 
@@ -264,515 +283,102 @@ if args['use_HR_reference'] == False and args['n_colors'] == 1:
     #                    shuffle = True, 
     #                    num_workers = 0)
 
-    """""""""""""""""""""""""""""""""""""""""""""
-    2.1.a. MRI HR and LR Validation Data pair preprocessing validation part
-    """""""""""""""""""""""""""""""""""""""""""""
-    num_low_resolution_mat_file = 0
-    num_high_resolution_groundtruth_mat_file = 0
+"""""""""""""""""""""""""""""""""""""""""""""
+2.1.c. MRI HR and LR Validation Data pair preprocessing validation part
+"""""""""""""""""""""""""""""""""""""""""""""
+num_low_resolution_mat_file = 0
+num_high_resolution_groundtruth_mat_file = 0
+num_reference_mat_file = 0
 
-    for idx_file in file_names:
-        print(idx_file)
-        if 'LR_validation_2' in os.path.join(folder_log_path, idx_file):
-            print('One more low resolution image set exist')
-            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-            print(np.shape(data_low_resolution))
-            print(data_low_resolution.dtype)
-            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+for idx_file in file_names_validation:
+    print(idx_file)
+    if '.mat' in os.path.join(folder_data_validation, idx_file):
+        print('One more low resolution image set exist')
+        num_low_resolution_mat_file = num_low_resolution_mat_file + 1
+        print(os.path.join(folder_data_validation, idx_file))
+        file_data = h5py.File(os.path.join(folder_data_validation, idx_file), 'r')
+        data_low_resolution = file_data['LR'][:] #----- numpy array
+        print('Evaluation data: Shape of LR data is: ', np.shape(data_low_resolution))
+        print(data_low_resolution.dtype)
+        torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+        torch_data_low_resolution = torch_data_low_resolution.permute(0, 1, 3, 2)
+        print('Evaluation data: Shape of LR data in Torch is: ', np.shape(torch_data_low_resolution))
+        if num_low_resolution_mat_file == 1:
+            torch_data_low_resolution_sequence = torch_data_low_resolution
+        elif num_low_resolution_mat_file > 1:
+            print(num_low_resolution_mat_file)
+            torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
+        print('Evaluation data: Shape of LR data sequence in Torch is: ', np.shape(torch_data_low_resolution_sequence))
+#        elif 'HRGT_validation' in os.path.join(folder_data_validation, idx_file):
+#            print('One more high resolution groundtruth image set exist')
+        num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
+#            print(os.path.join(folder_data_validation, idx_file))
+#            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_data_validation, idx_file), 'r')
+        data_high_resolution_groundtruth = file_data['HRGT'][:] #----- numpy array
+        print('Evaluation data: Shape of HR data is: ', np.shape(data_high_resolution_groundtruth))
+        torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+        "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+        torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 1, 3, 2)
+        print('Evaluation data: Shape of HR data in Torch is: ', np.shape(torch_data_high_resolution_groundtruth))
+        if num_high_resolution_groundtruth_mat_file == 1:
+            torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+        if num_high_resolution_groundtruth_mat_file > 1:
+            print(num_high_resolution_groundtruth_mat_file)
+            torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
+        print('Evaluation data: Shape of HR data sequence in Torch is: ', np.shape(torch_data_high_resolution_groundtruth_sequence))
+        if args['use_HR_reference']:
+#                print('One more reference image set exist')
+            num_reference_mat_file = num_reference_mat_file + 1
+#                print(os.path.join(folder_log_path, idx_file))
+#                file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+            data_reference = file_data['REF'][:] #----- numpy array
+            print(np.shape(data_reference))
+            torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
             "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-    # =============================================================================
-    #         torch_data_low_resolution = tc.t(torch_data_low_resolution)
-    # =============================================================================
-    # =============================================================================
-    #         torch_data_low_resolution = torch_data_low_resolution.type(tc.DoubleTensor)
-    # =============================================================================
-            print(np.shape(torch_data_low_resolution))
-            if num_low_resolution_mat_file == 1:
-                torch_data_low_resolution_sequence = torch_data_low_resolution
-            elif num_low_resolution_mat_file > 1:
-                print(num_low_resolution_mat_file)
-                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-            print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_validation_2' in os.path.join(folder_log_path, idx_file):
-            print('One more high resolution groundtruth image set exist')
-            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-            print(np.shape(data_high_resolution_groundtruth))
-            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-    # =============================================================================
-    #         torch_data_high_resolution_groundtruth = tc.t(torch_data_high_resolution_groundtruth)
-    # =============================================================================
-    # =============================================================================
-    #         torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.type(tc.DoubleTensor)
-    # =============================================================================
-            print(np.shape(torch_data_high_resolution_groundtruth))
-            if num_high_resolution_groundtruth_mat_file == 1:
-                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-            if num_high_resolution_groundtruth_mat_file > 1:
-                print(num_high_resolution_groundtruth_mat_file)
-                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-        else:
-            print('other type NOT support for now')
+            torch_data_reference = torch_data_reference.permute(0, 1, 3, 2)
+            print(np.shape(torch_data_reference))
+            if num_reference_mat_file == 1:
+                torch_data_reference_sequence = torch_data_reference
+            if num_reference_mat_file > 1:
+                print(num_reference_mat_file)
+                torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
+            print(np.shape(torch_data_reference_sequence))
+    else:
+        print('other type NOT support for now')
 
-    """Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
-    the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
-    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-    print(np.shape(torch_data_low_resolution_sequence))
-    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+"""Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
+the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
+torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.float() 
+print(np.shape(torch_data_low_resolution_sequence))
+torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+if args['use_HR_reference']:
+    torch_data_reference_sequence = torch_data_reference_sequence.float()
+    print(np.shape(torch_data_reference_sequence))
+# num_validation_samples = math.floor(torch_data_low_resolution_sequence.size(0))
+print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
 
-    num_validation_samples = math.floor(torch_data_low_resolution_sequence.size(0))
-    #print(num_training_samples)
-    #torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
-    #torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
-    #print(np.shape(torch_data_low_resolution_training_sequence))
-    #print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
-
-    #torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
-    #torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
-    #print(np.shape(torch_data_low_resolution_test_sequence))
-    #print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
-
-    print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    2.2.a. Load MRI HR and LR Validation Data pair validation part
-    """""""""""""""""""""""""""""""""""""""""""""
-    torch_data_low_resolution_validation_sequence = torch_data_low_resolution_sequence.float()
-    torch_data_high_resolution_groundtruth_validation_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-
+"""""""""""""""""""""""""""""""""""""""""""""
+2.2.c. Load MRI HR and LR Validation Data pair validation part
+"""""""""""""""""""""""""""""""""""""""""""""
+torch_data_low_resolution_validation_sequence = torch_data_low_resolution_sequence.float()
+torch_data_high_resolution_groundtruth_validation_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+if args['use_HR_reference']:
+    torch_data_reference_validation_sequence = torch_data_reference_sequence.float()
+    validationset = tc.utils.data.TensorDataset(torch_data_low_resolution_validation_sequence, torch_data_high_resolution_groundtruth_validation_sequence, torch_data_reference_validation_sequence)
     # tc.multiprocessing.freeze_support()
-
+else:
+    # tc.multiprocessing.freeze_support()
     validationset = tc.utils.data.TensorDataset(torch_data_low_resolution_validation_sequence, torch_data_high_resolution_groundtruth_validation_sequence)
 
-    validationloader = tc.utils.data.DataLoader(
+validationloader = tc.utils.data.DataLoader(
                         validationset, 
-                        batch_size = batch_size,
-                        shuffle = False, 
-                        num_workers = 0)
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    3.1.a. MRI HR and LR Evaluation(Test) Data pair preprocessing evaluation(test) part
-    """""""""""""""""""""""""""""""""""""""""""""
-    # Please beware the data should be Evaluation data rather than training data
-    """ folder_log_path = '/srv/DATA/RAID/HaoLi/Data/'
-    file_names = os.listdir(folder_log_path) """
-
-    num_low_resolution_mat_file = 0
-    num_high_resolution_groundtruth_mat_file = 0
-
-    for idx_file in file_names:
-        print(idx_file)
-        if 'LR_eval_2' in os.path.join(folder_log_path, idx_file):
-            print('One more low resolution image set exist')
-            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-            print(np.shape(data_low_resolution))
-            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-            print(np.shape(torch_data_low_resolution))
-            if num_low_resolution_mat_file == 1:
-                torch_data_low_resolution_sequence = torch_data_low_resolution
-            elif num_low_resolution_mat_file > 1:
-                print(num_low_resolution_mat_file)
-                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-            print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_eval_2' in os.path.join(folder_log_path, idx_file):
-            print('One more high resolution groundtruth image set exist')
-            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-            print(np.shape(data_high_resolution_groundtruth))
-            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-            print(np.shape(torch_data_high_resolution_groundtruth))
-            if num_high_resolution_groundtruth_mat_file == 1:
-                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-            if num_high_resolution_groundtruth_mat_file > 1:
-                print(num_high_resolution_groundtruth_mat_file)
-                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-        else:
-            print('other type NOT support for now')
-
-    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-    print(np.shape(torch_data_low_resolution_sequence))
-    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    3.2.a. Load MRI HR and LR Evaluation(Test) Data pair evaluation(test) part
-    """""""""""""""""""""""""""""""""""""""""""""
-    torch_data_low_resolution_eval_sequence = torch_data_low_resolution_sequence.float()
-    torch_data_high_resolution_groundtruth_eval_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-
-    testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_high_resolution_groundtruth_eval_sequence)
-
-    new_batch_size_for_checking = 32
-
-    testloader = tc.utils.data.DataLoader(
-                        testset, 
-                        batch_size = new_batch_size_for_checking,
-                        shuffle = False, 
-                        num_workers = 0)        
-
-    "Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
-    #trainloader = tc.utils.data.DataLoader(
-    #                    trainset, 
-    #                    batch_size = new_batch_size_for_checking,
-    #                    shuffle = True, 
-    #                    num_workers = 0)
-
-elif args['use_HR_reference'] == True and args['n_colors'] == 1:
-    """
-    The data loading pipeline for MRI SR with HR reference:
-    """
-    """""""""""""""""""""""""""""""""""""""""""""
-    1.1.b. MRI HR reference, HR and LR Data pair preprocessing training part
-    """""""""""""""""""""""""""""""""""""""""""""
-    # =============================================================================
-    # h5py.version
-    # =============================================================================
-    "The folder where to load the training LR, HR and HR reference data pair"
-    folder_log_path = 'D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/data/sample_downsize_training_data_HR_reference_20210111'
-    file_names = os.listdir(folder_log_path)
-
-    num_low_resolution_mat_file = 0
-    num_high_resolution_groundtruth_mat_file = 0
-    num_reference_mat_file = 0
-
-    for idx_file in file_names:
-        print(idx_file)
-        if 'LR_training_2' in os.path.join(folder_log_path, idx_file):
-            print('One more low resolution image set exist')
-            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-            print(np.shape(data_low_resolution))
-            print(data_low_resolution.dtype)
-            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-            print(np.shape(torch_data_low_resolution))
-            if num_low_resolution_mat_file == 1:
-                torch_data_low_resolution_sequence = torch_data_low_resolution
-            elif num_low_resolution_mat_file > 1:
-                print(num_low_resolution_mat_file)
-                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-            print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_training_2' in os.path.join(folder_log_path, idx_file):
-            print('One more high resolution groundtruth image set exist')
-            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-            print(np.shape(data_high_resolution_groundtruth))
-            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-            print(np.shape(torch_data_high_resolution_groundtruth))
-            if num_high_resolution_groundtruth_mat_file == 1:
-                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-            if num_high_resolution_groundtruth_mat_file > 1:
-                print(num_high_resolution_groundtruth_mat_file)
-                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-        elif 'REF_training_2' in os.path.join(folder_log_path, idx_file):
-            print('One more reference image set exist')
-            num_reference_mat_file = num_reference_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_reference = file_data_reference['REF'][:] #----- numpy array
-            print(np.shape(data_reference))
-            torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_reference = torch_data_reference.permute(0, 2, 1)
-            print(np.shape(torch_data_reference))
-            if num_reference_mat_file == 1:
-                torch_data_reference_sequence = torch_data_reference
-            if num_reference_mat_file > 1:
-                print(num_reference_mat_file)
-                torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
-            print(np.shape(torch_data_reference_sequence))
-        else:
-            print('other type NOT support for now')
-
-    """Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
-    the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
-    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-    print(np.shape(torch_data_low_resolution_sequence))
-    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-    torch_data_reference_sequence = torch_data_reference_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_reference_sequence))
-
-    num_training_samples = math.floor(torch_data_low_resolution_sequence.size(0))
-    #print(num_training_samples)
-    #torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
-    #torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
-    #print(np.shape(torch_data_low_resolution_training_sequence))
-    #print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
-
-    #torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
-    #torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
-    #print(np.shape(torch_data_low_resolution_test_sequence))
-    #print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
-
-    print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    1.2.b. Load MRI HR reference, HR and LR Data pair training part
-    """""""""""""""""""""""""""""""""""""""""""""
-    torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence.float()
-    torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-    torch_data_reference_training_sequence = torch_data_reference_sequence.float()
-
-    # tc.multiprocessing.freeze_support()
-
-    trainset = tc.utils.data.TensorDataset(torch_data_low_resolution_training_sequence, torch_data_high_resolution_groundtruth_training_sequence,
-                                            torch_data_reference_training_sequence)
-
-    trainloader = tc.utils.data.DataLoader(
-                        trainset, 
                         batch_size = batch_size,
                         shuffle = True, 
-                        num_workers = 0)
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    2.1.b. MRI HR reference, HR and LR Validation Data pair preprocessing validation part
-    """""""""""""""""""""""""""""""""""""""""""""
-    num_low_resolution_mat_file = 0
-    num_high_resolution_groundtruth_mat_file = 0
-    num_reference_mat_file = 0
-
-    for idx_file in file_names:
-        print(idx_file)
-        if 'LR_validation_2' in os.path.join(folder_log_path, idx_file):
-            print('One more low resolution image set exist')
-            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-            print(np.shape(data_low_resolution))
-            print(data_low_resolution.dtype)
-            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-            print(np.shape(torch_data_low_resolution))
-            if num_low_resolution_mat_file == 1:
-                torch_data_low_resolution_sequence = torch_data_low_resolution
-            elif num_low_resolution_mat_file > 1:
-                print(num_low_resolution_mat_file)
-                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-            print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_validation_2' in os.path.join(folder_log_path, idx_file):
-            print('One more high resolution groundtruth image set exist')
-            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-            print(np.shape(data_high_resolution_groundtruth))
-            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-            print(np.shape(torch_data_high_resolution_groundtruth))
-            if num_high_resolution_groundtruth_mat_file == 1:
-                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-            if num_high_resolution_groundtruth_mat_file > 1:
-                print(num_high_resolution_groundtruth_mat_file)
-                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-        elif 'REF_validation_2' in os.path.join(folder_log_path, idx_file):
-            print('One more referece image set exist')
-            num_reference_mat_file = num_reference_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_reference = file_data_reference['REF'][:] #----- numpy array
-            print(np.shape(data_reference))
-            torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_reference = torch_data_reference.permute(0, 2, 1)
-            print(np.shape(torch_data_reference))
-            if num_reference_mat_file == 1:
-                torch_data_reference_sequence = torch_data_reference
-            if num_reference_mat_file > 1:
-                print(num_reference_mat_file)
-                torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
-            print(np.shape(torch_data_reference_sequence))
-        else:
-            print('other type NOT support for now')
-
-    """Note for 2D matrix data with dimension H x W, everytime before loading into trainset and testset, we have to adapt the dimension into format N x C X H x W. Cause all
-    the dimension of input/output are using N x C x H x W. N denotes number of data, C denotes number of channels, H means height, W stays width"""        
-    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-    print(np.shape(torch_data_low_resolution_sequence))
-    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-    torch_data_reference_sequence = torch_data_reference_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_reference_sequence))
-
-    num_validation_samples = math.floor(torch_data_low_resolution_sequence.size(0))
-    #print(num_training_samples)
-    #torch_data_low_resolution_training_sequence = torch_data_low_resolution_sequence[0: num_training_samples, :, :, :]
-    #torch_data_high_resolution_groundtruth_training_sequence = torch_data_high_resolution_groundtruth_sequence[0: num_training_samples, :, :, :]
-    #print(np.shape(torch_data_low_resolution_training_sequence))
-    #print(np.shape(torch_data_high_resolution_groundtruth_training_sequence))
-
-    #torch_data_low_resolution_test_sequence = torch_data_low_resolution_sequence[num_training_samples: -1, :, :, :]     
-    #torch_data_high_resolution_groundtruth_test_sequence = torch_data_high_resolution_groundtruth_sequence[num_training_samples: -1, :, :, :]
-    #print(np.shape(torch_data_low_resolution_test_sequence))
-    #print(np.shape(torch_data_high_resolution_groundtruth_test_sequence))
-
-    print('All mat files have been concatenated into one tensor for each type, data is ready to be loaded!')
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    2.2.b. Load MRI HR reference, HR and LR Validation Data pair validation part
-    """""""""""""""""""""""""""""""""""""""""""""
-    torch_data_low_resolution_validation_sequence = torch_data_low_resolution_sequence.float()
-    torch_data_high_resolution_groundtruth_validation_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-    torch_data_reference_validation_sequence = torch_data_reference_sequence.float()
-
-    # tc.multiprocessing.freeze_support()
-
-    validationset = tc.utils.data.TensorDataset(torch_data_low_resolution_validation_sequence, torch_data_high_resolution_groundtruth_validation_sequence, 
-                                                    torch_data_reference_validation_sequence)
-
-    validationloader = tc.utils.data.DataLoader(
-                        validationset, 
-                        batch_size = batch_size,
-                        shuffle = False, 
-                        num_workers = 0)
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    3.1.b. MRI HR reference, HR and LR Evaluation(Test) Data pair preprocessing evaluation(test) part
-    """""""""""""""""""""""""""""""""""""""""""""
-    # Please beware the data should be Evaluation data rather than training data
-    """ folder_log_path = '/srv/DATA/RAID/HaoLi/Data/'
-    file_names = os.listdir(folder_log_path) """
-
-    num_low_resolution_mat_file = 0
-    num_high_resolution_groundtruth_mat_file = 0
-    num_reference_mat_file = 0
-
-    for idx_file in file_names:
-        print(idx_file)
-        if 'LR_eval_2' in os.path.join(folder_log_path, idx_file):
-            print('One more low resolution image set exist')
-            num_low_resolution_mat_file = num_low_resolution_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_low_resolution = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_low_resolution = file_data_low_resolution['LR'][:] #----- numpy array
-            print(np.shape(data_low_resolution))
-            torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_low_resolution = torch_data_low_resolution.permute(0, 2, 1)
-            print(np.shape(torch_data_low_resolution))
-            if num_low_resolution_mat_file == 1:
-                torch_data_low_resolution_sequence = torch_data_low_resolution
-            elif num_low_resolution_mat_file > 1:
-                print(num_low_resolution_mat_file)
-                torch_data_low_resolution_sequence = tc.cat((torch_data_low_resolution_sequence, torch_data_low_resolution), 0)
-            print(np.shape(torch_data_low_resolution_sequence))
-        elif 'HRGT_eval_2' in os.path.join(folder_log_path, idx_file):
-            print('One more high resolution groundtruth image set exist')
-            num_high_resolution_groundtruth_mat_file = num_high_resolution_groundtruth_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_high_resolution_groundtruth = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_high_resolution_groundtruth = file_data_high_resolution_groundtruth['HRGT'][:] #----- numpy array
-            print(np.shape(data_high_resolution_groundtruth))
-            torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 2, 1)
-            print(np.shape(torch_data_high_resolution_groundtruth))
-            if num_high_resolution_groundtruth_mat_file == 1:
-                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
-            if num_high_resolution_groundtruth_mat_file > 1:
-                print(num_high_resolution_groundtruth_mat_file)
-                torch_data_high_resolution_groundtruth_sequence = tc.cat((torch_data_high_resolution_groundtruth_sequence, torch_data_high_resolution_groundtruth), 0)
-            print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-        elif 'REF_eval_2' in os.path.join(folder_log_path, idx_file):
-            print('One more reference image set exist')
-            num_reference_mat_file = num_reference_mat_file + 1
-            print(os.path.join(folder_log_path, idx_file))
-            file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
-            data_reference = file_data_reference['REF'][:] #----- numpy array
-            print(np.shape(data_reference))
-            torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
-            "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
-            torch_data_reference = torch_data_reference.permute(0, 2, 1)
-            print(np.shape(torch_data_reference))
-            if num_reference_mat_file == 1:
-                torch_data_reference_sequence = torch_data_reference
-            if num_reference_mat_file > 1:
-                print(num_reference_mat_file)
-                torch_data_reference_sequence = tc.cat((torch_data_reference_sequence, torch_data_reference), 0)
-            print(np.shape(torch_data_reference_sequence))
-        else:
-            print('other type NOT support for now')
-
-    torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.unsqueeze(1)    
-    print(np.shape(torch_data_low_resolution_sequence))
-    torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_high_resolution_groundtruth_sequence))
-    torch_data_reference_sequence = torch_data_reference_sequence.unsqueeze(1)  
-    print(np.shape(torch_data_reference_sequence))
-
-    """""""""""""""""""""""""""""""""""""""""""""
-    3.2.b. Load MRI HR reference, HR and LR Evaluation(Test) Data pair evaluation(test) part
-    """""""""""""""""""""""""""""""""""""""""""""
-    torch_data_low_resolution_eval_sequence = torch_data_low_resolution_sequence.float()
-    torch_data_high_resolution_groundtruth_eval_sequence = torch_data_high_resolution_groundtruth_sequence.float()
-    torch_data_reference_eval_sequence = torch_data_reference_sequence.float()
-
-    testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_high_resolution_groundtruth_eval_sequence,
-                                            torch_data_reference_eval_sequence)
-
-    new_batch_size_for_checking = 32
-
-    testloader = tc.utils.data.DataLoader(
-                        testset, 
-                        batch_size = new_batch_size_for_checking,
-                        shuffle = False, 
-                        num_workers = 0)        
-
-    "Resetup the batch size for train and test data, to avoid the errorCUDA out of memory"
-    #trainloader = tc.utils.data.DataLoader(
-    #                    trainset, 
-    #                    batch_size = new_batch_size_for_checking,
-    #                    shuffle = True, 
-    #                    num_workers = 0)
-
-elif args['use_HR_reference'] == False and args['n_colors'] == 3:
-    """
-    The data loading pipeline for ordinary SISR RGB Visual Image SR:
-    """
-    # @TODO: The corresponding data loading part to be added 
-    pass
-
-elif args['use_HR_reference'] == True and args['n_colors'] == 3:
-    """
-    The data loading pipeline for RGB Visual Image SR with HR reference:
-    """
-    # @TODO: The corresponding data loading part to be added 
-    pass
-else:
-    raise ValueError("Not supported type of input image in loading input data!")
-
-
+                        num_workers = 0,
+                        pin_memory = False,
+                        drop_last = True)
 
  
 
@@ -807,24 +413,91 @@ def create_2d_Gaussian_weights(window_size, num_of_samples, channel):
 
 
 "calculate gradient map for any input MRI image"
-def calculate_gradient_map(img):
-    # sobel operator
-    vertical_edge_mask = tc.Tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
-    horizontal_edge_mask = tc.Tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
+def calculate_gradient_map(n_colors, img):
+    
+    if n_colors == 1:
+        # sobel operator
+        vertical_edge_mask = tc.Tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]).unsqueeze(0)
+        horizontal_edge_mask = tc.Tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]).unsqueeze(0)
+        
+        vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).cuda()
+        horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).cuda()
 
-    vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).unsqueeze(0).to(device)
-    horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).unsqueeze(0).to(device)
+        gradient_vertical_map = F.conv2d(img, vertical_edge_mask, padding = 1, stride = 1, groups = 1)
+        gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
 
-    gradient_vertical_map = F.conv2d(img, vertical_edge_mask, padding = 1, stride = 1, groups = 1)
-    gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
+        gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
+    elif n_colors == 2:
+        vertical_edge_mask = tc.Tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]).unsqueeze(0)
+        horizontal_edge_mask = tc.Tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]).unsqueeze(0)
+        vertical_edge_mask = tc.cat((vertical_edge_mask, vertical_edge_mask),0)
+        horizontal_edge_mask = tc.cat((horizontal_edge_mask, horizontal_edge_mask),0)
+        
+        vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).cuda()
+        horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).cuda()
+        
+        gradient_vertical_map = F.conv2d(img, vertical_edge_mask, padding = 1, stride = 1, groups = 1)
+        gradient_horizontal_map = F.conv2d(img, horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
 
-    gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
+        gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map)
+    elif n_colors >= 3:   # For MRI image with number of channel = 3, we just stack 3 MRI image with number of channel = 1 together. 
+        # 3D prewitt operator
+        vertical_edge_mask = tc.Tensor([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]).unsqueeze(0)
+        horizontal_edge_mask = tc.Tensor([[-1, -1, -1], [0, 0, 0], [1, 1, 1]]).unsqueeze(0)
+        vertical_edge_mask = tc.cat((vertical_edge_mask, vertical_edge_mask, vertical_edge_mask),0)
+        horizontal_edge_mask = tc.cat((horizontal_edge_mask, horizontal_edge_mask, horizontal_edge_mask),0)
+        through_plane_edge_mask = horizontal_edge_mask.permute(1,2,0)
+        
+        vertical_edge_mask = vertical_edge_mask.float().unsqueeze(0).unsqueeze(0).cuda()
+        horizontal_edge_mask = horizontal_edge_mask.float().unsqueeze(0).unsqueeze(0).cuda()
+        through_plane_edge_mask = through_plane_edge_mask.float().unsqueeze(0).unsqueeze(0).cuda()
+
+        gradient_vertical_map = F.conv3d(img.unsqueeze(1), vertical_edge_mask, padding = 1, stride = 1, groups = 1)
+        gradient_horizontal_map = F.conv3d(img.unsqueeze(1), horizontal_edge_mask, padding = 1, stride = 1, groups = 1)
+        gradient_through_plane_map = F.conv3d(img.unsqueeze(1), through_plane_edge_mask, padding = 1, stride = 1, groups = 1)
+
+        gradient_map = abs(gradient_vertical_map) + abs(gradient_horizontal_map) + abs(gradient_through_plane_map)
+    else:
+        raise SystemExit('Error: Dimension of gradient operator is not correct!')
+
+    
+#    gradient_map = tc.cat((gradient_vertical_map, gradient_horizontal_map),1)
 
     if Amplify_Small_Value_In_Gradient_Map == True:
-        gradient_map = 1 - tc.exp(-2.5 * gradient_map) # 1 - exp(-ax), a = 2.5
+#        gradient_map = (1 - tc.exp(-2.5 * abs(gradient_map)))*(gradient_map/abs(gradient_map)) # 1 - exp(-ax), a = 2.5
+        gradient_map = 1 - tc.exp(-2.5 * gradient_map)
 
     return gradient_map
 
+
+"""(Not used yet in this code)Calculate PSNR for MRI image in shape (N, C, H, W)"""
+def calc_psnr_for_mri_image(img1, img2):
+    ### args:
+        # img1: pytorch tensor, shape is [N, C, H, W]
+        # img2: pytorch tensor, shape is [N, C, H, W]
+
+    diff = tc.add(img1, -img2)
+    mse = tc.pow(diff, 2).mean(2).mean(2)
+    return -10 * tc.log10(mse).mean(0).mean(0)
+
+
+"""
+(Not used yet in this code)
+L1 Charbonnier Loss. See more information regarding L1 Charboniier Loss from paper: 2018.Fast and Accurate Image Super-Resolution with 
+Deep Laplacian Pyramid Networks. L1 Charboniier Loss in theory can be used to replace the (smooth) L1 loss, to provide reconstructed 
+image with less over-smoothing issues and problem.
+"""
+class L1_Charbonnier_Loss(tc.nn.Module):
+    def __init__(self):
+        super(L1_Charbonnier_Loss,self).__init__()
+        self.eps = 1e-4
+
+    def forward(self, X, Y):
+        diff = tc.add(X, -Y)
+        error = tc.sqrt(diff * diff + self.eps)
+        loss = tc.mean(error)
+        return loss
+    
 
 """
 Negative Total Variation Loss(TV loss). negative_tv_loss = 1 - TV.
@@ -956,7 +629,7 @@ class IFFT_TIME_DOMAIN(nn.Module):
         # Take in k space data x at frequency domain and fetch the image data at time domain. 
         # See https://pytorch.org/docs/stable/generated/torch.irfft.html
         # Beware the shape of input for irfft in our case should be (N, C, H, W, 2), the last 2 stands for real and image part of complex number
-        time_domain_result = tc.irfft(x, signal_ndim = 2, onesided = False)
+        time_domain_result = tc.fft.ifftn(x, dim = (-3,-2,-1))
         return time_domain_result
 
 
@@ -992,6 +665,25 @@ class MeanShift(nn.Conv2d):
         self.requires_grad = False
 
 
+
+class MultiScaleExtractor(nn.Module):
+    def __init__(self, channel_in, channel_out):
+        super(MultiScaleExtractor, self).__init__()
+        
+        self.conv3 = nn.Conv2d(channel_in, channel_out, kernel_size=3, stride=1, padding = 1)
+        self.conv5 = nn.Conv2d(channel_in, channel_out, kernel_size=5, stride=1, padding = 2)
+        self.conv7 = nn.Conv2d(channel_in, channel_out, kernel_size=7, stride=1, padding = 3)
+        self.relu = nn.ReLU()
+        self.fuser = nn.Conv2d(channel_out*3, channel_out, kernel_size=1, stride=1, padding=0)
+        
+    def forward(self,x):
+        x1 = self.relu(self.conv3(x))
+        x2 = self.relu(self.conv5(x))
+        x3 = self.relu(self.conv7(x))
+        y = self.fuser(tc.cat((x1,x2,x3), dim=1))
+        return x+y
+        
+        
 
 "gMLP or aMLP, which is another 'pure MLP' or 'pure MLP with tiny attention' module. See paper: '2021.Pay Attention to MLPs' for more info."
 class gMLPVision(nn.Module):
@@ -1129,7 +821,6 @@ class SpatialGatingUnit(nn.Module):
         return gate * res
 
 
-
 class gMLPVisionInfoExchange(nn.Module):
     def __init__(
         self,
@@ -1254,14 +945,12 @@ class GatingMlpResidualBlockInfoExchange(nn.Module):
         self.proj_2 = nn.Linear(dim_ff, dim)
 
     def forward(self, x, injected_key = None):
-        shorcut = x
-        x = self.norm(x)
-        x = self.proj_1(x)
-        x = self.activation(x)
-        x, output_key = self.spatial_gating_unit(x, injected_key)
-        x = self.proj_2(x)
-        return x + shorcut, output_key
-
+        res = self.norm(x)
+        res = self.proj_1(res)
+        res = self.activation(res)
+        res, output_key = self.spatial_gating_unit(res, injected_key)
+        res = self.proj_2(res)
+        return res + x, output_key
 
 
 "EfficientTransformerBlock in ResTransformer. See paper: 2021.ResT:An Efficient Transformer for Visual Recognition"
@@ -1431,9 +1120,9 @@ class BasicStem(nn.Module):
         if self.with_pos:
             x = self.pos(x)
         return x
-
-
-
+    
+    
+    
 "Upsampler Module, implemented by employeed of sub-pixel conv"
 class Upsampler(nn.Sequential):
     """
@@ -1448,11 +1137,14 @@ class Upsampler(nn.Sequential):
         if reduce_number_of_channels_in_half == False:
             self.upsampler = nn.Sequential(*[
                 nn.Conv2d(n_feats, n_feats, kernel_size = 3, padding=1, stride=1),
+                nn.ReLU(),
+                nn.Conv2d(n_feats, n_feats, kernel_size = 3, padding=1, stride=1),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
         else: # reduce_number_of_channels_in_half == True
             self.upsampler = nn.Sequential(*[
                 nn.Conv2d(n_feats, n_feats//2, kernel_size = 3, padding=1, stride=1),
+                nn.ReLU(),
                 nn.Conv2d(n_feats//2, n_feats//2, kernel_size = 3, padding=1, stride=1),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
@@ -1460,8 +1152,6 @@ class Upsampler(nn.Sequential):
     def forward(self, x):
         upsampled_x = self.upsampler(x)
         return upsampled_x
-
-
 
 
 
@@ -1475,53 +1165,55 @@ class U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
 
         n_colors = args['n_colors'] # number of channels going of input of entire model.
         LR_image_size = args['LR_image_size'] # size of LR image.
+        n_dim = args['n_dim'] # number of dimension we expect to use for gMLP.
         type_of_upsampler = args['type_of_upsampler']
         
-        self.fisrt_u_net_layer = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = 16, channels = n_colors, attn_dim = 2)
-        self.second_u_net_layer = gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = 64, channels = 16, attn_dim = 2)
-        self.third_u_net_layer = gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = 256, channels = 64, attn_dim = 2)
-        self.forth_u_net_layer = gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = 1024, channels = 256, attn_dim = 2)
+        self.fisrt_u_net_layer = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = n_dim, channels = n_colors, attn_dim = 2)
+        self.second_u_net_layer = gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = n_dim*4, channels = n_dim, attn_dim = 2)
+        self.third_u_net_layer = gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = n_dim*16, channels = n_dim*4, attn_dim = 2)
+        self.forth_u_net_layer = gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = n_dim*64, channels = n_dim*16, attn_dim = 2)
 
         if type_of_upsampler == 'conv_based_upsampler':
-            self.fisrt_upsampling_layer = Upsampler(n_feats = 1024)
-            self.second_upsampling_layer = Upsampler(n_feats = 256*2, reduce_number_of_channels_in_half = True)
-            self.third_upsampling_layer = Upsampler(n_feats = 64*2, reduce_number_of_channels_in_half = True)
-            self.forth_upsampling_layer = Upsampler(n_feats = 16*2, reduce_number_of_channels_in_half = True)
-            if Maintain_Same_Size == True:
-                self.last_channel_reduce_layer = nn.Conv2d(4, n_colors, kernel_size = 3, padding=1, stride=1)
+            self.fisrt_upsampling_layer = Upsampler(n_feats = n_dim)
+            self.second_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.third_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.forth_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            if Maintain_in_plane_Size == True:
+                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
             else:
-                self.fifth_upsampling_layer = Upsampler(n_feats = 4, reduce_number_of_channels_in_half = False)
-                self.last_channel_reduce_layer = nn.Conv2d(1, n_colors, kernel_size = 3, padding=1, stride=1)
+                self.fifth_upsampling_layer = Upsampler(n_feats = n_dim, reduce_number_of_channels_in_half = False)
+                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
         elif type_of_upsampler == 'gMLP_based_upsampler':
             self.fisrt_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 1024, channels = 1024, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 64*n_dim, channels = 64*n_dim, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.second_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 256, channels = 2*256, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 16*n_dim, channels = 32*n_dim, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.third_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 64, channels = 2*64, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 4*n_dim, channels = 8*n_dim, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
             self.forth_upsampling_layer = nn.Sequential(*[
-                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = 16, channels = 2*16, attn_dim = 2),
+                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = n_dim, channels = 2*n_dim, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
-            if Maintain_Same_Size == True:
-                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = 4, attn_dim = 2)
+            if Maintain_in_plane_Size == True:
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
             else:
                 self.fifth_upsampling_layer = nn.Sequential(*[
-                    gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4, channels = 4, attn_dim = 2),
+                    gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_dim//4, channels = n_dim//4, attn_dim = 2),
                     nn.PixelShuffle(upscale_factor = 2)
                 ])
-                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = 1, attn_dim = 2)
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = n_dim//16, attn_dim = 2)
         else:
             raise ValueError("Not supported type of upsampler!")
 
     def forward(self, x):
         # U-Net framework.
+        
         x1 = self.fisrt_u_net_layer(x)
         x2 = self.second_u_net_layer(x1)
         x3 = self.third_u_net_layer(x2)
@@ -1531,16 +1223,133 @@ class U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
         y2 = self.second_upsampling_layer(tc.cat((x3, y1), dim = 1))
         y3 = self.third_upsampling_layer(tc.cat((x2, y2), dim = 1))
         y4 = self.forth_upsampling_layer(tc.cat((x1, y3), dim = 1))
-        if Maintain_Same_Size == True:
-            """ sr = self.last_channel_reduce_layer(y4) """
-            sr = y4
+        if Maintain_in_plane_Size == True:
+            sr = self.last_channel_reduce_layer(y4)
         else:
             y5 = self.fifth_upsampling_layer(y4)
-            """ sr = self.last_channel_reduce_layer(y5) """
-            sr = y5
+            sr = self.last_channel_reduce_layer(y5)
+        """    
+        x1 = self.fisrt_u_net_layer(x)
+        x2 = self.second_u_net_layer(x1)
+        x3 = self.third_u_net_layer(x2)
+
+        y1 = self.second_upsampling_layer(x3)
+        y2 = self.third_upsampling_layer(tc.cat((x2, y1), dim = 1))
+        y3 = self.forth_upsampling_layer(tc.cat((x1, y2), dim = 1))
+        if Maintain_in_plane_Size == True:
+            sr = self.last_channel_reduce_layer(y3)
+        else:
+            y4 = self.fifth_upsampling_layer(y3)
+            sr = self.last_channel_reduce_layer(y4)    
+        """
         return sr
 
 
+"gMLP based U-Net for Super Resolution MRI"
+class U_Net_Based_MRI_SR_Transformer_Conv_MLP_2D(nn.Module):
+    """
+    U-Net framework in this code, consists of each gMLP as one layer in U-Net.
+    """
+    def __init__(self, args):
+        super(U_Net_Based_MRI_SR_Transformer_Conv_MLP_2D, self).__init__()
+
+        n_colors = args['n_colors'] # number of channels going of input of entire model.
+        LR_image_size = args['LR_image_size'] # size of LR image.
+        n_dim = args['n_dim'] # number of dimension we expect to use for gMLP.
+        type_of_upsampler = args['type_of_upsampler']
+        
+        self.fisrt_u_net_layer = nn.Sequential(*[
+            MultiScaleExtractor(n_colors, n_dim//4),
+            gMLPVision(image_size = LR_image_size, patch_size = 2, dim = n_dim, channels = n_dim//4, attn_dim = 2)
+            ])
+        self.second_u_net_layer = nn.Sequential(*[
+            MultiScaleExtractor(n_dim, n_dim),
+            gMLPVision(image_size = LR_image_size//2, patch_size = 2, dim = n_dim*4, channels = n_dim, attn_dim = 2)
+            ])
+        self.third_u_net_layer = nn.Sequential(*[
+            MultiScaleExtractor(n_dim*4, n_dim*4),
+            gMLPVision(image_size = LR_image_size//4, patch_size = 2, dim = n_dim*16, channels = n_dim*4, attn_dim = 2)
+            ])
+        self.forth_u_net_layer = nn.Sequential(*[
+            MultiScaleExtractor(n_dim*16, n_dim*16),
+            gMLPVision(image_size = LR_image_size//8, patch_size = 2, dim = n_dim*64, channels = n_dim*16, attn_dim = 2)
+            ])
+
+        if type_of_upsampler == 'conv_based_upsampler':
+            self.fisrt_upsampling_layer = Upsampler(n_feats = n_dim)
+            self.second_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.third_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            self.forth_upsampling_layer = Upsampler(n_feats = n_dim*2, reduce_number_of_channels_in_half = True)
+            if Maintain_in_plane_Size == True:
+                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+            else:
+                self.fifth_upsampling_layer = Upsampler(n_feats = n_dim, reduce_number_of_channels_in_half = False)
+                self.last_channel_reduce_layer = nn.Conv2d(n_dim, n_colors, kernel_size = 3, padding=1, stride=1)
+        elif type_of_upsampler == 'gMLP_based_upsampler':
+            self.fisrt_upsampling_layer = nn.Sequential(*[
+                MultiScaleExtractor(n_dim*64, n_dim*64),
+                gMLPVision(image_size = LR_image_size//16, patch_size = 1, dim = 64*n_dim, channels = 64*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.second_upsampling_layer = nn.Sequential(*[
+                MultiScaleExtractor(n_dim*32, n_dim*16),
+                gMLPVision(image_size = LR_image_size//8, patch_size = 1, dim = 16*n_dim, channels = 16*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.third_upsampling_layer = nn.Sequential(*[
+                MultiScaleExtractor(n_dim*8, n_dim*4),
+                gMLPVision(image_size = LR_image_size//4, patch_size = 1, dim = 4*n_dim, channels = 4*n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            self.forth_upsampling_layer = nn.Sequential(*[
+                MultiScaleExtractor(n_dim*2, n_dim),
+                gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = n_dim, channels = n_dim, attn_dim = 2),
+                nn.PixelShuffle(upscale_factor = 2)
+            ])
+            if Maintain_in_plane_Size == True:
+                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = n_dim, attn_dim = 2)
+            else:
+                self.fifth_upsampling_layer = nn.Sequential(*[
+                    MultiScaleExtractor(n_dim//4, n_dim//4),
+                    gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_dim//4, channels = n_dim//4, attn_dim = 2),
+                    nn.PixelShuffle(upscale_factor = 2)
+                ])
+#                self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size*2, patch_size = 1, dim = n_colors, channels = n_dim//16, attn_dim = 2)
+        else:
+            raise ValueError("Not supported type of upsampler!")
+
+    def forward(self, x):
+        # U-Net framework.
+        
+        x1 = self.fisrt_u_net_layer(x)
+        x2 = self.second_u_net_layer(x1)
+        x3 = self.third_u_net_layer(x2)
+        x4 = self.forth_u_net_layer(x3)
+
+        y1 = self.fisrt_upsampling_layer(x4)
+        y2 = self.second_upsampling_layer(tc.cat((x3, y1), dim = 1))
+        y3 = self.third_upsampling_layer(tc.cat((x2, y2), dim = 1))
+        y4 = self.forth_upsampling_layer(tc.cat((x1, y3), dim = 1))
+        if Maintain_in_plane_Size == True:
+            sr = self.last_channel_reduce_layer(y4)
+        else:
+            sr = self.fifth_upsampling_layer(y4)
+#            sr = self.last_channel_reduce_layer(y5)
+        """    
+        x1 = self.fisrt_u_net_layer(x)
+        x2 = self.second_u_net_layer(x1)
+        x3 = self.third_u_net_layer(x2)
+
+        y1 = self.second_upsampling_layer(x3)
+        y2 = self.third_upsampling_layer(tc.cat((x2, y1), dim = 1))
+        y3 = self.forth_upsampling_layer(tc.cat((x1, y2), dim = 1))
+        if Maintain_in_plane_Size == True:
+            sr = self.last_channel_reduce_layer(y3)
+        else:
+            y4 = self.fifth_upsampling_layer(y3)
+            sr = self.last_channel_reduce_layer(y4)    
+        """
+        return sr
 
 
 
@@ -1570,7 +1379,7 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
             self.second_upsampling_layer = Upsampler(n_feats = 256*2, reduce_number_of_channels_in_half = True)
             self.third_upsampling_layer = Upsampler(n_feats = 64*2, reduce_number_of_channels_in_half = True)
             self.forth_upsampling_layer = Upsampler(n_feats = 16*2, reduce_number_of_channels_in_half = True)
-            if Maintain_Same_Size == True:
+            if Maintain_in_plane_Size == True:
                 self.last_channel_reduce_layer = nn.Conv2d(4, n_colors, kernel_size = 3, padding=1, stride=1)
             else:
                 self.fifth_upsampling_layer = Upsampler(n_feats = 4, reduce_number_of_channels_in_half = False)
@@ -1592,7 +1401,7 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
                 gMLPVision(image_size = LR_image_size//2, patch_size = 1, dim = 16, channels = 2*16, attn_dim = 2),
                 nn.PixelShuffle(upscale_factor = 2)
             ])
-            if Maintain_Same_Size == True:
+            if Maintain_in_plane_Size == True:
                 self.last_channel_reduce_layer = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = n_colors, channels = 4, attn_dim = 2)
             else:
                 if self.HR_reference_framework == 'gMLP_without_information_exchange':
@@ -1605,14 +1414,14 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
             raise ValueError("Not supported type of upsampler!")
 
         if self.HR_reference_framework == 'gMLP_without_information_exchange':
-            if Maintain_Same_Size == True:
+            if Maintain_in_plane_Size == True:
                 raise ValueError("Size of HR reference and LR are same, not supported yet!")
             else:
                 self.first_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size*2, patch_size = 2, dim = n_colors, channels = n_colors, attn_dim = 2)
                 self.second_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size, patch_size = 2, dim = 16, channels = n_colors, attn_dim = 2)
                 self.last_layer_in_reference_branch_for_unet_decoder = gMLPVision(image_size = LR_image_size, patch_size = 1, dim = 4, channels = n_colors, attn_dim = 2)
         elif self.HR_reference_framework == 'gMLP_with_information_exchange':
-            if Maintain_Same_Size == True:
+            if Maintain_in_plane_Size == True:
                 raise ValueError("Size of HR reference and LR are same, not supported yet!")
             else:
                 self.first_layer_in_reference_branch_for_unet_encoder = gMLPVision(image_size = LR_image_size*2, patch_size = 2, dim = n_colors, channels = n_colors, attn_dim = 2)
@@ -1638,7 +1447,7 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
         y2 = self.second_upsampling_layer(tc.cat((x3, y1), dim = 1))
         y3 = self.third_upsampling_layer(tc.cat((x2, y2), dim = 1))
         y4 = self.forth_upsampling_layer(tc.cat((x1, y3), dim = 1))
-        if Maintain_Same_Size == True:
+        if Maintain_in_plane_Size == True:
             """ sr = self.last_channel_reduce_layer(y4) """
             sr = y4
         else:
@@ -1652,8 +1461,6 @@ class HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
             """ sr = self.last_channel_reduce_layer(y5) """
             sr = y5
         return sr
-
-
 
 
 
@@ -1673,6 +1480,7 @@ class Efficient_Transformer_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
         super().__init__()
         self.depths = depths
         self.apply_transform = apply_transform
+        self.type_of_upsampler = args['type_of_upsampler']
 
         # Efficient transformer block based encoder.
         self.stem = BasicStem(in_ch=args['n_colors'], out_ch=embed_dims[0], with_pos=True)  # See figure 2 of ResT paper for more detail regarding stem.
@@ -1680,7 +1488,8 @@ class Efficient_Transformer_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
         self.patch_embed_2 = PatchEmbed(patch_size=2, in_ch=embed_dims[0], out_ch=embed_dims[1], with_pos=True) # Patch embedding for stage 2.
         self.patch_embed_3 = PatchEmbed(patch_size=2, in_ch=embed_dims[1], out_ch=embed_dims[2], with_pos=True) # Patch embedding for stage 3.
         self.patch_embed_4 = PatchEmbed(patch_size=2, in_ch=embed_dims[2], out_ch=embed_dims[3], with_pos=True) # Patch embedding for stage 4.
-
+        
+        
         self.stage1 = nn.ModuleList([
             EfficientTransformerBlock(embed_dims[0], num_heads[0], mlp_ratios[0], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[0], apply_transform=apply_transform)
             for i in range(self.depths[0])])
@@ -1697,41 +1506,53 @@ class Efficient_Transformer_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
             EfficientTransformerBlock(embed_dims[3], num_heads[3], mlp_ratios[3], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[3], apply_transform=apply_transform)
             for i in range(self.depths[3])])
 
-        # Efficient transformer block based decoder.
-        self.patch_embed_upsampling_1 = PatchEmbed(patch_size=2, in_ch=embed_dims[4], out_ch=embed_dims[4], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 1.
-        self.patch_embed_upsampling_2 = PatchEmbed(patch_size=2, in_ch=embed_dims[5]*2, out_ch=embed_dims[5], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 2.
-        self.patch_embed_upsampling_3 = PatchEmbed(patch_size=2, in_ch=embed_dims[6]*2, out_ch=embed_dims[6], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 3.
-        self.patch_embed_upsampling_4 = PatchEmbed(patch_size=2, in_ch=embed_dims[7]*2, out_ch=embed_dims[7], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 4.
-        self.patch_embed_upsampling_5 = PatchEmbed(patch_size=2, in_ch=embed_dims[7]//4, out_ch=embed_dims[7]//4, with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 5.
 
-        self.pixel_shuffle_upsampler_1 = nn.PixelShuffle(upscale_factor = 2)
-        self.pixel_shuffle_upsampler_2 = nn.PixelShuffle(upscale_factor = 2)
-        self.pixel_shuffle_upsampler_3 = nn.PixelShuffle(upscale_factor = 2)
-        self.pixel_shuffle_upsampler_4 = nn.PixelShuffle(upscale_factor = 2)
-        self.pixel_shuffle_upsampler_5 = nn.PixelShuffle(upscale_factor = 2)
+        if self.type_of_upsampler == 'conv_based_upsampler':
+            self.fisrt_upsampling_layer = Upsampler(n_feats = embed_dims[4])
+            self.second_upsampling_layer = Upsampler(n_feats = embed_dims[5]*2, reduce_number_of_channels_in_half = True)
+            self.third_upsampling_layer = Upsampler(n_feats = embed_dims[6]*2, reduce_number_of_channels_in_half = True)
+            self.forth_upsampling_layer = Upsampler(n_feats = embed_dims[7]*2, reduce_number_of_channels_in_half = True)
+            if Maintain_in_plane_Size == True:
+                self.last_channel_reduce_layer = nn.Conv2d(embed_dims[7]//4, args['n_colors'], kernel_size = 3, padding=1, stride=1)
+            else:
+                self.fifth_upsampling_layer = Upsampler(n_feats = embed_dims[7]//4, reduce_number_of_channels_in_half = False)
+                self.last_channel_reduce_layer = nn.Conv2d(embed_dims[7]//16, args['n_colors'], kernel_size = 3, padding=1, stride=1)
+        else:
+            # Efficient transformer block based decoder.
+            self.patch_embed_upsampling_1 = PatchEmbed(patch_size=2, in_ch=embed_dims[4], out_ch=embed_dims[4], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 1.
+            self.patch_embed_upsampling_2 = PatchEmbed(patch_size=2, in_ch=embed_dims[5]*2, out_ch=embed_dims[5], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 2.
+            self.patch_embed_upsampling_3 = PatchEmbed(patch_size=2, in_ch=embed_dims[6]*2, out_ch=embed_dims[6], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 3.
+            self.patch_embed_upsampling_4 = PatchEmbed(patch_size=2, in_ch=embed_dims[7]*2, out_ch=embed_dims[7], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 4.
+            self.patch_embed_upsampling_5 = PatchEmbed(patch_size=2, in_ch=embed_dims[7]//4, out_ch=embed_dims[7]//4, with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 5.
+            
+            self.pixel_shuffle_upsampler_1 = nn.PixelShuffle(upscale_factor = 2)
+            self.pixel_shuffle_upsampler_2 = nn.PixelShuffle(upscale_factor = 2)
+            self.pixel_shuffle_upsampler_3 = nn.PixelShuffle(upscale_factor = 2)
+            self.pixel_shuffle_upsampler_4 = nn.PixelShuffle(upscale_factor = 2)
+            self.pixel_shuffle_upsampler_5 = nn.PixelShuffle(upscale_factor = 2)
 
-        self.upsampling_stage_1 = nn.ModuleList([
-            EfficientTransformerBlock(embed_dims[4], num_heads[4], mlp_ratios[4], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[4], apply_transform=apply_transform)
-            for i in range(self.depths[4])])
-        
-        self.upsampling_stage_2 = nn.ModuleList([
-            EfficientTransformerBlock(embed_dims[5], num_heads[5], mlp_ratios[5], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[5], apply_transform=apply_transform)
-            for i in range(self.depths[5])])
+            self.upsampling_stage_1 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[4], num_heads[4], mlp_ratios[4], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[4], apply_transform=apply_transform)
+                for i in range(self.depths[4])])
 
-        self.upsampling_stage_3 = nn.ModuleList([
-            EfficientTransformerBlock(embed_dims[6], num_heads[6], mlp_ratios[6], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[6], apply_transform=apply_transform)
-            for i in range(self.depths[6])])
+            self.upsampling_stage_2 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[5], num_heads[5], mlp_ratios[5], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[5], apply_transform=apply_transform)
+                for i in range(self.depths[5])])
 
-        self.upsampling_stage_4 = nn.ModuleList([
-            EfficientTransformerBlock(embed_dims[7], num_heads[7], mlp_ratios[7], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[7], apply_transform=apply_transform)
-            for i in range(self.depths[7])])
+            self.upsampling_stage_3 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[6], num_heads[6], mlp_ratios[6], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[6], apply_transform=apply_transform)
+                for i in range(self.depths[6])])
 
-        self.upsampling_stage_5 = nn.ModuleList([
-            EfficientTransformerBlock(embed_dims[7]//4, num_heads[7], mlp_ratios[7], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[7], apply_transform=apply_transform)
-            for i in range(self.depths[7])])
+            self.upsampling_stage_4 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[7], num_heads[7], mlp_ratios[7], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[7], apply_transform=apply_transform)
+                for i in range(self.depths[7])])
+
+            self.upsampling_stage_5 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[7]//4, num_heads[7], mlp_ratios[7], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[7], apply_transform=apply_transform)
+                for i in range(self.depths[7])])
 
     def forward(self, x):
-        lr = x
+        lr = x.clone()
         x = self.stem(x)
         B, _, H, W = x.shape
         x = x.flatten(2).permute(0, 2, 1)
@@ -1759,65 +1580,276 @@ class Efficient_Transformer_Based_MRI_SR_Transformer_MLP_2D(nn.Module):
             x = blk(x, H, W)
         x = x.permute(0, 2, 1).reshape(B, -1, H, W)
 
-        # decoder(upampling) stage 1
-        x, (H, W) = self.patch_embed_upsampling_1(x)
-        for blk in self.upsampling_stage_1: # blk stands for every efficient transformer block in currect stage.
-            x = blk(x, H, W)
-        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
-        x_upampling_1 = self.pixel_shuffle_upsampler_1(x)
+        
 
-        # decoder(upampling) stage 2
-        x, (H, W) = self.patch_embed_upsampling_2(tc.cat((x_upampling_1, x_downsampling_3), dim = 1))
-        for blk in self.upsampling_stage_2: # blk stands for every efficient transformer block in currect stage.
-            x = blk(x, H, W)
-        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
-        x_upampling_2 = self.pixel_shuffle_upsampler_2(x)
+        if self.type_of_upsampler == 'conv_based_upsampler':
 
-        # decoder(upampling) stage 3
-        x, (H, W) = self.patch_embed_upsampling_3(tc.cat((x_upampling_2, x_downsampling_2), dim = 1))
-        for blk in self.upsampling_stage_3: # blk stands for every efficient transformer block in currect stage.
-            x = blk(x, H, W)
-        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
-        x_upampling_3 = self.pixel_shuffle_upsampler_3(x)
+            x_upampling_1 = self.fisrt_upsampling_layer(x)
+            x_upampling_2 = self.second_upsampling_layer(tc.cat((x_upampling_1,x_downsampling_3),dim=1))
+            x_upampling_3 = self.third_upsampling_layer(tc.cat((x_upampling_2,x_downsampling_2),dim=1))
+            x_upampling_4 = self.forth_upsampling_layer(tc.cat((x_upampling_3,x_downsampling_1),dim=1))
+            if Maintain_in_plane_Size == True:
+                sr = self.last_channel_reduce_layer(x_upampling_4)
+            else:
+                x_upampling_5 = self.fifth_upsampling_layer(x_upampling_4)
+                sr = self.last_channel_reduce_layer(x_upampling_5)
 
-        # decoder(upampling) stage 4
-        x, (H, W) = self.patch_embed_upsampling_4(tc.cat((x_upampling_3, x_downsampling_1), dim = 1))
-        for blk in self.upsampling_stage_4: # blk stands for every efficient transformer block in currect stage.
-            x = blk(x, H, W)
-        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
-        x_upampling_4 = self.pixel_shuffle_upsampler_4(x)
+            
+        else:            
+            # decoder(upampling) stage 1
+            x, (H, W) = self.patch_embed_upsampling_1(x)
+            for blk in self.upsampling_stage_1: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            x_upampling_1 = self.pixel_shuffle_upsampler_1(x)
 
-        """ x_upampling_4 = x_upampling_4 + lr  # If we want to just recover the "residual of sr" rather than the sr directly, then need this line of code. """
+            # decoder(upampling) stage 2
+            x, (H, W) = self.patch_embed_upsampling_2(tc.cat((x_upampling_1, x_downsampling_3), dim = 1))
+            for blk in self.upsampling_stage_2: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            x_upampling_2 = self.pixel_shuffle_upsampler_2(x)
 
-        # decoder(upampling) stage 5
-        x, (H, W) = self.patch_embed_upsampling_5(x_upampling_4)
-        for blk in self.upsampling_stage_5: # blk stands for every efficient transformer block in currect stage.
-            x = blk(x, H, W)
-        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
-        sr = self.pixel_shuffle_upsampler_5(x)
+            # decoder(upampling) stage 3
+            x, (H, W) = self.patch_embed_upsampling_3(tc.cat((x_upampling_2, x_downsampling_2), dim = 1))
+            for blk in self.upsampling_stage_3: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            x_upampling_3 = self.pixel_shuffle_upsampler_3(x)
+
+            # decoder(upampling) stage 4
+            x, (H, W) = self.patch_embed_upsampling_4(tc.cat((x_upampling_3, x_downsampling_1), dim = 1))
+            for blk in self.upsampling_stage_4: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            x_upampling_4 = self.pixel_shuffle_upsampler_4(x)
+
+            """ x_upampling_4 = x_upampling_4 + lr  # If we want to just recover the "residual of sr" rather than the sr directly, then need this line of code. """
+
+            # decoder(upampling) stage 5
+            x, (H, W) = self.patch_embed_upsampling_5(x_upampling_4)
+            for blk in self.upsampling_stage_5: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            sr = self.pixel_shuffle_upsampler_5(x)
+            
 
         return sr
+    
+    
+"Efficient Transformer based U-Net for Super Resolution MRI. See paper 2021.ResT:An Efficient Transformer for Visual Recognition for detail"
+class Efficient_Transformer_Based_MRI_SR_Conv_Transformer_MLP_2D(nn.Module):
+    """
+    Input arguments:
+        embed_dims: Stands for number of output channel from last effiecient transformer block and number of input channel for next effiecient transformer block.
+        num_heads: Stands for how many heads are used in efficient multi-head self-attention block.
+        depths: Stands for how many EfficientTransformerBlock are used in each stage. See figure 2 of paper:2021.ResT:An Efficient Transformer for Visual Recognition for detail(depth is L1, L2, L3, L4 in figure 2).
+    """
+    def __init__(self, args, embed_dims=[16, 64, 256, 1024, 1024, 256, 64, 16],
+                 num_heads=[1, 2, 4, 8, 8, 4, 2, 1], mlp_ratios=[4, 4, 4, 4, 4, 4, 4, 4], 
+                 qkv_bias=False, qk_scale=None,
+                 depths=[2, 2, 2, 2, 2, 2, 2, 2], sr_ratios=[8, 4, 2, 1, 1, 2, 4, 8],
+                 norm_layer=nn.LayerNorm, apply_transform=True):
+        super().__init__()
+        self.depths = depths
+        self.apply_transform = apply_transform
+        self.type_of_upsampler = args['type_of_upsampler']
+
+        # Efficient transformer block based encoder.
+        self.stem = BasicStem(in_ch=args['n_colors'], out_ch=embed_dims[0], with_pos=True)  # See figure 2 of ResT paper for more detail regarding stem.
+
+        self.patch_embed_2 = PatchEmbed(patch_size=2, in_ch=embed_dims[0], out_ch=embed_dims[1], with_pos=True) # Patch embedding for stage 2.
+        self.patch_embed_3 = PatchEmbed(patch_size=2, in_ch=embed_dims[1], out_ch=embed_dims[2], with_pos=True) # Patch embedding for stage 3.
+        self.patch_embed_4 = PatchEmbed(patch_size=2, in_ch=embed_dims[2], out_ch=embed_dims[3], with_pos=True) # Patch embedding for stage 4.
+
+        self.stage1 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[0], num_heads[0], mlp_ratios[0], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[0], apply_transform=apply_transform)
+            for i in range(self.depths[0])])
+        
+        self.MultiScaleExtractor_encoder_stage2 = nn.Sequential(*[MultiScaleExtractor(embed_dims[0], embed_dims[0])])
+        self.stage2 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[1], num_heads[1], mlp_ratios[1], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[1], apply_transform=apply_transform)
+            for i in range(self.depths[1])])
+        
+        self.MultiScaleExtractor_encoder_stage3 = nn.Sequential(*[MultiScaleExtractor(embed_dims[1], embed_dims[1])])
+        self.stage3 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[2], num_heads[2], mlp_ratios[2], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[2], apply_transform=apply_transform)
+            for i in range(self.depths[2])])
+
+        self.MultiScaleExtractor_encoder_stage4 = nn.Sequential(*[MultiScaleExtractor(embed_dims[2], embed_dims[2])])
+        self.stage4 = nn.ModuleList([
+            EfficientTransformerBlock(embed_dims[3], num_heads[3], mlp_ratios[3], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[3], apply_transform=apply_transform)
+            for i in range(self.depths[3])])
 
 
+        if self.type_of_upsampler == 'conv_based_upsampler':
+            self.fisrt_upsampling_layer = Upsampler(n_feats = embed_dims[4])
+            self.second_upsampling_layer = Upsampler(n_feats = embed_dims[5]*2, reduce_number_of_channels_in_half = True)
+            self.third_upsampling_layer = Upsampler(n_feats = embed_dims[6]*2, reduce_number_of_channels_in_half = True)
+            self.forth_upsampling_layer = Upsampler(n_feats = embed_dims[7]*2, reduce_number_of_channels_in_half = True)
+            if Maintain_in_plane_Size == True:
+                self.last_channel_reduce_layer = nn.Conv2d(embed_dims[7]//4, args['n_colors'], kernel_size = 3, padding=1, stride=1)
+            else:
+                self.fifth_upsampling_layer = Upsampler(n_feats = embed_dims[7]//4, reduce_number_of_channels_in_half = False)
+                self.last_channel_reduce_layer = nn.Conv2d(embed_dims[7]//16, args['n_colors'], kernel_size = 3, padding=1, stride=1)
+        else:
+            # Efficient transformer block based decoder.
+            self.MultiScaleExtractor_dencoder_stage1 = nn.Sequential(*[MultiScaleExtractor(embed_dims[4], embed_dims[4])])
+            self.MultiScaleExtractor_dencoder_stage2 = nn.Sequential(*[MultiScaleExtractor(embed_dims[5]*2, embed_dims[5])])
+            self.MultiScaleExtractor_dencoder_stage3 = nn.Sequential(*[MultiScaleExtractor(embed_dims[6]*2, embed_dims[6])])
+            self.MultiScaleExtractor_dencoder_stage4 = nn.Sequential(*[MultiScaleExtractor(embed_dims[7]*2, embed_dims[7])])
+            self.MultiScaleExtractor_dencoder_stage5 = nn.Sequential(*[MultiScaleExtractor(embed_dims[7]//4, embed_dims[7]//4)])
+            self.patch_embed_upsampling_1 = PatchEmbed(patch_size=2, in_ch=embed_dims[4], out_ch=embed_dims[4], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 1.
+            self.patch_embed_upsampling_2 = PatchEmbed(patch_size=2, in_ch=embed_dims[5], out_ch=embed_dims[5], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 2.
+            self.patch_embed_upsampling_3 = PatchEmbed(patch_size=2, in_ch=embed_dims[6], out_ch=embed_dims[6], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 3.
+            self.patch_embed_upsampling_4 = PatchEmbed(patch_size=2, in_ch=embed_dims[7], out_ch=embed_dims[7], with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 4.
+            self.patch_embed_upsampling_5 = PatchEmbed(patch_size=2, in_ch=embed_dims[7]//4, out_ch=embed_dims[7]//4, with_pos=True, for_upsampling = True) # Patch embedding for upsampling stage 5.
+            
+            self.pixel_shuffle_upsampler_1 = nn.PixelShuffle(upscale_factor = 2)
+            self.pixel_shuffle_upsampler_2 = nn.PixelShuffle(upscale_factor = 2)
+            self.pixel_shuffle_upsampler_3 = nn.PixelShuffle(upscale_factor = 2)
+            self.pixel_shuffle_upsampler_4 = nn.PixelShuffle(upscale_factor = 2)
+            self.pixel_shuffle_upsampler_5 = nn.PixelShuffle(upscale_factor = 2)
+
+            self.upsampling_stage_1 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[4], num_heads[4], mlp_ratios[4], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[4], apply_transform=apply_transform)
+                for i in range(self.depths[4])])
+
+            self.upsampling_stage_2 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[5], num_heads[5], mlp_ratios[5], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[5], apply_transform=apply_transform)
+                for i in range(self.depths[5])])
+
+            self.upsampling_stage_3 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[6], num_heads[6], mlp_ratios[6], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[6], apply_transform=apply_transform)
+                for i in range(self.depths[6])])
+
+            self.upsampling_stage_4 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[7], num_heads[7], mlp_ratios[7], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[7], apply_transform=apply_transform)
+                for i in range(self.depths[7])])
+
+            self.upsampling_stage_5 = nn.ModuleList([
+                EfficientTransformerBlock(embed_dims[7]//4, num_heads[7], mlp_ratios[7], qkv_bias, qk_scale, norm_layer=norm_layer, sr_ratio=sr_ratios[7], apply_transform=apply_transform)
+                for i in range(self.depths[7])])
+
+    def forward(self, x):
+        lr = x.clone()
+        x = self.stem(x)
+        B, _, H, W = x.shape
+        x = x.flatten(2).permute(0, 2, 1)
+        # encoder(downsampling) stage 1
+        for blk in self.stage1: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x_downsampling_1 = x.permute(0, 2, 1).reshape(B, -1, H, W)
+
+        # encoder(downsampling) stage 2
+        x, (H, W) = self.patch_embed_2(self.MultiScaleExtractor_encoder_stage2(x_downsampling_1))
+        for blk in self.stage2: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x_downsampling_2 = x.permute(0, 2, 1).reshape(B, -1, H, W)
+
+        # encoder(downsampling) stage 3
+        x, (H, W) = self.patch_embed_3(self.MultiScaleExtractor_encoder_stage3(x_downsampling_2))
+        for blk in self.stage3: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x_downsampling_3 = x.permute(0, 2, 1).reshape(B, -1, H, W)
+
+        # encoder(downsampling) stage 4
+        x, (H, W) = self.patch_embed_4(self.MultiScaleExtractor_encoder_stage4(x_downsampling_3))
+        for blk in self.stage4: # blk stands for every efficient transformer block in currect stage.
+            x = blk(x, H, W)
+        x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+
+        
+
+        if self.type_of_upsampler == 'conv_based_upsampler':
+
+            x_upampling_1 = self.fisrt_upsampling_layer(x)
+            x_upampling_2 = self.second_upsampling_layer(tc.cat((x_upampling_1,x_downsampling_3),dim=1))
+            x_upampling_3 = self.third_upsampling_layer(tc.cat((x_upampling_2,x_downsampling_2),dim=1))
+            x_upampling_4 = self.forth_upsampling_layer(tc.cat((x_upampling_3,x_downsampling_1),dim=1))
+            if Maintain_in_plane_Size == True:
+                sr = self.last_channel_reduce_layer(x_upampling_4)
+            else:
+                x_upampling_5 = self.fifth_upsampling_layer(x_upampling_4)
+                sr = self.last_channel_reduce_layer(x_upampling_5)
+
+            
+        else:            
+            # decoder(upampling) stage 1
+            x, (H, W) = self.patch_embed_upsampling_1(self.MultiScaleExtractor_dencoder_stage1(x))
+            for blk in self.upsampling_stage_1: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            x_upampling_1 = self.pixel_shuffle_upsampler_1(x)
+
+            # decoder(upampling) stage 2
+            x, (H, W) = self.patch_embed_upsampling_2(self.MultiScaleExtractor_dencoder_stage2(tc.cat((x_upampling_1, x_downsampling_3), dim = 1)))
+            for blk in self.upsampling_stage_2: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            x_upampling_2 = self.pixel_shuffle_upsampler_2(x)
+
+            # decoder(upampling) stage 3
+            x, (H, W) = self.patch_embed_upsampling_3(self.MultiScaleExtractor_dencoder_stage3(tc.cat((x_upampling_2, x_downsampling_2), dim = 1)))
+            for blk in self.upsampling_stage_3: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            x_upampling_3 = self.pixel_shuffle_upsampler_3(x)
+
+            # decoder(upampling) stage 4
+            x, (H, W) = self.patch_embed_upsampling_4(self.MultiScaleExtractor_dencoder_stage4(tc.cat((x_upampling_3, x_downsampling_1), dim = 1)))
+            for blk in self.upsampling_stage_4: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            x_upampling_4 = self.pixel_shuffle_upsampler_4(x)
+
+            """ x_upampling_4 = x_upampling_4 + lr  # If we want to just recover the "residual of sr" rather than the sr directly, then need this line of code. """
+
+            # decoder(upampling) stage 5
+            x, (H, W) = self.patch_embed_upsampling_5(self.MultiScaleExtractor_dencoder_stage5(x_upampling_4))
+            for blk in self.upsampling_stage_5: # blk stands for every efficient transformer block in currect stage.
+                x = blk(x, H, W)
+            x = x.permute(0, 2, 1).reshape(B, -1, H, W)
+            sr = self.pixel_shuffle_upsampler_5(x)
+            
+
+        return sr    
 
 
-
+    
 device=tc.device("cuda" if use_cuda else "cpu")
+
+if Freeze_random_seed == True:
+    tc.manual_seed(args['seed'])
+#    tc.backend.cudnn.deterministic = True
+#    tc.backend.cudnn.benchmark = False
+    print('Seed is frozen!')
+
 if args['use_HR_reference'] == False:
     if args['basic_block'] == 'efficient_transformer':
         our_model_mri_sr_2d = Efficient_Transformer_Based_MRI_SR_Transformer_MLP_2D(args)
     elif args['basic_block'] == 'gMLP':
         our_model_mri_sr_2d = U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
+    elif args['basic_block'] == 'MultiScaleExtrctor_gMLP':
+        our_model_mri_sr_2d = U_Net_Based_MRI_SR_Transformer_Conv_MLP_2D(args)
+    elif args['basic_block'] == 'MultiScaleExtrctor_ResT':
+        our_model_mri_sr_2d = Efficient_Transformer_Based_MRI_SR_Conv_Transformer_MLP_2D(args)
 else:   # args['use_HR_reference'] == True:
     if args['basic_block'] == 'efficient_transformer':
         pass
     elif args['basic_block'] == 'gMLP':
         our_model_mri_sr_2d = HR_Reference_U_Net_Based_MRI_SR_Transformer_MLP_2D(args)
-
-
-
+        
+        
+if Use_saved_model == True:
+    parameter_file = open(os.path.join(folder_saved_network, 'min_validation_loss_network_parameter.pkl'), 'rb')
+    min_validation_loss_model_wts = pickle.load(parameter_file)
+    parameter_file.close()
+    our_model_mri_sr_2d.load_state_dict(min_validation_loss_model_wts)
+    print("Saved model loaded")
+    
 # Weight initialization using He initialization.
-""" for m in our_model_mri_sr_2d.modules():
+""" for m in our_rcan_mri_sr_2d.modules():
     if isinstance(m, (nn.Conv2d, nn.Linear)):
         nn.init.kaiming_normal_(m.weight, mode='fan_in') """
 
@@ -1827,11 +1859,12 @@ our_model_mri_sr_2d.to(device)
 
 print('this is our model: ', our_model_mri_sr_2d)
 
-feature_extractor = FeatureExtractor().to(device)
-print('this is our FeatureExtractor: ', feature_extractor)
-
-fft_k_space = FFT_K_SPACE().to(device)
-print('this is our FFT_K_SPACE: ', fft_k_space)
+if Use_Feature_Map_Loss == True:
+    feature_extractor = FeatureExtractor().to(device)
+    print('this is our FeatureExtractor: ', feature_extractor)
+if Use_kspace_loss == True:
+    fft_k_space = FFT_K_SPACE().to(device)
+    print('this is our FFT_K_SPACE: ', fft_k_space)
 
 
 """""""""""""""""""""""""""""""""""""""
@@ -1842,9 +1875,9 @@ if args['optimizer'] == 'look_ahead':
     base_opt = opt.Adam(our_model_mri_sr_2d.parameters(), lr=1e-3, betas=(0.9, 0.999)) #----- use Adam algorithm as based optimizer A
     optimizer = lookahead.Lookahead(base_opt, k=5, alpha=0.5) # Initialize Lookahead
 elif args['optimizer'] == 'Adam':
-    optimizer = opt.Adam(our_model_mri_sr_2d.parameters(), lr = 0.0001, eps = 1e-08, weight_decay = 1e-5)    #----- use Adam algorithm for all parameters of our_classifier
+    optimizer = opt.Adam(our_model_mri_sr_2d.parameters(), lr = args['initial_learning_rate_after_warm_up'], eps = 1e-08, weight_decay = 1e-5)    #----- use Adam algorithm for all parameters of our_classifier
 elif args['optimizer'] == 'SGD_with_momentum':
-    optimizer = opt.SGD(our_model_mri_sr_2d.parameters(), lr = 0.0001, momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
+    optimizer = opt.SGD(our_model_mri_sr_2d.parameters(), lr = args['initial_learning_rate_after_warm_up'], momentum=0.9, weight_decay = 1e-9)    #----- use SGD algorithm for all parameters of our_lenet, by learning rate 0.01 and Momentum is 0.9
 "set scheduler"
 if args['learning_rate_decay_method'] == 'multi_step_learning_rate':
     scheduler = opt.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
@@ -1868,17 +1901,24 @@ if args['use_learning_rate_warm_up'] == True:
 "set loss related item"
 loss_function_MSE = nn.MSELoss().to(device)        #----- MSE loss
 
-loss_function_L1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
+loss_function_SmoothL1 = nn.SmoothL1Loss().to(device)       #----- smooth L1 loss
+
+loss_function_L1 = nn.L1Loss().to(device)       #----- L1 loss
+
+loss_function_Charbonnier = L1_Charbonnier_Loss().to(device)        #----- L1 Charbonnier loss
 
 # loss_function_CE = nn.CrossEntropyLoss().to(device)
 
-SSIM_function = pytorch_ssim_l1.SSIM(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
+if Use_ssim_map == True:
+    SSIM_function = pytorch_ssim_map.SSIM().to(device)       #----- ssim map calculation
+else:
+    SSIM_function = pytorch_ssim_l1_org.SSIM().to(device)       #----- ssim calculation
 
-SSIM_map = pytorch_ssim_map.SSIMMap(luminance_weight = args_loss_weight['ssim_luminance_weight'], contrast_weight = args_loss_weight['ssim_contrast_weight'], structure_weight = args_loss_weight['ssim_structure_weight']).to(device)       #----- ssim calculation
+if Use_Negative_TV_Loss == True:
+    negative_tv_loss = NegativeTVLoss(negative_tv_loss_weight = args_loss_weight['negative_total_variation_weight']).to(device)
 
-negative_tv_loss = NegativeTVLoss(negative_tv_loss_weight = args_loss_weight['negative_total_variation_weight']).to(device)
-
-negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_weight['negative_trace_weight']).to(device)
+if Use_Negative_Trace_Loss == True:
+    negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_weight['negative_trace_weight']).to(device)
 
 # =============================================================================
 # print('The loss function is L1Loss')
@@ -1897,7 +1937,13 @@ negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_w
 tc.set_num_threads(10)  #----- Sets the number of OpenMP threads used for parallelizing CPU operations
 
 best_ssim = 0.0 # Initialization of best_ssim = 0.0
+best_psnr = 0.0
+min_validation_loss = 0.0
+best_ssim_epoch = 0
+best_psnr_epoch = 0
+min_validation_loss_epoch = 0
 
+f = open(os.path.join(folder_log_path, 'log.txt'), 'w')
 for epoch in range(EPOCH_NUM):
     "Set training mode"
     our_model_mri_sr_2d.train()
@@ -1907,21 +1953,27 @@ for epoch in range(EPOCH_NUM):
     running_loss = 0.0
 
     batch_number_test = 0
-    feature_map_loss_test = 0.0
-    pixel_wise_loss_test = 0.0
-    k_space_freq_loss_test = 0.0
-    ssim_loss_test = 0.0
-    gradient_img_loss_test = 0.0
-    ssim_test = 0.0
+    pixel_wise_loss_test = []
+    k_space_freq_loss_test = []
+    ssim_loss_test = []
+    gradient_img_loss_test = []
+    ssim_test = []
+    psnr_test = []
 
     batch_number_training = 0
-    feature_map_loss_training = 0.0
-    pixel_wise_loss_training = 0.0
-    k_space_freq_loss_training = 0.0
-    ssim_loss_training = 0.0
-    gradient_img_loss_training = 0.0
-    loss_training = 0.0
-    ssim_training = 0.0
+    pixel_wise_loss_training = []
+    k_space_freq_loss_training = []
+    ssim_loss_training = []
+    gradient_img_loss_training = []
+    loss_training = []
+    ssim_training = []
+    psnr_training = []
+    
+    batch_with_nan = []
+    
+    if Use_Feature_Map_Loss == True:
+        feature_map_loss_test = 0.0
+        feature_map_loss_training = 0.0
 
     if Use_Gram_Matrix_L1_Loss == True:
         gram_similarity_between_img_loss_training = 0.0
@@ -1929,7 +1981,7 @@ for epoch in range(EPOCH_NUM):
     
     if Use_Negative_TV_Loss == True:
         negative_total_variation_for_img_loss_training = 0.0
-        negative_toal_variation_for_img_loss_test = 0.0
+        negative_total_variation_for_img_loss_test = 0.0
     
     if Use_Negative_Trace_Loss == True:
         negative_trace_for_img_loss_training = 0.0
@@ -1941,13 +1993,39 @@ for epoch in range(EPOCH_NUM):
     gradient_grad_loss_test = 0.0
     wavelets_high_frequency_components_branch_high_frequency_loss_training = 0.0
     wavelets_high_frequency_components_branch_high_frequency_loss_test = 0.0
+    
+    "Save the training loss for each epoch"
+    if (epoch == 0):
+#        f = open(os.path.join(folder_log_path, 'log.txt'), 'w')
+        f.write('Code Version: 1.0.1\n')
+        f.write('The configuration of parameters:\n')
+        f.write('batch_size is: %d\n' % batch_size)
+        f.write('EPOCH_NUM is: %d\n' % EPOCH_NUM)
+        f.write('Maintain_in_plane_Size is: %s\n' % Maintain_in_plane_Size)
+        f.write('Freeze_random_seed is: %s\n' % Freeze_random_seed)
+        f.write('Use_saved_model is: %s\n' % Use_saved_model)
+        f.write('Use_kspace_Loss is: %s\n' % Use_kspace_loss)
+        f.write('Use_SSIM_L1_Loss is: %s\n' % Use_SSIM_L1_Loss)
+        f.write('Use_Gradient_Map_L1_Loss is: %s\n' % Use_Gradient_Map_L1_Loss)
+        f.write('Use_Gram_Matrix_L1_Loss is: %s\n' % Use_Gram_Matrix_L1_Loss)
+        f.write('Use_Negative_TV_Loss is: %s\n' % Use_Negative_TV_Loss)
+        f.write('Use_Negative_Trace_Loss is: %s\n' % Use_Negative_Trace_Loss)
+        f.write('Amplify_Small_Value_In_Gradient_Map: %s\n' % Amplify_Small_Value_In_Gradient_Map)
+        f.write('Amplify_High_Frequency_Value_In_K_Space_Loss: %s\n' % Amplify_High_Frequency_Value_In_K_Space_Loss)
+        f.write('Use_ssim_map is: %s\n' % Use_ssim_map)
+        f.write('args is: %s\n' % args)
+        f.write('args of loss weight is: %s\n' % args_loss_weight)
+        f.write('------------------------------------------------------------------------------------------------------------------------------------------------------------------')
+        f.write(' \n')
 
     # If using warm up, call the scheduler of warm up now
     if args['use_learning_rate_warm_up'] == True:
         scheduler.step(epoch)
-        learning_rate = optimizer.param_groups[0]['lr']
-        print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
-
+    learning_rate = optimizer.param_groups[0]['lr']
+    print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
+    
+    optimizer.zero_grad()
+    
     for i, data in enumerate(trainloader, 0):
 # =============================================================================
 #         print('This is the ', i, ' batch for the ', epoch, ' epoch' )
@@ -1963,10 +2041,14 @@ for epoch in range(EPOCH_NUM):
         bachsize的梯度平均值来代替，更方便，坏处当然是正常计算时我们只需要本次计算的梯度于是每次都要清零梯度。
         """
         "clear all stored gradients if there exist"
-        optimizer.zero_grad()
+#        optimizer.zero_grad()
         # print('The optimizer has been cleared' )
 
-
+        """
+        if args['conv_layer_type'] == 'deformable_conv':
+            tc.cuda.empty_cache()
+        """
+        
         if args['use_HR_reference'] == False:
             "load input data"
             inputs, labels = data
@@ -1990,95 +2072,115 @@ for epoch in range(EPOCH_NUM):
             # print(outputs.size())
             # print('the forward pass has been went')
 
-        SR_img_copies = tc.cat((img_outputs, img_outputs, img_outputs), 1)
-        # print(SR_copies.size())
-        SR_features = feature_extractor(SR_img_copies)
-        # print(SR_features.size())
-        # print(SR_features.dtype)
+        if Use_Feature_Map_Loss == True:
+            SR_img_copies = tc.cat((img_outputs, img_outputs, img_outputs), 1)
+            # print(SR_copies.size())
+            SR_features = feature_extractor(SR_img_copies)
+            # print(SR_features.size())
+            # print(SR_features.dtype)
 
-        HR_copies = tc.cat((labels, labels, labels), 1)
-        # print(HR_copies.size())
-        HR_features = feature_extractor(HR_copies)
-        # print(HR_features.size())
-        # print(HR_features.dtype)
+            HR_copies = tc.cat((labels, labels, labels), 1)
+            # print(HR_copies.size())
+            HR_features = feature_extractor(HR_copies)
+            # print(HR_features.size())
+            # print(HR_features.dtype)
+        
+        if Use_kspace_loss == True:
+            SR_freq = fft_k_space(img_outputs)
 
-        SR_freq = fft_k_space(img_outputs)
-
-        HR_freq = fft_k_space(labels)
+            HR_freq = fft_k_space(labels)
 
         "calculate the gradients for all Variables during back prop"
         "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
-        feature_map_loss = args_loss_weight['feature_map_weight']*loss_function_MSE(SR_features, HR_features)
-        feature_map_loss_training += feature_map_loss.item()    # Only save the value of feature_map_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
+        if Use_Feature_Map_Loss == True:
+            feature_map_loss = args_loss_weight['feature_map_weight']*loss_function_MSE(SR_features, HR_features)
+            feature_map_loss_training.append(feature_map_loss.item())    # Only save the value of feature_map_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
         # feature_map_loss = 0.000000001*loss_function_CE(SR_features, HR_features)
 #           print("feature_map_loss: ", feature_map_loss)
-        
-        pixel_wise_loss = args_loss_weight['pixel_wise_weight']*loss_function_L1(img_outputs, labels)
-        pixel_wise_loss_training += pixel_wise_loss.item()    # Only save the value of pixel_wise_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage 
-#            print("pixel_wise_loss: ", pixel_wise_loss)
-
-        if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
-            k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(
-                create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq.real, 
-                create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.real) + 
-                loss_function_MSE(
-                    create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq.imag, 
-                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.imag))
+        if Use_Gradient_Map_Guided_Pixel_Wise_Loss == True:
+            gradient_map_guided_weight_for_pixel_wise_loss = GradientMapGuidedWeightForPixelWiseLoss()
+            gradient_map_difference_weight_matrix = gradient_map_guided_weight_for_pixel_wise_loss(img_outputs, labels)
+            pixel_wise_loss = args_loss_weight['pixel_wise_weight']*loss_function_L1(gradient_map_difference_weight_matrix*img_outputs, gradient_map_difference_weight_matrix*labels)
+        elif Use_SSIM_Map_Guided_Pixel_Wise_Loss == True:
+            ssim_map_guided_weight_for_pixel_wise_loss = SSIMMapGuidedWeightForPixelWiseLoss()
+            ssim_map_difference_weight_matrix = ssim_map_guided_weight_for_pixel_wise_loss(img_outputs, labels)
+            pixel_wise_loss = args_loss_weight['pixel_wise_weight']*loss_function_L1(ssim_map_difference_weight_matrix*img_outputs, ssim_map_difference_weight_matrix*labels)
         else:
-            k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq.real, HR_freq.real) + loss_function_MSE(SR_freq.imag, HR_freq.imag))
-        k_space_freq_loss_training += k_space_freq_loss.item()
-#            print(loss_function_MSE(SR_freq.real, HR_freq.real))
-#            print(loss_function_MSE(SR_freq.imag, HR_freq.imag))
-        """ print("k_space_freq_loss: ", k_space_freq_loss) """
+            pixel_wise_loss = args_loss_weight['pixel_wise_weight']*loss_function_L1(img_outputs, labels)
+        pixel_wise_loss_training.append(pixel_wise_loss.item())    # Only save the value of pixel_wise_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage 
+#            print("pixel_wise_loss: ", pixel_wise_loss)
+        if Use_kspace_loss == True:
+            if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
+                k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(
+                    create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq.real, 
+                    create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.real) + 
+                    loss_function_MSE(
+                        create_2d_Gaussian_weights(window_size = SR_freq.shape[2], num_of_samples = SR_freq.shape[0], channel = SR_freq.shape[1]).to(device)*SR_freq.imag, 
+                        create_2d_Gaussian_weights(window_size = HR_freq.shape[2], num_of_samples = HR_freq.shape[0], channel = HR_freq.shape[1]).to(device)*HR_freq.imag))
+            else:
+                k_space_freq_loss = args_loss_weight['k_space_weight']*(loss_function_MSE(SR_freq.real, HR_freq.real) + loss_function_MSE(SR_freq.imag, HR_freq.imag))
+            k_space_freq_loss_training.append(k_space_freq_loss.item())
+#            print(loss_function_MSE(SR_freq[:,:,:,:,0], HR_freq[:,:,:,:,0]))
+#            print(loss_function_MSE(SR_freq[:,:,:,:,1], HR_freq[:,:,:,:,1]))
+#            print("k_space_freq_loss: ", k_space_freq_loss.item())
 
-        HR_ssim_weighted, HR_ssim = SSIM_function(labels, labels)
-        SR_ssim_weighted, SR_ssim = SSIM_function(img_outputs, labels)
-        HR_ssim_map_weighted, HR_ssim_map = SSIM_map(labels, labels)
-        SR_ssim_map_weighted, SR_ssim_map = SSIM_map(img_outputs, labels)
+#        HR_ssim_weighted, HR_ssim = SSIM_function(labels, labels)
+#        SR_ssim_weighted, SR_ssim = SSIM_function(img_outputs, labels)
+        HR_ssim = SSIM_function(labels, labels)
+        SR_ssim = SSIM_function(img_outputs, labels)
 
-        ssim_loss = args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_map_weighted, HR_ssim_map_weighted)
-        ssim_loss_training += ssim_loss.item()    # Only save the value of ssim_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage 
-        ssim_training += SR_ssim.item()    # Accumulation of SR_ssim in training over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
-        """ print("ssim_loss: ", ssim_loss) """
-
-        gradient_img_loss = args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(img_outputs), calculate_gradient_map(labels))
-        gradient_img_loss_training += gradient_img_loss.item()  # Only save the value of gradient_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
-        """ print("gradient_img_loss: ", gradient_img_loss) """
+        if Use_SSIM_L1_Loss == True:
+            ssim_loss = args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim.pow(args_loss_weight['ssim_component_weight']), HR_ssim.pow(args_loss_weight['ssim_component_weight']))
+            ssim_loss_training.append(ssim_loss.item())    # Only save the value of ssim_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage 
+        ssim_training.append(SR_ssim.item())    # Accumulation of SR_ssim in training over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
+        psnr_training.append(calc_psnr_for_mri_image(img_outputs, labels).item())
+        
+        if Use_Gradient_Map_L1_Loss == True:
+            gradient_img_loss = args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(args['n_colors'], img_outputs), calculate_gradient_map(args['n_colors'], labels))
+            gradient_img_loss_training.append(gradient_img_loss.item())  # Only save the value of gradient_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
 
         "TODO: The coefficient of this loss function needs to be adjusted"
         if Use_Gram_Matrix_L1_Loss == True:
             gram_similarity_between_img_loss = args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(img_outputs), calculate_gram_matrix(labels))
-            gram_similarity_between_img_loss_training += gram_similarity_between_img_loss.item()    # Only save the value of gram_similarity_between_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
+            gram_similarity_between_img_loss_training.append(gram_similarity_between_img_loss.item())    # Only save the value of gram_similarity_between_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
 
         if Use_Negative_TV_Loss == True:
             negative_total_variation_for_img_loss = negative_tv_loss(img_outputs)
-            negative_total_variation_for_img_loss_training += negative_total_variation_for_img_loss.item()    # Only save the value of gram_similarity_between_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
+            negative_total_variation_for_img_loss_training.append(negative_total_variation_for_img_loss.item())    # Only save the value of gram_similarity_between_img_loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage
         
         if Use_Negative_Trace_Loss == True:
             negative_trace_for_img_loss = negative_trace_loss(img_outputs, labels)
-            negative_trace_for_img_loss_training += negative_trace_for_img_loss.item()
+            negative_trace_for_img_loss_training.append(negative_trace_for_img_loss.item())
 
 
+        if tc.isnan(SR_ssim) or tc.isnan(HR_ssim):
+            batch_with_nan.append(i)
+            continue
 
 #            print('gradient_loss: ', gradient_map_loss)
 
 #            loss = pixel_wise_loss + ssim_loss
-        loss = pixel_wise_loss + feature_map_loss
+        loss = pixel_wise_loss
+        
+        if Use_Feature_Map_Loss == True:
+            loss = loss + feature_map_loss
 
 #            if ssim_loss < 0.5:
 #                loss = ssim_loss + feature_map_loss + pixel_wise_loss
 #                print('ssim_loss')
 #            else:
 #                loss = pixel_wise_loss + feature_map_loss
+        if Use_kspace_loss == True:
+            if tc.isnan(k_space_freq_loss) != 1:
+                loss = loss + k_space_freq_loss
+        
+        if Use_SSIM_L1_Loss == True:
+            if tc.isnan(ssim_loss) != 1:
+                loss = loss + ssim_loss
 
-        if tc.isnan(k_space_freq_loss) != 1:
-            loss = loss + k_space_freq_loss
-
-        if tc.isnan(ssim_loss) != 1 and Use_SSIM_L1_Loss == True:
-            loss = loss + ssim_loss
-
-        if tc.isnan(gradient_img_loss) != 1 and Use_Gradient_Map_L1_Loss == True:
-            loss = loss + gradient_img_loss
+        if Use_Gradient_Map_L1_Loss == True:
+            if tc.isnan(gradient_img_loss) != 1:
+                loss = loss + gradient_img_loss
 
         if Use_Gram_Matrix_L1_Loss == True:
             loss = loss + gram_similarity_between_img_loss
@@ -2100,26 +2202,29 @@ for epoch in range(EPOCH_NUM):
 #                break
             "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"
 
-        loss_training += loss.item()  # Only save the value of loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage    
-
+        loss_training.append(loss.item())  # Only save the value of loss(rather than saving the entire graph), otherwise the GPU memory may not be enough for usage    
+        loss = loss / accumulation_steps
         "back prop"
         loss.backward()
             # print('the backward pass has gone')
-
-        "update all Variables by using newly fetched gradients"
-        optimizer.step() 
+        
+        if (i+1) % accumulation_steps == 0:             
+            optimizer.step()                            
+            optimizer.zero_grad()
+#        "update all Variables by using newly fetched gradients"
+#        optimizer.step() 
         """print('learning rate: %f' % (optimizer.param_groups[0]['lr']))"""
         # print('the all Variables have been updated')
 
         "print log info"
         running_loss += loss.data
-        if i % 50 == 0: #----- print log info every 1000 batch
+        if i % 1000 == 0 and i!=0: #----- print log info every 1000 batch
             if i == 0:
                 print('[%d, %5d] loss: %.3f' \
                       % (epoch, i, running_loss))
             else:
                 print('[%d, %5d] loss: %.3f' \
-                      % (epoch, i, running_loss / 50))
+                      % (epoch, i, running_loss / 1000))
             running_loss = 0.0
         """
         training_loss_for_current_epoch = loss_training / 50
@@ -2138,159 +2243,197 @@ for epoch in range(EPOCH_NUM):
             wavelets_high_frequency_components_branch_high_frequency_loss_for_current_epoch = wavelets_high_frequency_components_branch_high_frequency_loss
         """
 
-    print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
+    
     learning_rate = optimizer.param_groups[0]['lr']
     
     # If NOT using warm up, call the normal scheduler now
     if args['use_learning_rate_warm_up'] == False:
+#        print('learning rate for epoch %d is : %f' % (epoch, optimizer.param_groups[0]['lr']))
         scheduler.step()
-    
-    print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
+#        print('learning rate for next epoch is : %f' % (optimizer.param_groups[0]['lr']))
 
     batch_number_training = i+1 # Calculate for the current epoch, how many batches are used.
 
+    "Set evaluation Mode"    
+    our_model_mri_sr_2d.eval()    
     with tc.no_grad():
-        "Set evaluation Mode"    
-        our_model_mri_sr_2d.eval()
         for i, data in enumerate(validationloader, 0):
-            
+
             if args['use_HR_reference'] == False:
                 "load input data"
                 inputs, labels = data
                 inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
 
-                SR_img_test, SR_secondary_branch_outputs_test, network_model_type_test = our_model_mri_sr_2d(inputs)
+                SR_img_test = our_model_mri_sr_2d(inputs)
             elif args['use_HR_reference'] == True:
                 "load input data"
                 inputs, labels, references = data
                 inputs, labels, references = Variable(inputs).to(device), Variable(labels).to(device), Variable(references).to(device)
 
-                SR_img_test, SR_secondary_branch_outputs_test, network_model_type_test = our_model_mri_sr_2d(inputs, references)
+                SR_img_test = our_model_mri_sr_2d(inputs, references)
 
-            SR_test_copies = tc.cat((SR_img_test, SR_img_test, SR_img_test), 1)
-            # print(SR_copies.size())
-            SR_test_features = feature_extractor(SR_test_copies)
-            # print(SR_features.size())
+            if Use_Feature_Map_Loss == True:
+                SR_test_copies = tc.cat((SR_img_test, SR_img_test, SR_img_test), 1)
+                # print(SR_copies.size())
+                SR_test_features = feature_extractor(SR_test_copies)
+                # print(SR_features.size())
 
-            HR_test_copies = tc.cat((labels, labels, labels), 1)
-            # print(HR_copies.size())
-            HR_test_features = feature_extractor(HR_test_copies)
-            # print(HR_features.size())
+                HR_test_copies = tc.cat((labels, labels, labels), 1)
+                # print(HR_copies.size())
+                HR_test_features = feature_extractor(HR_test_copies)
+                # print(HR_features.size())
 
-            SR_test_freq = fft_k_space(SR_img_test)
+            if Use_kspace_loss == True:
+                SR_test_freq = fft_k_space(SR_img_test)
 
-            HR_test_freq = fft_k_space(labels)
+                HR_test_freq = fft_k_space(labels)
 
 
             "calculate the gradients for all Variables during back prop"
             "vgg loss + pixel MSE loss + fft frequency loss, and we use weight_decay in Adam so that is L2 regularization"
-            feature_map_loss_test += args_loss_weight['feature_map_weight']*loss_function_MSE(SR_test_features, HR_test_features)
+            if Use_Feature_Map_Loss == True:
+                feature_map_loss_test.append((args_loss_weight['feature_map_weight']*loss_function_MSE(SR_test_features, HR_test_features)).item())
 #                print("feature_map_loss_test: ", feature_map_loss_test)
 
             if Use_Gradient_Map_Guided_Pixel_Wise_Loss == True:
                 gradient_map_guided_weight_for_pixel_wise_loss = GradientMapGuidedWeightForPixelWiseLoss()
                 gradient_map_difference_weight_matrix = gradient_map_guided_weight_for_pixel_wise_loss(SR_img_test, labels)
-                pixel_wise_loss_test += args_loss_weight['pixel_wise_weight']*loss_function_L1(gradient_map_difference_weight_matrix*SR_img_test, gradient_map_difference_weight_matrix*labels)
+                pixel_wise_loss_test.append((args_loss_weight['pixel_wise_weight']*loss_function_L1(gradient_map_difference_weight_matrix*SR_img_test, gradient_map_difference_weight_matrix*labels)).item())
             elif Use_SSIM_Map_Guided_Pixel_Wise_Loss == True:
                 ssim_map_guided_weight_for_pixel_wise_loss = SSIMMapGuidedWeightForPixelWiseLoss()
                 ssim_map_difference_weight_matrix = ssim_map_guided_weight_for_pixel_wise_loss(SR_img_test, labels)
-                pixel_wise_loss_test = args_loss_weight['pixel_wise_weight']*loss_function_L1(ssim_map_difference_weight_matrix*SR_img_test, ssim_map_difference_weight_matrix*labels)
+                pixel_wise_loss_test.append((args_loss_weight['pixel_wise_weight']*loss_function_L1(ssim_map_difference_weight_matrix*SR_img_test, ssim_map_difference_weight_matrix*labels)).item())
             else:
-                pixel_wise_loss_test += args_loss_weight['pixel_wise_weight']*loss_function_L1(SR_img_test, labels)
+                pixel_wise_loss_test.append((args_loss_weight['pixel_wise_weight']*loss_function_L1(SR_img_test, labels)).item())
 #                print("pixel_wise_loss_test: ", pixel_wise_loss_test)
 
-            if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
-                k_space_freq_loss_test += args_loss_weight['k_space_weight']*(loss_function_MSE(
-                    create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq.real, 
-                    create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq.real) + 
-                    loss_function_MSE(
-                        create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq.imag, 
-                        create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq.imag))
-            else:
-                k_space_freq_loss_test += args_loss_weight['k_space_weight']*(loss_function_MSE(SR_test_freq.real, HR_test_freq.real)+loss_function_MSE(SR_test_freq.imag, HR_test_freq.imag))
+            if Use_kspace_loss == True:
+                if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
+                    k_space_freq_loss_test.append((args_loss_weight['k_space_weight']*(loss_function_MSE(
+                        create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq.real, 
+                        create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq.real) + 
+                        loss_function_MSE(
+                            create_2d_Gaussian_weights(window_size = SR_test_freq.shape[2], num_of_samples = SR_test_freq.shape[0], channel = SR_test_freq.shape[1]).to(device)*SR_test_freq.imag, 
+                            create_2d_Gaussian_weights(window_size = HR_test_freq.shape[2], num_of_samples = HR_test_freq.shape[0], channel = HR_test_freq.shape[1]).to(device)*HR_test_freq.imag))).item())
+                else:
+                    k_space_freq_loss_test.append((args_loss_weight['k_space_weight']*(loss_function_MSE(SR_test_freq.real, HR_test_freq.real)+loss_function_MSE(SR_test_freq.imag, HR_test_freq.imag))).item())
 #                print("k_space_freq_loss_test: ", k_space_freq_loss_test)
 
-            HR_ssim_test_weighted, HR_ssim_test = SSIM_function(labels,labels)
-            SR_ssim_test_weighted, SR_ssim_test = SSIM_function(SR_img_test, labels)
-            HR_ssim_map_test_weighted, HR_ssim_map_test = SSIM_map(labels, labels)
-            SR_ssim_map_test_weighted, SR_ssim_map_test = SSIM_map(SR_img_test, labels)
-            ssim_loss_test += args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_map_test_weighted, HR_ssim_map_test_weighted)
-            ssim_test += SR_ssim_test   # Accumulation of SR_ssim in testing over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
-#                print("ssim_loss_test: ", ssim_loss_test)
 
-            gradient_img_loss_test += args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(SR_img_test), calculate_gradient_map(labels))
+#            HR_ssim_test_weighted, HR_ssim_test = SSIM_function(labels,labels)
+#            SR_ssim_test_weighted, SR_ssim_test = SSIM_function(SR_img_test, labels)
+            HR_ssim_test = SSIM_function(labels,labels)
+            SR_ssim_test = SSIM_function(SR_img_test, labels)
+            if tc.isnan(SR_ssim_test):
+                continue
+            if Use_SSIM_L1_Loss == True:
+                ssim_loss_test.append((args_loss_weight['ssim_weight']*loss_function_L1(SR_ssim_test.pow(args_loss_weight['ssim_component_weight']), HR_ssim_test.pow(args_loss_weight['ssim_component_weight']))).item())
+            ssim_test.append(SR_ssim_test.item())   # Accumulation of SR_ssim in testing over all batches in one epoch, will be used to calculate the average value of SR SSIM for one epoch.
+#                print("ssim_loss_test: ", ssim_loss_test)
+            psnr_test.append((calc_psnr_for_mri_image(SR_img_test, labels)).item())
+
+            if Use_Gradient_Map_L1_Loss == True:
+                gradient_img_loss_test.append((args_loss_weight['gradient_img_weight']*loss_function_L1(calculate_gradient_map(args['n_colors'], SR_img_test), calculate_gradient_map(args['n_colors'], labels))).item())
 #                print('gradient_loss_test: ', gradient_map_loss_test)
 
             if Use_Gram_Matrix_L1_Loss == True:
-                gram_similarity_between_img_loss_test = args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(SR_img_test), calculate_gram_matrix(labels))
+                gram_similarity_between_img_loss_test.append((args_loss_weight['gram_similarity_weight']*loss_function_L1(calculate_gram_matrix(SR_img_test), calculate_gram_matrix(labels))).item())
 
             if Use_Negative_TV_Loss == True:
-                negative_total_variation_for_img_loss_test = negative_tv_loss(SR_img_test)
+                negative_total_variation_for_img_loss_test.append((negative_tv_loss(SR_img_test)).item())
 
             if Use_Negative_Trace_Loss == True:
-                negative_trace_for_img_loss_test = negative_trace_loss(SR_img_test, labels)
+                negative_trace_for_img_loss_test.append((negative_trace_loss(SR_img_test, labels)).item())
 
 
-            loss_test = pixel_wise_loss_test + feature_map_loss_test
+        loss_test = pixel_wise_loss_test 
+        if Use_Feature_Map_Loss == True:
+            loss_test = np.sum([loss_test, feature_map_loss_test],axis=0)
 #                print('loss_test: ', loss_test)
 
-            if tc.isnan(k_space_freq_loss_test) != 1:
-                loss_test = loss_test + k_space_freq_loss_test
+#            if tc.isnan(k_space_freq_loss_test) != 1:
+        if Use_kspace_loss == True:
+            loss_test = np.sum([loss_test, k_space_freq_loss_test],axis=0)
 
-            if tc.isnan(ssim_loss_test) != 1 and Use_SSIM_L1_Loss == True:
-                loss_test = loss_test + ssim_loss_test
+#            if tc.isnan(ssim_loss_test) != 1 and Use_SSIM_L1_Loss == True:
+        if Use_SSIM_L1_Loss == True:
+            loss_test = np.sum([loss_test, ssim_loss_test],axis=0)
 
-            if tc.isnan(gradient_img_loss_test) != 1 and Use_Gradient_Map_L1_Loss == True:
-                loss_test = loss_test + gradient_img_loss_test
+#            if tc.isnan(gradient_img_loss_test) != 1 and Use_Gradient_Map_L1_Loss == True:
+        if Use_Gradient_Map_L1_Loss == True:
+            loss_test = np.sum([loss_test, gradient_img_loss_test],axis=0)
 
-            if Use_Gram_Matrix_L1_Loss == True:
-                loss_test = loss_test + gram_similarity_between_img_loss_test
+        if Use_Gram_Matrix_L1_Loss == True:
+            loss_test = np.sum([loss_test, gram_similarity_between_img_loss_test],axis=0)
             
-            if Use_Negative_TV_Loss == True:
-                loss_test = loss_test + negative_total_variation_for_img_loss_test
+        if Use_Negative_TV_Loss == True:
+            loss_test = np.sum([loss_test, negative_total_variation_for_img_loss_test],axis=0)
             
-            if Use_Negative_Trace_Loss == True:
-                loss_test = loss_test + negative_trace_for_img_loss_test
+        if Use_Negative_Trace_Loss == True:
+            loss_test = np.sum([loss_test, negative_trace_for_img_loss_test],axis=0)
 
 
-    batch_number_test = i+1
-    ssim_test = ssim_test/batch_number_test # Calculate avergae SR SSIM over all validation data samples in one epoch.
-    print("ssim_test: ", ssim_test)
-    feature_map_loss_test = feature_map_loss_test/batch_number_test
-    print("feature_map_loss_test: ", feature_map_loss_test)
-    pixel_wise_loss_test = pixel_wise_loss_test/batch_number_test
-    print("pixel_wise_loss_test: ", pixel_wise_loss_test)
-    k_space_freq_loss_test = k_space_freq_loss_test/batch_number_test
-    print("k_space_freq_loss_test: ", k_space_freq_loss_test)
-    ssim_loss_test = ssim_loss_test/batch_number_test
-    print("ssim_loss_test: ", ssim_loss_test)
-    gradient_img_loss_test = gradient_img_loss_test/batch_number_test
-    print('gradient_img_loss_test: ', gradient_img_loss_test)
-    if Use_Gram_Matrix_L1_Loss == True:
-        gram_similarity_between_img_loss_test = gram_similarity_between_img_loss_test/batch_number_test
-        print('gram_similarity_between_img_loss_test: ', gram_similarity_between_img_loss_test)
-    if Use_Negative_TV_Loss == True:
-        negative_total_variation_for_img_loss_test = negative_total_variation_for_img_loss_test/batch_number_test
-        print('negative_total_variation_for_img_loss_test: ', negative_total_variation_for_img_loss_test)
-    if Use_Negative_Trace_Loss == True:
-        negative_trace_for_img_loss_test = negative_trace_for_img_loss_test/batch_number_test
-        print('negative_trace_for_img_loss_test: ', negative_trace_for_img_loss_test)
-    loss_test = loss_test/batch_number_test
-    print('loss_test: ', loss_test)
+        batch_number_test = i+1
+        ssim_test = np.mean(ssim_test) # Calculate avergae SR SSIM over all validation data samples in one epoch.
+        print("ssim_test: ", ssim_test)
+        psnr_test = np.mean(psnr_test)
+        print("psnr_test: ", psnr_test)
+        pixel_wise_loss_test = np.mean(pixel_wise_loss_test)
+        print("pixel_wise_loss_test: ", pixel_wise_loss_test)
+        if Use_Feature_Map_Loss == True:
+            feature_map_loss_test = np.mean(feature_map_loss_test)
+            print("feature_map_loss_test: ", feature_map_loss_test)
+        if Use_kspace_loss == True:
+            k_space_freq_loss_test = np.mean(k_space_freq_loss_test)
+            print("k_space_freq_loss_test: ", k_space_freq_loss_test)
+        if Use_SSIM_L1_Loss == True:
+            ssim_loss_test = np.mean(ssim_loss_test)
+            print("ssim_loss_test: ", ssim_loss_test)
+        if Use_Gradient_Map_L1_Loss == True:
+            gradient_img_loss_test = np.mean(gradient_img_loss_test)
+            print('gradient_img_loss_test: ', gradient_img_loss_test)
+        if Use_Gram_Matrix_L1_Loss == True:
+            gram_similarity_between_img_loss_test = np.mean(gram_similarity_between_img_loss_test)
+            print('gram_similarity_between_img_loss_test: ', gram_similarity_between_img_loss_test)
+        if Use_Negative_TV_Loss == True:
+            negative_total_variation_for_img_loss_test = np.mean(negative_total_variation_for_img_loss_test)
+            print('negative_total_variation_for_img_loss_test: ', negative_total_variation_for_img_loss_test)
+        if Use_Negative_Trace_Loss == True:
+            negative_trace_for_img_loss_test = np.mean(negative_trace_for_img_loss_test)
+            print('negative_trace_for_img_loss_test: ', negative_trace_for_img_loss_test)
+        loss_test = np.mean(loss_test)
+        print('loss_test: ', loss_test)
+        print("*************************************")
     
-    ssim_training = ssim_training/batch_number_training # Calculate avergae SR SSIM over all training data samples in one epoch.
-    training_loss_for_current_epoch = loss_training / batch_number_training
-    feature_map_loss_for_current_epoch = feature_map_loss_training/ batch_number_training
-    pixel_wise_loss_for_current_epoch = pixel_wise_loss_training/ batch_number_training
-    ssim_loss_for_current_epoch = ssim_loss_training/ batch_number_training
-    gradient_img_loss_for_current_epoch = gradient_img_loss_training/ batch_number_training
-    k_space_freq_loss_for_current_epoch = k_space_freq_loss_training/ batch_number_training
+    ssim_training = np.mean(ssim_training) # Calculate avergae SR SSIM over all training data samples in one epoch.
+    print("ssim_training: ", ssim_training)
+    psnr_training = np.mean(psnr_training)
+    print("psnr_training: ", psnr_training)
+    training_loss_for_current_epoch = np.mean(loss_training)
+    print("training_loss: ", training_loss_for_current_epoch)
+    pixel_wise_loss_for_current_epoch = np.mean(pixel_wise_loss_training)
+    print("pixel_wise_loss_training: ", pixel_wise_loss_for_current_epoch)
+    if Use_Feature_Map_Loss == True:
+        feature_map_loss_for_current_epoch = np.mean(feature_map_loss_training)
+        print("feature_map_loss_training: ", feature_map_loss_for_current_epoch)
+    if Use_SSIM_L1_Loss == True:
+        ssim_loss_for_current_epoch = np.mean(ssim_loss_training)
+        print("ssim_loss_for_training: ", ssim_loss_for_current_epoch)
+    if Use_Gradient_Map_L1_Loss == True:
+        gradient_img_loss_for_current_epoch = np.mean(gradient_img_loss_training)
+        print("gradient_img_loss_training: ", gradient_img_loss_for_current_epoch)
+    if Use_kspace_loss == True:
+        k_space_freq_loss_for_current_epoch = np.mean(k_space_freq_loss_training)
+        print("k_space_freq_loss_training: ", k_space_freq_loss_for_current_epoch)
     if Use_Gram_Matrix_L1_Loss == True:
-        gram_similarity_between_img_loss_for_current_epoch = gram_similarity_between_img_loss_training/ batch_number_training
+        gram_similarity_between_img_loss_for_current_epoch = np.mean(gram_similarity_between_img_loss_training)
+        print("gram_similarity_loss_training: ", gram_similarity_between_img_loss_for_current_epoch)
     if Use_Negative_TV_Loss == True:
-        negative_total_variation_for_img_loss_for_current_epoch = negative_total_variation_for_img_loss_training/ batch_number_training
+        negative_total_variation_for_img_loss_for_current_epoch = np.mean(negative_total_variation_for_img_loss_training)
+        print("negative_total_variation_loss_training: ", negative_total_variation_for_img_loss_for_current_epoch)
     if Use_Negative_Trace_Loss == True:
-        negative_trace_for_img_loss_for_current_epoch = negative_trace_for_img_loss_training/ batch_number_training
+        negative_trace_for_img_loss_for_current_epoch = np.mean(negative_trace_for_img_loss_training)
+        print("negative_trace_loss_training: ", negative_trace_for_img_loss_for_current_epoch)
 
 
     "added code to prevent 'NaN' in loss, just a work around but not final/correct solution"    
@@ -2300,52 +2443,77 @@ for epoch in range(EPOCH_NUM):
 
 
     "Save the weights of network model when it achieves best average SR SSIM over all validation data samples in one epoch"
+    print("*************************************")
     print("best_ssim:", best_ssim)
     print("validation_ssim:", ssim_test)
     if ssim_test > best_ssim:
         best_ssim = ssim_test
-        best_model_wts = copy.deepcopy(our_model_mri_sr_2d.state_dict())
-        parameter_file = open('D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/code/baseline+our_model/output_file/network_weight_parameter.pkl', 'wb')
-        pickle.dump(best_model_wts, parameter_file)
+        best_ssim_model_wts = copy.deepcopy(our_model_mri_sr_2d.state_dict())
+        parameter_file = open(os.path.join(folder_log_path, 'best_ssim_network_parameter.pkl'), 'wb')
+        pickle.dump(best_ssim_model_wts, parameter_file)
         parameter_file.close()
-        best_epoch = epoch
+        best_ssim_epoch = epoch
+    print("best_psnr:", best_psnr)
+    print("validation_psnr:", psnr_test)
+    if psnr_test > best_psnr:
+        best_psnr = psnr_test
+        best_psnr_model_wts = copy.deepcopy(our_model_mri_sr_2d.state_dict())
+        parameter_file = open(os.path.join(folder_log_path, 'best_psnr_network_parameter.pkl'), 'wb')
+        pickle.dump(best_psnr_model_wts, parameter_file)
+        parameter_file.close()
+        best_psnr_epoch = epoch
+    print("min_validation_loss:",min_validation_loss)
+    print("validation_loss:",loss_test)
+    print("*************************************")
+    if epoch==0:
+        min_validation_loss=loss_test
+        min_validation_loss_epoch = epoch
+    elif min_validation_loss>loss_test:
+        min_validation_loss=loss_test
+        min_validation_loss_model_wts = copy.deepcopy(our_model_mri_sr_2d.state_dict())
+        parameter_file = open(os.path.join(folder_log_path, 'min_validation_loss_network_parameter.pkl'), 'wb')
+        pickle.dump(min_validation_loss_model_wts, parameter_file)
+        parameter_file.close()
+        min_validation_loss_epoch = epoch
+        
+    last_model_wts = copy.deepcopy(our_model_mri_sr_2d.state_dict())
+    parameter_file = open(os.path.join(folder_log_path, 'last_network_parameter.pkl'), 'wb')
+    pickle.dump(last_model_wts, parameter_file)
+    parameter_file.close()
 
 
-    "Save the training loss for each epoch"
-    if (epoch == 0):
-        f = open('D:/Tech_Resource/Paper_Resource/MRI SR以及相关论文/our_project_code/code/baseline+our_model/output_file/result_RCAN_l1_gradssim_laf_100_32_2folds_2d_downsize_20200816.txt', 'w')
-        f.write('The configuration of parameters:\n')
-        f.write('batch_size is: %d\n' % batch_size)
-        f.write('EPOCH_NUM is: %d\n' % EPOCH_NUM)
-        f.write('Use_SSIM_L1_Loss is: %s\n' % Use_SSIM_L1_Loss)
-        f.write('Use_Gradient_Map_L1_Loss is: %s\n' % Use_Gradient_Map_L1_Loss)
-        f.write('Use_Gram_Matrix_L1_Loss is: %s\n' % Use_Gram_Matrix_L1_Loss)
-        f.write('Use_Negative_TV_Loss is: %s\n' % Use_Negative_TV_Loss)
-        f.write('Use_Negative_Trace_Loss is: %s\n' % Use_Negative_Trace_Loss)
-        f.write('Amplify_Small_Value_In_Gradient_Map: %s\n' % Amplify_Small_Value_In_Gradient_Map)
-        f.write('Amplify_High_Frequency_Value_In_K_Space_Loss: %s\n' % Amplify_High_Frequency_Value_In_K_Space_Loss)
-        f.write('args is: %s\n' % args)
-        f.write('args of loss weight is: %s\n' % args_loss_weight)
-        f.write('------------------------------------------------------------------------------------------------------------------------------------------------------------------')
-        f.write(' \n')
+    
 #    f.write('Training Loss:')
 #    f.write('\n')
-    f.write('Best SR SSIM for validation data has been achieved at epoch : %d' % (best_epoch))
-    f.write('\n')    
-    f.write('Learning rate for current epoch is : %f' % (learning_rate))
+    f.write('Best SR SSIM for validation data has been achieved at epoch : %d' % (best_ssim_epoch))
     f.write('\n')
-    f.write('Training SR SSIM for epoch %d is : %f' % (epoch, ssim_training))
+    f.write('Best SR PSNR for validation data has been achieved at epoch : %d' % (best_psnr_epoch))
     f.write('\n')
-    f.write('The feature_map_loss for epoch %d is : %f' % (epoch, feature_map_loss_for_current_epoch))
+    f.write('Minimal validation loss has been achieved at epoch : %d' % (min_validation_loss_epoch))
+    f.write('\n')
+    f.write('Learning rate for epoch %d is : %f' % (epoch, learning_rate))
+    f.write('\n')
+    f.write('The batches with NaN for epoch %d is : %s' % (epoch, batch_with_nan))
+    f.write('\n')
+    f.write('Training SSIM for epoch %d is : %f' % (epoch, ssim_training))
+    f.write('\n')
+    f.write('Training PSNR for epoch %d is : %f' % (epoch, psnr_training))
     f.write('\n')
     f.write('The pixel_wise_loss for epoch %d is : %f' % (epoch, pixel_wise_loss_for_current_epoch))
     f.write('\n')
-    f.write('The k_space_freq_loss for epoch %d is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
-    f.write('\n')
-    f.write('The ssim_loss for epoch %d is : %f' % (epoch, ssim_loss_for_current_epoch))
-    f.write('\n')
-    f.write('The gradient_img_loss for epoch %d is : %f' % (epoch, gradient_img_loss_for_current_epoch))
-    f.write('\n')
+    
+    if Use_Feature_Map_Loss == True:
+        f.write('The feature_map_loss for epoch %d is : %f' % (epoch, feature_map_loss_for_current_epoch))
+        f.write('\n')
+    if Use_kspace_loss == True:
+        f.write('The k_space_freq_loss for epoch %d is : %f' % (epoch, k_space_freq_loss_for_current_epoch))
+        f.write('\n')
+    if Use_SSIM_L1_Loss == True:
+        f.write('The ssim_loss for epoch %d is : %f' % (epoch, ssim_loss_for_current_epoch))
+        f.write('\n')
+    if Use_Gradient_Map_L1_Loss == True:
+        f.write('The gradient_img_loss for epoch %d is : %f' % (epoch, gradient_img_loss_for_current_epoch))
+        f.write('\n')
     if Use_Gram_Matrix_L1_Loss == True:
         f.write('The gram_similarity_between_img_loss for epoch %d is : %f' % (epoch, gram_similarity_between_img_loss_for_current_epoch))
         f.write('\n')
@@ -2362,18 +2530,24 @@ for epoch in range(EPOCH_NUM):
 
 #    f.write('Validation Loss:')
 #    f.write('\n')
-    f.write('Validation SR SSIM for epoch %d is : %f' % (epoch, ssim_test))
-    f.write('\n')    
-    f.write('The feature_map_loss_validation for epoch %d is : %f' % (epoch, feature_map_loss_test))
+    f.write('Validation SSIM for epoch %d is : %f' % (epoch, ssim_test))
+    f.write('\n')
+    f.write('Validation PSNR for epoch %d is : %f' % (epoch, psnr_test))
     f.write('\n')
     f.write('The pixel_wise_loss_validation for epoch %d is : %f' % (epoch, pixel_wise_loss_test))
     f.write('\n')
-    f.write('The k_space_freq_loss_validation for epoch %d is : %f' % (epoch, k_space_freq_loss_test))
-    f.write('\n')
-    f.write('The ssim_loss_validation for epoch %d is : %f' % (epoch, ssim_loss_test))
-    f.write('\n')
-    f.write('The gradient_img_loss_validation for epoch %d is : %f' % (epoch, gradient_img_loss_test))
-    f.write('\n')
+    if Use_Feature_Map_Loss == True:
+        f.write('The feature_map_loss_validation for epoch %d is : %f' % (epoch, feature_map_loss_test))
+        f.write('\n')
+    if Use_kspace_loss == True:
+        f.write('The k_space_freq_loss_validation for epoch %d is : %f' % (epoch, k_space_freq_loss_test))
+        f.write('\n')
+    if Use_SSIM_L1_Loss == True:
+        f.write('The ssim_loss_validation for epoch %d is : %f' % (epoch, ssim_loss_test))
+        f.write('\n')
+    if Use_Gradient_Map_L1_Loss == True:
+        f.write('The gradient_img_loss_validation for epoch %d is : %f' % (epoch, gradient_img_loss_test))
+        f.write('\n')
     if Use_Gram_Matrix_L1_Loss == True:
         f.write('The gram_similarity_between_img_loss_validation for epoch %d is : %f' % (epoch, gram_similarity_between_img_loss_test))
         f.write('\n')
@@ -2388,141 +2562,140 @@ for epoch in range(EPOCH_NUM):
     f.write('----------------------------------------------------------------------------------')
     f.write(' \n')
     f.write(' \n')
+    """
     if (epoch == EPOCH_NUM - 1):
         f.close()
-
+    """
+    
 "Reload best weight parameters into the network model, which will be used for evaludation in the following part"
-our_model_mri_sr_2d.load_state_dict(best_model_wts)
-
+our_model_mri_sr_2d.load_state_dict(min_validation_loss_model_wts)
+training_end = time.perf_counter()
+running_time = training_end - training_start
+print('The training time in minute is: ', running_time/60) 
 print("training complete")
+f.write('Total training time is: %f' % (running_time))
+f.write('\n')
 
 
 
-
-
-"Test"
-with tc.no_grad():
-    our_model_mri_sr_2d.eval()
-#    "exam the generated SR MRI image by using training LR image data and save them"
-    # =============================================================================
-    # for data in testloader:
-    # =============================================================================
-#    for i, training_data_2 in enumerate(trainloader, 0):
-
-        #    LR_images_training, HR_images_training = training_data_2
-
-        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-        #    outputs = our_model_mri_sr_2d(Variable(LR_images_training).type(tc.FloatTensor).to(device))
+if Perform_Evaluation:
+    "Evaluation(Test)"
+    with tc.no_grad():
+        our_model_mri_sr_2d.eval()
+        f.write('Test started: \n')
+    
+        """
+        The data loading pipeline for ordinary multi-channel SISR MRI SR or RGB SISR:
+        """
         # =============================================================================
-        #     print(outputs.data.size())
-        # =============================================================================
+        # h5py.version
+        # ===========================================================================
+        "The folder where to load the training LR, HR data pair"
 
-#        if (i == math.floor((torch_data_low_resolution_training_sequence.size(0)/new_batch_size_for_checking)/2)): 
+#    file_names_evaluation = os.listdir(folder_data_evaluation)
 
-#            LR_images_training, HR_images_training = training_data_2
-            # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-#            img_outputs, grad_outputs = our_model_mri_sr_2d(Variable(LR_images_training).type(tc.FloatTensor).to(device))
+        for idx_file in file_names_evaluation:
+            print(idx_file)
+            if '.mat' in os.path.join(folder_data_evaluation, idx_file):
+                print('One more low resolution image set exist')
+                print(os.path.join(folder_data_evaluation, idx_file))
+                file_data = h5py.File(os.path.join(folder_data_evaluation, idx_file), 'r')
+                data_low_resolution = file_data['LR'][:] #----- numpy array
+                print('Testing data: Shape of LR data is: ', np.shape(data_low_resolution))
+                print(data_low_resolution.dtype)
+                torch_data_low_resolution = tc.from_numpy(data_low_resolution) #----- torch type data could be read by tc.utils.data.TensorDataset
+                "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+                torch_data_low_resolution = torch_data_low_resolution.permute(0, 1, 3, 2)
+                print('Testing data: Shape of LR data in Torch is: ', np.shape(torch_data_low_resolution))
+                torch_data_low_resolution_sequence = torch_data_low_resolution
+                print('Testing data: Shape of LR data sequence in Torch is: ', np.shape(torch_data_low_resolution_sequence))
+                """
+                data_high_resolution_groundtruth = file_data['HRGT'][:] #----- numpy array
+                print('Testing data: Shape of HR data is: ', np.shape(data_high_resolution_groundtruth))
+                torch_data_high_resolution_groundtruth = tc.from_numpy(data_high_resolution_groundtruth) #----- torch type data could be read by tc.utils.data.TensorDataset
+                "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+                torch_data_high_resolution_groundtruth = torch_data_high_resolution_groundtruth.permute(0, 1, 3, 2)
+                print('Testing data: Shape of HR data in Torch is: ', np.shape(torch_data_high_resolution_groundtruth))
+                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth
+                print('Testing data: Shape of HR data sequence in Torch is: ', np.shape(torch_data_high_resolution_groundtruth_sequence))
+                """
+                if args['use_HR_reference']:
+#                print('One more reference image set exist')
+#                print(os.path.join(folder_log_path, idx_file))
+#                file_data_reference = h5py.File(os.path.join(folder_log_path, idx_file), 'r')
+                    data_reference = file_data['REF'][:] #----- numpy array
+                    print(np.shape(data_reference))
+                    torch_data_reference = tc.from_numpy(data_reference) #----- torch type data could be read by tc.utils.data.TensorDataset
+                    "Note the original .mat file has 2D image matrix by number_of_data_samples, which is H x W x N. After reading into h5py, the dimension changes as N x W x H. However in 2D MRI SR, so we have to permute axis to form the data on N x H x W"
+                    torch_data_reference = torch_data_reference.permute(0, 1, 3, 2)
+                    print(np.shape(torch_data_reference))
+                    torch_data_reference_sequence = torch_data_reference
+                    print(np.shape(torch_data_reference_sequence))
+                    torch_data_reference_sequence = torch_data_reference_sequence.float()
+                torch_data_low_resolution_sequence = torch_data_low_resolution_sequence.float()
+                
+                
+                print(np.shape(torch_data_low_resolution_sequence))
+                """
+                torch_data_high_resolution_groundtruth_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+                print(np.shape(torch_data_high_resolution_groundtruth_sequence))
+                """
 
-            #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
-#            SR_images_tensor_training = img_outputs.data.cpu().squeeze(1)
-#            SR_grad_tensor_training = grad_outputs.data.cpu().squeeze(1)
-            # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
-            # =============================================================================
-            #         print(SR_images_tensor.size())
-            # =============================================================================
-            # print(HR_images_tensor.size())    
-#            SR_images_exam_train = SR_images_tensor_training.numpy()
-            # HR_images_test = HR_images_tensor.numpy()
+                """""""""""""""""""""""""""""""""""""""""""""
+                3.2.c. Load MRI HR and LR Evaluation(Test) Data pair evaluation(test) part
+                """""""""""""""""""""""""""""""""""""""""""""
+                torch_data_low_resolution_eval_sequence = torch_data_low_resolution_sequence.float()
+                if args['use_HR_reference'] == True:
+                    torch_data_reference_eval_sequence = torch_data_reference_sequence.float()
+                    testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_reference_eval_sequence)
+                else:    
+                    """
+                    torch_data_high_resolution_groundtruth_eval_sequence = torch_data_high_resolution_groundtruth_sequence.float()
+                    testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence, torch_data_high_resolution_groundtruth_eval_sequence)
+                    """
+                    testset = tc.utils.data.TensorDataset(torch_data_low_resolution_eval_sequence)
+                    
+                testloader = tc.utils.data.DataLoader(
+                                testset, 
+                                batch_size = batch_size,
+                                shuffle = False, 
+                                num_workers = 0,
+                                pin_memory = False)
+ 
+    
+                prediction_start = time.perf_counter()
+                "predict the SR MRI image by using testing LR image data and save them"
+                for i, testing_data_2 in enumerate(testloader, 0):
 
-#            "save the .mat files for SR LR, HR training images"
-#            scipy.io.savemat('D:/HaoLi/SR/results/200730_RCAN_l1_ssim_grad_laf_100_32_2folds_2d_downsize_Dual/HR_training_image.mat', mdict = {'HR_training_image' : HR_images_training.numpy()})
-#            scipy.io.savemat('D:/HaoLi/SR/results/200730_RCAN_l1_ssim_grad_laf_100_32_2folds_2d_downsize_Dual/LR_training_image.mat', mdict = {'LR_training_image' : LR_images_training.numpy()})
-#            scipy.io.savemat('D:/HaoLi/SR/results/200730_RCAN_l1_ssim_grad_laf_100_32_2folds_2d_downsize_Dual/SR_training_image.mat', mdict = {'SR_training_image' : SR_images_exam_train})
+                    if args['use_HR_reference'] == False:
+                        LR_images_test = testing_data_2[0]
+                        """
+                        LR_images_test, HR_images_test = testing_data_2
+                        HR_images_test = HR_images_test.type(tc.FloatTensor)
+                        """
+                        img_outputs = our_model_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
+                
+                    elif args['use_HR_reference'] == True:
+                        LR_images_test, references_test = testing_data_2
+                        LR_images_test, references_test = Variable(LR_images_test).to(device), Variable(references_test).to(device)
+                        img_outputs = our_model_mri_sr_2d(LR_images_test, references_test)
 
+                #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
+                    SR_images_tensor_test = img_outputs.data.cpu()
 
+                    if i==0:
+                        SR_img_eval_tensor = SR_images_tensor_test
+                        
+                    else:
+                        SR_img_eval_tensor = tc.cat((SR_img_eval_tensor, SR_images_tensor_test), 0)
+                        
+                prediction_end = time.perf_counter()
+                prediction_time = prediction_end - prediction_start
+                f.write('Prediction time for dataset %s is %f s \n' % (idx_file, prediction_time))
+                SR_images_test = SR_img_eval_tensor.numpy()
 
-        #        for j in range(new_batch_size_for_checking):
-        #            plt.imshow(SR_images_exam_train[j, :, :])
-        #            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_SR_image.png')
-        #            plt.show()
-        #            plt.imshow(HR_images_training[j, 0, :, :])
-        #            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_HR_image.png')
-        #            plt.show()
-        #            plt.imshow(LR_images_training[j, 0, :, :])
-        #            plt.savefig('/home/HaoLi/SR/Results/training_' + str(j) + '_LR_image.png')
-        #            plt.show()
-
-#    print("examination of generated SR image by using training samples complete")
-
-    "predict the SR MRI image by using testing LR image data and save them"
-    # =============================================================================
-    # for data in testloader:
-    # =============================================================================
-    for i, testing_data_2 in enumerate(testloader, 0):
-
-        #    LR_images_test, HR_images_test = testing_data_2
-        # HR_images_temp = HR_images.type(tc.LongTensor).to(device)
-        #    outputs = our_model_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
-        # =============================================================================
-        #     print(outputs.data.size())
-        # =============================================================================
-
-#       if (i == math.floor((torch_data_low_resolution_test_sequence.size(0)/new_batch_size_for_checking)/2)): 
-        if args['use_HR_reference'] == False:
-            LR_images_test, HR_images_test = testing_data_2
-            HR_images_test = HR_images_test.type(tc.FloatTensor)
-            img_outputs, secondary_branch_outputs, network_model_type = our_model_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device))
-        elif args['use_HR_reference'] == True:
-            LR_images_test, HR_images_test, references_test = testing_data_2
-            HR_images_test = HR_images_test.type(tc.FloatTensor)
-            img_outputs, secondary_branch_outputs, network_model_type = our_model_mri_sr_2d(Variable(LR_images_test).type(tc.FloatTensor).to(device),
-                                                                                            Variable(references_test).type(tc.FloatTensor).to(device))
-
-        #----- skip display "the last batch for one epoch test data" and skip "all the batches expect the batch in the middle"
-        SR_images_tensor_test = img_outputs.data.cpu().squeeze(1)
-        LR_images_tensor_test = LR_images_test.cpu().squeeze(1)
-        HR_images_tensor_test = HR_images_test.cpu().squeeze(1)
-        # HR_images_tensor = HR_images_temp.cpu().squeeze(1)
-        # =============================================================================
-        #         print(SR_images_tensor.size())
-        # =============================================================================
-        # print(HR_images_tensor.size())    
-
-        # HR_images_test = HR_images_tensor.numpy()
-        if i==0:
-            SR_img_eval_tensor = SR_images_tensor_test
-            LR_eval_tensor = LR_images_tensor_test
-            HR_eval_tensor = HR_images_tensor_test
-        else:
-            SR_img_eval_tensor = tc.cat((SR_img_eval_tensor, SR_images_tensor_test), 0)
-            LR_eval_tensor = tc.cat((LR_eval_tensor, LR_images_tensor_test), 0)
-            HR_eval_tensor = tc.cat((HR_eval_tensor, HR_images_tensor_test), 0)
-
-    SR_images_test = SR_img_eval_tensor.numpy()
-    LR_images_test = LR_eval_tensor.numpy()
-    HR_images_test = HR_eval_tensor.numpy()
-    "save the .mat files for SR, HR and LR training images"
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/SR_test_image.mat', mdict = {'SR_test_image' : SR_images_test})
-    if network_model_type != 'Single Branch Network':
-        scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/SR_secondary_branch_test.mat', mdict = {'SR_secondary_branch_test' : SR_secondary_branch_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/HR_test_image.mat', mdict = {'HR_test_image' : HR_images_test})
-    scipy.io.savemat('/srv/DATA/RAID/HaoLi/Results/20201027_RCAN_l1_ssim_grad_cosine_warm_restarts_1000_32_2folds_2d_downsize_baseline/LR_test_image.mat', mdict = {'LR_test_image' : LR_images_test})
+                scipy.io.savemat(os.path.join(folder_log_path, 'test_results', os.path.splitext(idx_file)[0]+'_SR_test_image_ssim.mat'), mdict = {'SR_test_image' : SR_images_test})
 
 
-    #        for j in range(new_batch_size_for_checking):
-    #            plt.imshow(SR_images_test[j, :, :])
-    #            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_SR_image.png')
-    #            plt.show()            
-    #            plt.imshow(HR_images_test[j, 0, :, :])
-    #            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_HR_image.png')
-    #            plt.show()            
-    #            plt.imshow(LR_images_test[j, 0, :, :])
-    #            plt.savefig('/home/HaoLi/SR/Results/testing_' + str(j) + '_LR_image.png')
-    #            plt.show()            
-
-    print("the predicting of generated SR image by using testing samples complete")
-
-now = time.perf_counter()
-
-running_time = now - since
-print('The spent time in minute is: ', running_time/60)
+print("the predicting of generated SR image by using testing samples complete")
+f.close()
