@@ -32,7 +32,7 @@ Date		Network								Dataset					Result							Device
 
 
 -------------------------------------------------------------------------------------gMLP and Efficient Transformer--------------------------------------------------------------------
-2021.05.27	gMLP+conv v1.0.2						HCP 300 datasets, 3D 2x1 128x3		Break, val ssim 0.9608 					A6000
+2021.05.27	gMLP+conv_decoder v1.0.2					HCP 300 datasets, 3D 2x1 128x1		Break, val ssim 0.9608 					A6000
 2021.06.04	gMLP U-Net v1.0.2						HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9575 psnr 38.5156			A6000
 2021.06.07	gMLP U-Net with simple HR ref v1.0.4				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9571 psnr 38.6680			A6000
 2021.06.08	gMLP U-Net with info-exchange HR ref v1.0.4			HCP 100 datasets, 3D 2x1 128x1		Break at epoch 36, val ssim 0.9566 psnr 38.3368		A6000
