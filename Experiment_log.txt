@@ -28,6 +28,7 @@ Date		Network								Dataset					Result							Device
 2021.06.24	RCAN with Char, SSIM, mean non-selective probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9641 psnr 39.7816			GV100
 2021.06.25	RCAN with Char, mean non-selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.4860			GV100
 2021.06.26	RCAN with sum non-selective probability v1.0.3			HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9608 psnr 39.0530			GV100
+2021.06.25	RCAN with Char, mean selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		started							A6000
 
 
 -------------------------------------------------------------------------------------gMLP and Efficient Transformer--------------------------------------------------------------------
@@ -43,14 +44,17 @@ Date		Network								Dataset					Result							Device
 
 
 -------------------------------------------------------------New RCAN Tests (2021.06.18 RCAN with Charbonnier,ssim v1.2.2 included)----------------------------------------------------
-2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x1		Done, val ssim 0.9343 psnr 37.0895			GV100
 2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x3		Done, val ssim 0.9643 psnr 39.8255			GV100
+2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x1		Done, val ssim 0.9343 psnr 37.0895			GV100
+2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x3		Done, val ssim 0.9468 psnr 38.0781			GV100
 2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x1		started							GV100
-2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x3		started							GV100
+2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x3		started							GV100
+2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x1		pending							GV100
+2021.07.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x3		pending							GV100
 
 
 -----------------------------------------------------------------------------------------------TTSR Test-------------------------------------------------------------------------------
-2021.06.30	TTSR waveletswith Char, SSIM v1.0.3				HCP 100 datasets, 3D 2x1 128x1		started							A6000
+2021.06.30	TTSR waveletswith Char, SSIM v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Terminated						A6000
 2021.06.30	TTSR with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x1		started							A6000
 
 
