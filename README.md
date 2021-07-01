@@ -168,7 +168,15 @@ https://github.com/dvlab-research/MASA-SR/blob/main/models/archs/MASA_arch.py
 的search函数。
 这个class可以加载到gMLP UNet，EfficientTrasnformer UNet，或者RCAN的HR Reference网络中使用，看一看效果怎么样。
 
-41. 在方案34. 上拓展更新，用CoAtNet以及VOLO这俩种新的“Transformer中加入CNN的结合俩者的framework”在UNet结构中来替换掉gMLP或者efficient transformer模块实现MRI SR。
+41. 在方案34. 上拓展更新，用新的transformer结构在UNet构架里替换掉gMLP或者efficient transformer模块实现MRI SR。
+可选的可能方案及其代码见：
+https://github.com/xmu-xiaoma666/External-Attention-pytorch
+现在考虑可能靠谱的俩个option为CoAtNet以及VOLO这俩种新的“Transformer中加入CNN的结合俩者的framework”。
+
+
+42. 看uncertainty modeling的各种方案的paper，找一个新的uncertainty modeling的方案用于MRI SR with uncertainty:
+见：https://github.com/JunMa11/MedUncertainty
+
 
 
 ### 近期主要的写代码的任务集中在：
