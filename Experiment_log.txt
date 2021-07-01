@@ -44,7 +44,7 @@ Date		Network								Dataset					Result							Device
 
 
 -------------------------------------------------------------New RCAN Tests (2021.06.18 RCAN with Charbonnier,ssim v1.2.2 included)----------------------------------------------------
-2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x3		Done, val ssim 0.9643 psnr 39.8255			GV100
+2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9643 psnr 39.8255			GV100
 2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x1		Done, val ssim 0.9343 psnr 37.0895			GV100
 2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x3		Done, val ssim 0.9468 psnr 38.0781			GV100
 2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x1		started							GV100
