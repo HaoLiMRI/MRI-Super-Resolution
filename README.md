@@ -174,7 +174,7 @@ https://github.com/xmu-xiaoma666/External-Attention-pytorch
 现在考虑可能靠谱的俩个option为CoAtNet以及VOLO这俩种新的“Transformer中加入CNN的结合俩者的framework”。
 
 42. 在41和34基础上，加上wavelet transform模块，把小波变换和gMLP/各种transformer based UNet结构结合。具体怎么结合的方式，需要讨论。
-先从wavelet transform结合multi-scale feature extractor + gMLP UNet开始设计。
+先从wavelet transform结合multi-scale feature extractor + gMLP UNet开始设计。基本方案就是把LR过wavelet transform得到频域数据，然后频域数据过multi-scale feature extractor + gMLP UNet，然后再inverse wavelet transform变回时域，再最后upsampling一下放大得到MRI SR。
 
 43. 看uncertainty modeling的各种方案的paper，找一个新的uncertainty modeling的方案用于MRI SR with uncertainty:
 见：https://github.com/JunMa11/MedUncertainty
