@@ -28,7 +28,7 @@ Date		Network								Dataset					Result							Device
 2021.06.25	RCAN with Char, mean non-selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.4860			GV100
 2021.06.26	RCAN with sum non-selective probability v1.0.3			HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9608 psnr 39.0530			GV100
 2021.07.01	RCAN with Char, mean selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.5392			A6000
-2021.07.01	RCAN with Char, new non-selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		started							A6000
+2021.07.01	RCAN with Char, new non-selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9617 psnr 39.5500			A6000
 
 
 ----------------------------------------------------------------------------------gMLP and Efficient Transformer-----------------------------------------------------------------------
@@ -49,14 +49,14 @@ Date		Network								Dataset					Result							Device
 2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x1		Done, val ssim 0.9343 psnr 37.0895			GV100
 2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x3		Done, val ssim 0.9468 psnr 38.0781			GV100
 2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x1		Done, val ssim 0.9550 psnr 38.7596			GV100
-2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x3		Epoch 42, val ssim 0.9688 psnr 40.3051			GV100
-2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x1		started							GV100
+2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x3		Done, val ssim 0.9688 psnr 40.3051			GV100
+2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x1		Done, val ssim 0.9110 psnr 35.1764			GV100
 2021.07.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x3		pending							GV100
 
 
 --------------------------------------------------------------------------------------------TTSR Test----------------------------------------------------------------------------------
 2021.06.30	TTSR waveletswith Char, SSIM v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Terminated						A6000
-2021.06.30	TTSR with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x1		Epoch 15, val ssim 0.9642 psnr 39.625			A6000
+2021.06.30	TTSR with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.666			A6000
 
 
 		
