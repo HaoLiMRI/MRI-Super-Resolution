@@ -65,6 +65,7 @@ Date		Network								Dataset					Result							Device
 --------------------------------------------------------------------------------------------TTSR Test----------------------------------------------------------------------------------
 2021.06.30	TTSR waveletswith Char, SSIM v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Terminated						A6000
 2021.06.30	TTSR with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.666			A6000
+2021.07.05	TTSR with Char, SSIM, adv v1.0.3				HCP 100 datasets, 3D 2x1 128x1		started							A6000
 
 
 		
