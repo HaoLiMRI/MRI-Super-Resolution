@@ -29,6 +29,7 @@ Date		Network								Dataset					Result							Device
 2021.06.26	RCAN with sum non-selective probability v1.0.3			HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9608 psnr 39.0530			GV100
 2021.07.01	RCAN with Char, mean selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.5392			A6000
 2021.07.01	RCAN with Char, new non-selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9617 psnr 39.5500			A6000
+2021.07.05	RCAN with new non-selective probability v1.0.3			HCP 100 datasets, 3D 2x1 128x1		started							A6000
 
 
 ----------------------------------------------------------------------------------gMLP and Efficient Transformer-----------------------------------------------------------------------
@@ -51,7 +52,14 @@ Date		Network								Dataset					Result							Device
 2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x1		Done, val ssim 0.9550 psnr 38.7596			GV100
 2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x3		Done, val ssim 0.9688 psnr 40.3051			GV100
 2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x1		Done, val ssim 0.9110 psnr 35.1764			GV100
-2021.07.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x3		pending							GV100
+2021.07.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x3		started							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x5		pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x5		started							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x5		pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x5		pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x1		pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x3		pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x5		pending							GV100
 
 
 --------------------------------------------------------------------------------------------TTSR Test----------------------------------------------------------------------------------
