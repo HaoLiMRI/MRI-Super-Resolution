@@ -180,9 +180,13 @@ https://github.com/xmu-xiaoma666/External-Attention-pytorch
 见：https://github.com/JunMa11/MedUncertainty
 
 44. UNet构架的一些新任务：
+45. 
 	1). 把现有的multi-scale extractor + gMLP/EfficientTransformer UNet结构中的conv多加几层。
+
 	2). 把现有的multi-scale extractor + gMLP/EfficientTransformer UNet结构中的decoder的multi-scale extractor和gMLP/EfficientTransformer顺序对调一下看看效果。
+
 	3). 用outlooker transformer结构替换掉现在的multi-scale extractor + gMLP/EfficientTransformer UNet中的gMLP/EfficientTransformer模块。完成代码。Outlooker transformer代码见: https://github.com/sail-sg/volo/blob/main/models/volo.py  https://github.com/xmu-xiaoma666/External-Attention-pytorch/blob/master/attention/OutlookAttention.py
+
 	4). 改变现在的UNet中用gMLP/EfficientTransformer替换conv的构架，将gMLP/EfficientTransformer/Outlooker transformer放在conv based UNet的encoder和decoder之间。完成代码。
 	
 
