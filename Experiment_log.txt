@@ -30,7 +30,8 @@ Date		Network								Dataset					Result							Device
 2021.07.01	RCAN with Char, mean selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9624 psnr 39.5392			A6000
 2021.07.01	RCAN with Char, new non-selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9617 psnr 39.5500			A6000
 2021.07.05	RCAN with new non-selective probability v1.0.3			HCP 100 datasets, 3D 2x1 128x1		Stopped at epoch 44, val ssim 0.5 psnr 24		A6000
-2021.07.06	RCAN with char, SSIM, new non-selective probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		started							A6000
+2021.07.06	RCAN with char, SSIM, new non-selective probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9621 psnr 39.2556			A6000
+2021.07.07	RCAN with char, SSIM, new selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		started							A6000
 
 
 ----------------------------------------------------------------------------------gMLP and Efficient Transformer-----------------------------------------------------------------------
