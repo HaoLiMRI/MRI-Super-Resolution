@@ -52,13 +52,13 @@ Date		Network								Dataset					Result							Device
 2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x3		Done, val ssim 0.9468 psnr 38.0781			GV100
 2021.06.30	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x1		Done, val ssim 0.9550 psnr 38.7596			GV100
 2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x3		Done, val ssim 0.9688 psnr 40.3051			GV100
-2021.07.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x1		Done, val ssim 0.9110 psnr 35.1764			GV100
-2021.07.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x3		Done, val ssim 0.9364 psnr 36.8857			GV100
-2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x5		started							GV100
-2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x5		Done, val ssim 0.9468 psnr 38.0059			GV100
-2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x5		pending							GV100
-2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x5		started							GV100
-2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x1		pending							GV100
+2021.07.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x1		Done, val ssim 0.9110 psnr 35.1764			GV100
+2021.07.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x3		Done, val ssim 0.9364 psnr 36.8857			GV100
+2021.07.06	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x5		Done, val ssim 0.9638 psnr 39.7103			GV100
+2021.07.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x5		Done, val ssim 0.9468 psnr 38.0059			GV100
+2021.07.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x5		started							GV100
+2021.07.06	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x5		Done, val ssim 0.9370 psnr 36.7144			GV100
+2021.07.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x1		started							GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x3		pending							GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x5		pending							GV100
 
