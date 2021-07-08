@@ -60,7 +60,7 @@ Date		Network								Dataset					Result							Device
 2021.07.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x2 128x5		started							GV100
 2021.07.06	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x5		Done, val ssim 0.9370 psnr 36.7144			GV100
 2021.07.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x1		Done, val ssim 0.9400 psnr 37.2010			GV100
-2021.07.08	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x3		pending							GV100
+2021.07.08	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x3		started							GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x3 128x5		pending							GV100
 
 
