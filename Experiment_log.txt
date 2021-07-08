@@ -43,10 +43,10 @@ Date		Network								Dataset					Result							Device
 2021.06.14	ResT U-Net v1.0.5						HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9565 psnr 38.5567			A6000
 2021.06.18	ResT+conv_decoder v1.0.5					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9591 psnr 38.9167			A6000
 2021.06.19	gMLP+MultiScaleExtraactor v1.0.5				HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9608 psnr 39.1580			A6000
-2021.06.23	Efficient transformer+MultiScaleExtraactor v1.0.5		HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9537 psnr 38.3155			A6000
+2021.06.23	Efficient transformer+MultiScaleExtractor v1.0.5		HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9537 psnr 38.3155			A6000
 
 
--------------------------------------------------------------New RCAN Tests (2021.06.18 RCAN with Charbonnier,ssim v1.2.2 included)----------------------------------------------------
+------------------------------------------------------------------------------------------New RCAN Tests------------------------------------------------------------------------------
 2021.06.18	RCAN with Charbonnier,ssim v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.7959			GV100
 2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x3		Done, val ssim 0.9643 psnr 39.8255			GV100
 2021.06.29	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x2 128x1		Done, val ssim 0.9343 psnr 37.0895			GV100
