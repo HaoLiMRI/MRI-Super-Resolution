@@ -45,7 +45,7 @@ Date		Network								Dataset					Result							Device
 2021.06.18	ResT+conv_decoder v1.0.5					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9591 psnr 38.9167			A6000
 2021.06.19	gMLP+MultiScaleExtractor v1.0.5					HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9608 psnr 39.1580			A6000
 2021.06.23	Efficient transformer+MultiScaleExtractor v1.0.5		HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9537 psnr 38.3155			A6000
-2021.07.09	gMLP+MultiScaleExtractor order switched decoder v1.0.5		HCP 300 datasets, 3D 2x1 128x1		started							A6000
+2021.07.09	gMLP+MultiScaleExtractor, order-switched decoder v1.0.5		HCP 300 datasets, 3D 2x1 128x1		started							A6000
 
 
 ------------------------------------------------------------------------------------------New RCAN Tests------------------------------------------------------------------------------
