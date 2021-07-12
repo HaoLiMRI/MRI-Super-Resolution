@@ -65,12 +65,12 @@ Date		Network								Dataset					Result							Device
 2021.07.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x1		Done, val ssim 0.9110 psnr 35.1764			GV100
 2021.07.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x3		Done, val ssim 0.9364 psnr 36.8857			GV100
 2021.07.06	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x5		Done, val ssim 0.9370 psnr 36.7144			GV100
-2021.07.12	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x1		started							GV100
-2021.07.xx	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x3		pending							GV100
-2021.07.xx	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x5		pending							GV100
-2021.07.xx	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x1		pending							GV100
+2021.07.12	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x1		started							GV100
 2021.07.xx	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x3		pending							GV100
 2021.07.xx	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x5		pending							GV100
+2021.07.xx	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x1		pending							GV100
+2021.07.xx	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x3		pending							GV100
+2021.07.xx	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x5		pending							GV100
 
 
 --------------------------------------------------------------------------------------------TTSR Test----------------------------------------------------------------------------------
