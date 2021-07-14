@@ -33,7 +33,7 @@ Date		Network								Dataset					Result							Device
 2021.07.06	RCAN with char, SSIM, new non-selective probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9621 psnr 39.2556			A6000
 2021.07.07	RCAN with char, SSIM, new selective probability v1.0.3		HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.8004			A6000
 2021.07.09	RCAN with char, SSIM, new non-selective probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9640 psnr 39.7724			GV100
-2021.07.12	RCAN with HR ref, Char, SSIM v1.2.2				HCP 100 datasets, 3D 2x1 128x1		started							GV100
+2021.07.12	RCAN with HR ref, Char, SSIM v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Stopped, wrong results					GV100
 
 
 ----------------------------------------------------------------------------------gMLP and Efficient Transformer-----------------------------------------------------------------------
@@ -46,7 +46,8 @@ Date		Network								Dataset					Result							Device
 2021.06.18	ResT+conv_decoder v1.0.5					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9591 psnr 38.9167			A6000
 2021.06.19	gMLP+MultiScaleExtractor v1.0.5					HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9608 psnr 39.1580			A6000
 2021.06.23	Efficient transformer+MultiScaleExtractor v1.0.5		HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9537 psnr 38.3155			A6000
-2021.07.09	gMLP+MultiScaleExtractor, order-switched decoder v1.0.5		HCP 300 datasets, 3D 2x1 128x1		started, epoch25, val ssim 0.9612 psnr 39.1378		A6000
+2021.07.09	gMLP+MultiScaleExtractor, order-switched decoder v1.0.5		HCP 300 datasets, 3D 2x1 128x1		started, epoch45, val ssim 0.9612 psnr 39.1378		A6000
+2021.07.14	gMLP+MultiScaleExtractor+, order-switched decoder v1.0.5	HCP 300 datasets, 3D 2x1 128x1		started							A6000
 
 
 ------------------------------------------------------------------------------------------New RCAN Tests------------------------------------------------------------------------------
@@ -65,18 +66,30 @@ Date		Network								Dataset					Result							Device
 2021.07.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x1		Done, val ssim 0.9110 psnr 35.1764			GV100
 2021.07.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x3		Done, val ssim 0.9364 psnr 36.8857			GV100
 2021.07.06	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 1x4 128x5		Done, val ssim 0.9370 psnr 36.7144			GV100
-2021.07.12	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x1		started							GV100
-2021.07.xx	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x3		pending							GV100
+2021.07.12	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x1		Done, val ssim 0.9267 psnr 36.6940			GV100
+2021.07.xx	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x3		started							GV100
 2021.07.xx	RCAN two stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x5		pending							GV100
 2021.07.xx	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x1		pending							GV100
 2021.07.xx	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x3		pending							GV100
 2021.07.xx	RCAN one stage with Char, SSIM v1.0.3				HCP 100 datasets, 3D 4x1 128x5		pending							GV100
+2021.07.14	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x1 128x1	started							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x1 128x3	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x1 128x5	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x1	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x3	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x5	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x1 128x1	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x1 128x3	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x1 128x5	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x2 128x1	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x2 128x3	pending							GV100
+2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x2 128x5	pending							GV100
 
 
 --------------------------------------------------------------------------------------------TTSR Test----------------------------------------------------------------------------------
 2021.06.30	TTSR waveletswith Char, SSIM v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Terminated						A6000
 2021.06.30	TTSR with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.666			A6000
-2021.07.05	TTSR with Char, SSIM, adv v1.0.3				HCP 100 datasets, 3D 2x1 128x1		started, epoch42, val ssim 0.9632 psnr 39.379		A6000
+2021.07.05	TTSR with Char, SSIM, adv v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9632 psnr 39.379			A6000
 
 
 		
