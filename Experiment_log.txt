@@ -78,7 +78,7 @@ Date		Network								Dataset					Result							Device
 2021.07.19	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x1	started							GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x3	pending							GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x5	pending							GV100
-2021.07.16	RCAN with Char, SSIM, transfer with 044 model v1.0.3		Real dental 0.32mm datasets, 2x1 128x1	Done, val ssim 0.7911 psnr 32.2581			GV100
+2021.07.19	RCAN with Char, SSIM, transfer with 044 model v1.0.3		Real dental 0.32mm datasets, 2x1 128x1	Restarted						GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x1 128x3	pending							GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x1 128x5	pending							GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x2 128x1	pending							GV100
