@@ -203,7 +203,9 @@ https://github.com/xmu-xiaoma666/External-Attention-pytorch
 	
 	2). 
 	a). 用基于Laplace distribution的NLL loss替换Gaussian的NLL loss，估计Aleatoric Uncertainty。
+	
 	b). 用Deep Evidential Regression里面设计的基于Normal Inverse-Gamma (NIG) distribution的Evidential Regression Loss去同时估计Aleatoric Uncertainty和Epistemic Uncertainty。
+	
 	c). 用Laplace distribution替换Normal Inverse-Gamma (NIG) distribution的Normal distribution，得到基于Laplace Inverse-Gamma (NIG) distribution Evidential Regression Loss去同时估计Aleatoric Uncertainty和Epistemic Uncertainty。
 	
 
