@@ -190,6 +190,7 @@ https://github.com/xmu-xiaoma666/External-Attention-pytorch
 
 45. Uncertainty的一些新探索：
 	1). 阅读论文2021.A Survey of Uncertainty in Deep Neural Networks. 中文解释:https://mp.weixin.qq.com/s/Tt7B-SarpYLApBwGpRGi4Q 理解分析这篇综述中提出的其他uncertainty估计的方案。我们现在用的NLL的uncertainty应该是那个综述fig 3中的single network deterministic methods中的一种。因为fig 4里面的解释，看上去我们用的NLL应该是single network deterministic methods。TABLE IV中说Single Deterministic Models这个方案对于regression任务对应的solution包括了[101][103][104]这三篇paper，我们需要看一下这些和NLL的有什么不同，怎么用的。论文链接如下：
+	
 	a). Deep Evidential Regression: https://arxiv.org/pdf/1910.02600.pdf
 	对应code: https://github.com/aamini/evidential-deep-learning/tree/main/evidential_deep_learning
 	
@@ -202,6 +203,7 @@ https://github.com/xmu-xiaoma666/External-Attention-pytorch
 	对应的code: https://github.com/facebookresearch/SingleModelUncertainty
 	
 	2). 
+	
 	a). 用基于Laplace distribution的NLL loss替换Gaussian的NLL loss，估计Aleatoric Uncertainty。
 	
 	b). 用Deep Evidential Regression里面设计的基于Normal Inverse-Gamma (NIG) distribution的Evidential Regression Loss去同时估计Aleatoric Uncertainty和Epistemic Uncertainty。
