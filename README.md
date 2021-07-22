@@ -190,10 +190,14 @@ https://github.com/xmu-xiaoma666/External-Attention-pytorch
 
 45. Uncertainty的一些新探索：
 	1). 阅读论文2021.A Survey of Uncertainty in Deep Neural Networks. 中文解释:https://mp.weixin.qq.com/s/Tt7B-SarpYLApBwGpRGi4Q 理解分析这篇综述中提出的其他uncertainty估计的方案。我们现在用的NLL的uncertainty应该是那个综述fig 3中的single network deterministic methods中的一种。因为fig 4里面的解释，看上去我们用的NLL应该是single network deterministic methods。TABLE IV中说Single Deterministic Models这个方案对于regression任务对应的solution包括了[101][103][104]这三篇paper，我们需要看一下这些和NLL的有什么不同，怎么用的。论文链接如下：
-	https://arxiv.org/pdf/1910.02600.pdf
-	https://arxiv.org/pdf/2104.06135.pdf
-	https://arxiv.org/pdf/2011.01655.pdf
-	https://arxiv.org/pdf/1811.00908.pdf
+	a). Deep Evidential Regression: https://arxiv.org/pdf/1910.02600.pdf
+	对应code: https://github.com/aamini/evidential-deep-learning/tree/main/evidential_deep_learning
+	
+	b). https://arxiv.org/pdf/2104.06135.pdf
+	
+	c). https://arxiv.org/pdf/2011.01655.pdf
+	
+	d). https://arxiv.org/pdf/1811.00908.pdf
 
 
 	
