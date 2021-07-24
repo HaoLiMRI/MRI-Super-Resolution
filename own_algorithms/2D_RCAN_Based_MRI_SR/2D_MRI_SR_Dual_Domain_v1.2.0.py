@@ -10,11 +10,11 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.5.0(Stable Version, even deformable conv works at least for RCAN network)
+Version: 1.2.0(Stable Version, even deformable conv works at least for RCAN network)
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210622
+This is the current version we are working on, in 20210724
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) use RCAN or U-Net as main framework, for image single branch network.
@@ -1284,15 +1284,16 @@ class UncertaintyNegativeLogGaussianPdfLikelihoodLoss(nn.Module):
         super(UncertaintyNegativeLogGaussianPdfLikelihoodLoss, self).__init__()
         self.uncertainty_nll_gaussian_pdf_likelihood_loss_weight = uncertainty_nll_gaussian_pdf_likelihood_loss_weight
         self.use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss = use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss
+	self.ssim_map_function = pytorch_ssim_map.SSIM().to(device)
         self.eps = 1e-5
 #        self.ssim_map_function = pytorch_ssim_map.SSIM().to(device)
 
     def forward(self, SR, variance_of_SR, HR):
 #        likelihood_probability_of_hr = gauss_pdf(x = HR, mu = SR, P = variance_of_SR)
-#        ssim_map, _ = self.ssim_map_function(SR, HR)
+        ssim_map, _ = self.ssim_map_function(SR, HR)
         """ nll_loss = tc.nn.NLLLoss2d() """
         """ soomth_l1_loss = nn.SmoothL1Loss().to(device) """
-        """
+        
         if self.use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss == False:
             selection_matrix = tc.ones_like(ssim_map)
         else:   # self.use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss == True:
@@ -1303,7 +1304,7 @@ class UncertaintyNegativeLogGaussianPdfLikelihoodLoss(nn.Module):
                 batch_ssim = ssim_map[i,:,:,:]
                 batch_selection[batch_ssim < threshold[i]] = 1
                 selection_matrix[i,:,:,:] = batch_selection
-        """
+        
         # Beware the target argument of nn.NLLLoss2d should have the shape [batch_size, height, width].
 #        all_ones_probability = tc.ones_like(ssim_map)
         """ uncertainty_nll_gaussian_pdf_likelihood_loss = nll_loss(input = tc.log(selection_matrix * likelihood_probability_of_hr), target = selection_matrix.long().squeeze(1)) """
@@ -1314,7 +1315,7 @@ class UncertaintyNegativeLogGaussianPdfLikelihoodLoss(nn.Module):
 #        print(tc.abs(tc.sum(tc.log(likelihood_probability_of_hr)))=='inf')
         
 #        uncertainty_nll_gaussian_pdf_likelihood_loss = self.uncertainty_nll_gaussian_pdf_likelihood_loss_weight * tc.mean(tc.abs(selection_matrix * tc.log(tc.max(likelihood_probability_of_hr, 1e-8*tc.ones_like(likelihood_probability_of_hr)))))
-        uncertainty_nll_gaussian_pdf_likelihood_loss = self.uncertainty_nll_gaussian_pdf_likelihood_loss_weight * tc.mean( 0.5 * (HR - SR)**2 / (variance_of_SR + self.eps) + 0.5 * tc.log(variance_of_SR + self.eps))
+        uncertainty_nll_gaussian_pdf_likelihood_loss = self.uncertainty_nll_gaussian_pdf_likelihood_loss_weight * tc.mean(selection_matrix * ( 0.5 * (HR - SR)**2 / (variance_of_SR + self.eps) + 0.5 * tc.log(variance_of_SR + self.eps)))
         return uncertainty_nll_gaussian_pdf_likelihood_loss
 
 class UncertaintyNegativeLogLaplacianLikelihoodLoss(nn.Module):
@@ -1322,13 +1323,14 @@ class UncertaintyNegativeLogLaplacianLikelihoodLoss(nn.Module):
         super(UncertaintyNegativeLogLaplacianLikelihoodLoss, self).__init__()
         self.uncertainty_nll_laplacian_likelihood_loss_weight = uncertainty_nll_laplacian_likelihood_loss_weight
         self.use_ssim_guided_uncertainty_nll_laplacian_likelihood_loss = use_ssim_guided_uncertainty_nll_laplacian_likelihood_loss
+	ssim_map, _ = self.ssim_map_function(SR, HR)
         self.eps = 1e-5
 #        self.ssim_map_function = pytorch_ssim_map.SSIM().to(device)
 
     def forward(self, SR, variance_of_SR, HR):
 #        likelihood_probability_of_hr = gauss_pdf(x = HR, mu = SR, P = variance_of_SR)
-#        ssim_map, _ = self.ssim_map_function(SR, HR)
-        """
+        ssim_map, _ = self.ssim_map_function(SR, HR)
+        
         if self.use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss == False:
             selection_matrix = tc.ones_like(ssim_map)
         else:   # self.use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss == True:
@@ -1339,8 +1341,8 @@ class UncertaintyNegativeLogLaplacianLikelihoodLoss(nn.Module):
                 batch_ssim = ssim_map[i,:,:,:]
                 batch_selection[batch_ssim < threshold[i]] = 1
                 selection_matrix[i,:,:,:] = batch_selection
-        """
-        uncertainty_nll_laplacian_likelihood_loss = self.uncertainty_nll_laplacian_likelihood_loss_weight * tc.mean(tc.abs(HR - SR) / (variance_of_SR + self.eps) + tc.log(variance_of_SR + self.eps))
+        
+        uncertainty_nll_laplacian_likelihood_loss = self.uncertainty_nll_laplacian_likelihood_loss_weight * tc.mean(selection_matrix * (tc.abs(HR - SR) / (variance_of_SR + self.eps) + tc.log(variance_of_SR + self.eps)))
         return uncertainty_nll_laplacian_likelihood_loss
 
 "Pyramidal Convolution(Py_Conv) Layer"
@@ -4363,7 +4365,7 @@ for epoch in range(EPOCH_NUM):
             print('uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test: ', uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test)
         if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
             uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test = np.mean(uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test)
-            print('uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test: ', uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test)
+            print('uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test: ', uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test)
         if network_model_type_test == 'Secondary branch is k space branch':
             k_space_branch_k_space_loss_test = np.mean(k_space_branch_k_space_loss_test)
             print('k_space_branch_k_space_loss_test: ', k_space_branch_k_space_loss_test)
@@ -4415,7 +4417,7 @@ for epoch in range(EPOCH_NUM):
         print('uncertainty_negative_log_gaussian_pdf_likelihood_loss_training: ', uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_for_current_epoch)
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
         uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_for_current_epoch = np.mean(uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_training)
-        print('uncertainty_negative_log_gaussian_pdf_likelihood_loss_training: ', uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_for_current_epoch)
+        print('uncertainty_negative_log_laplacian_likelihood_loss_training: ', uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_for_current_epoch)
     if network_model_type == 'Secondary branch is gradient map branch':
         gradient_grad_loss_for_current_epoch = np.mean(gradient_grad_loss_training)
         print("gradient_grad_loss_training: ", gradient_grad_loss_for_current_epoch)
