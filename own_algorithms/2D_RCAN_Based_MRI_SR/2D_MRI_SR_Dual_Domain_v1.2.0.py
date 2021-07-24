@@ -10,11 +10,11 @@ Author: chisyliu@hotmail.com *
         hao.li@med.uni-heidelberg.de *
         
         * Both authors contribute equally
-Version: 1.4.0(Stable Version, even deformable conv works at least for RCAN network)
+Version: 1.5.0(Stable Version, even deformable conv works at least for RCAN network)
 """
 "-------------------------------------------------------------------------------------------------"
 """
-This is the current version we are working on, in 20210619
+This is the current version we are working on, in 20210622
 This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already support following items:
     0)  Dual Domain Fusion Network Achitecture, where we already support:
         a) use RCAN or U-Net as main framework, for image single branch network.
@@ -79,10 +79,14 @@ This is a demo code of 2D_MRI_SR_Dual_Domain. in this version we have already su
     34) option to use external-attention. Which is a pure MLP based 'self-attention'. See paper: '2021.Beyond Self-attention: External Attention using Two Linear Layers for Visual Tasks' for more detail.
     35) option to use involution conv(but still has some bugs when using involution conv).
     36) option to use gMLP or aMLP, which is another "pure MLP" or "pure MLP with tiny attention" module. See paper: "2021.Pay Attention to MLPs" for more info.
-    37) option to use uncertainty loss to estimate the uncertainty map(pixel-wise variance of estimated MRI SR output) of MRI SR image.
+    37) option to use uncertainty KL loss to estimate the uncertainty map(pixel-wise variance of estimated MRI SR output) of MRI SR image.
         注意：uncertainty KL loss相关代码已经完成，但是由于需要使用的network model在最后输出MRI SR结果时多输出一个channel的数据作为variance(或者log of variance)，
         同时我们决定在这个版本中不修改任何network model的最后输出，所以现在的代码无法运行uncertainty KL loss。如果需要运行uncertainty KL loss，则需要更新相应的
         network model，最后输出MRI SR结果时多输出一个channel的数据作为variance(或者log of variance)。
+    38) option to use uncertainty negative log Gaussian pdf likelihood loss to estimate the uncertainty map(pixel-wise variance of estimated MRI SR output) of MRI SR image.
+        注意：uncertainty negative log Gaussian pdf likelihood loss相关代码已经完成，但是由于需要使用的network model在最后输出MRI SR结果时多输出一个channel的数据作为variance，
+        同时我们决定在这个版本中不修改任何network model的最后输出，所以现在的代码无法运行uncertainty negative log Gaussian pdf likelihood loss。如果需要运行uncertainty negative 
+        log Gaussian pdf likelihood loss，则需要更新相应的network model，最后输出MRI SR结果时多输出一个channel的数据作为variance。
 
 
 Some feature or bug fixing which have already been planed/started but still not finished yet:
@@ -251,7 +255,7 @@ since = time.perf_counter()
 0. Configure all parameter
 """""""""""""""""""""""""""""""""""""""""""""
 # --------------------------- configuration of support parameters --------------------------- #
-batch_size = 1
+batch_size = 2
 EPOCH_NUM = 1
 SELECTED_BATCH_FOR_PLOT_AND_SAVE_MAT_FILE = 10
 Feature_Extractor_in_Front_of_Network = False # stand for whether we use feature extractor in front of network
@@ -263,7 +267,8 @@ Use_Negative_TV_Loss = True # stand for whether we want to use "1/(total variati
 Use_Negative_Trace_Loss = True # stand for whether we want to use "1/(trace(sr*hr) + 1.000e-10) loss"(on HR and SR, for increasing similarity between SR and HR)
 Use_Gradient_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use gradient map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_SSIM_Map_Guided_Pixel_Wise_Loss is True
 Use_SSIM_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use SSIM map guided "attention weights" to multiply with pixel-wise loss. Can NOT be True if Use_Gradient_Map_Guided_Pixel_Wise_Loss is True
-Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss = True # stand for whether we let the network model to predict the variance for each pixel and use uncertainty KL loss to minimize the variance for each pixel as well.
+Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss = False # stand for whether we let the network model to predict the variance for each pixel and use uncertainty KL loss to minimize the variance for each pixel as well.
+Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss = True # stand for whether we let the network model to predict the variance for each pixel and use uncertainty negative log Gaussian pdf likelihood loss to minimize the variance for each pixel as well.
 Use_Channel_Attention_For_Cross_Branch_Fusion = True # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
 Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
 Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
@@ -297,6 +302,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 20000, 'k_spa
                     'gradient_img_weight': 1000, 'gradient_grd_weight': 10, 'k_space_branch_weight': 0.02, \
                     'wavelets_branch_weight': 5, 'gram_similarity_weight': 5, 'negative_total_variation_weight': 3, 'negative_trace_weight': 3,\
                     'uncertainty_kl_loss_weight': 1, 'use_ssim_guided_uncertainty_kl_loss' : True,
+                    'uncertainty_nll_gaussian_pdf_likelihood_loss_weight': 1, 'use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss': False,
                     'ssim_luminance_weight': 2, 'ssim_contrast_weight': 2, 'ssim_structure_weight': 4}
 
 # args['use_HR_reference'] = True, stands for whether we select to use HR reference for MRI SR, e.g. True, False
@@ -1187,13 +1193,61 @@ class UncertaintyKlLoss(nn.Module):
     
     def forward(self, SR, log_of_variance_of_SR, HR, ssim_map):
         if self.use_ssim_guided_uncertainty_kl_loss == False:
-            uncertainty_kl_loss = self.uncertainty_kl_loss_weight * tc.sum(tc.exp(-log_of_variance_of_SR) * tc.square(HR - SR) + 0.5 * log_of_variance_of_SR)
+            uncertainty_kl_loss = tc.abs(self.uncertainty_kl_loss_weight * tc.sum(tc.exp(-log_of_variance_of_SR) * tc.square(HR - SR) + 0.5 * log_of_variance_of_SR))
         else:   # self.use_ssim_guided_uncertainty_kl_loss == True:
             selection_matrix = tc.zeros_like(ssim_map)
             threshold = tc.mean(ssim_map, dim = (2, 3)) - tc.std(ssim_map, dim = (2, 3))
-            selection_matrix[ssim_map < threshold] = 1
-            uncertainty_kl_loss = self.uncertainty_kl_loss_weight * tc.sum( selection_matrix * (tc.exp(-log_of_variance_of_SR) * tc.square(HR - SR) + 0.5 * log_of_variance_of_SR) )
+            temp_selection_matrix_for_current_sample = tc.zeros_like(ssim_map[0, :, :, :])
+            for i in range(SR.size(0)):
+                temp_selection_matrix_for_current_sample = selection_matrix[i, :, :, :]
+                temp_selection_matrix_for_current_sample[ssim_map[i, :, :, :] < threshold[i]] = 1
+                selection_matrix[i, :, :, :] = temp_selection_matrix_for_current_sample
+            uncertainty_kl_loss = tc.abs(self.uncertainty_kl_loss_weight * tc.sum( selection_matrix * (tc.exp(-log_of_variance_of_SR) * tc.square(HR - SR) + 0.5 * log_of_variance_of_SR) ))
         return uncertainty_kl_loss
+
+
+"""
+Uncertainty negative log Gaussian pdf likelihood loss. 把RCAN网络输出部分输出两个变量，一个是每个像素的均值，另一个是每个像素的方差。
+但这里不再是用minimize KL散度的方式得到一个MSE loss的变形，而是直接写出以估计出的SR每个像素的均值方差表示的高斯分布的pdf函数，把HR 
+groundtruth的每个像素值带入该高斯pdf表达式求出对应的likelihood probability。当我们maximize每一个像素的likelihood probability时候，
+则意味着对应的高斯分布的variance越小的时候(以SR每个像素的均值方差表示的高斯分布越尖瘦)才能达到，同时需要对应的高斯分布的均值很接近SR的
+像素值。所以我们通过minimize sum(-log(Gaussian_pdf(i))),i表示每个像素。用这种方案得到每个像素的方差。
+见论文：2019.Gaussian YOLOv3: An Accurate and Fast Object Detector Using Localization Uncertainty for Autonomous Driving.
+另外，对这个方案，我们可以考虑不对每一个SR image的pixel都求variance，而是只对当前SR image中那些SSIM Map中值小于一定threshold的pixel求variance。
+这个threhold可以设为当前SSIM map中所有元素的均值减去一倍(68%置信区间)或者二倍(95%置信区间)的方差。
+"""
+class UncertaintyNegativeLogGaussianPdfLikelihoodLoss(nn.Module):
+    def __init__(self, uncertainty_nll_gaussian_pdf_likelihood_loss_weight = 1, use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss = True):
+        super(UncertaintyNegativeLogGaussianPdfLikelihoodLoss, self).__init__()
+        self.uncertainty_nll_gaussian_pdf_likelihood_loss_weight = uncertainty_nll_gaussian_pdf_likelihood_loss_weight
+        self.use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss = use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss
+    
+    def forward(self, SR, variance_of_SR, HR, ssim_map):
+        likelihood_probability_of_hr = gauss_pdf(x = HR, mu = SR, P = variance_of_SR)
+        """ nll_loss = tc.nn.NLLLoss2d() """
+        """ soomth_l1_loss = nn.SmoothL1Loss().to(device) """
+        if self.use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss == False:
+            selection_matrix = tc.ones_like(ssim_map)
+        else:   # self.use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss == True:
+            selection_matrix = tc.zeros_like(ssim_map)
+            threshold = tc.mean(ssim_map, dim = (2, 3)) - tc.std(ssim_map, dim = (2, 3))
+            temp_selection_matrix_for_current_sample = tc.zeros_like(ssim_map[0, :, :, :])
+            for i in range(SR.size(0)):
+                temp_selection_matrix_for_current_sample = selection_matrix[i, :, :, :]
+                temp_selection_matrix_for_current_sample[ssim_map[i, :, :, :] < threshold[i]] = 1
+                selection_matrix[i, :, :, :] = temp_selection_matrix_for_current_sample
+        # Beware the target argument of nn.NLLLoss2d should have the shape [batch_size, height, width].
+        all_ones_probability = tc.ones_like(ssim_map)
+        """ uncertainty_nll_gaussian_pdf_likelihood_loss = nll_loss(input = tc.log(selection_matrix * likelihood_probability_of_hr), target = selection_matrix.long().squeeze(1)) """
+        uncertainty_nll_gaussian_pdf_likelihood_loss = tc.mean(selection_matrix * tc.abs(tc.log(all_ones_probability) - tc.log(likelihood_probability_of_hr)))
+        return uncertainty_nll_gaussian_pdf_likelihood_loss
+
+def gauss_pdf(x, mu, P):
+    # Calculate the probability(likelihood) corresponds to input x, generated from Gaussian pdf function with mu as mean and P as variance.
+    """ pi = tc.acos(tc.zeros(1)).item()    # Calculate pi. Or we might just define pi = 3.1415926 """
+    pi = 3.1415926
+    gauss_pdf_likelihood_probablity = (1/tc.sqrt(pi * P)) * tc.exp(-0.5 * tc.square(x - mu)/P)
+    return gauss_pdf_likelihood_probablity
 
 
 "Pyramidal Convolution(Py_Conv) Layer"
@@ -3518,6 +3572,8 @@ negative_trace_loss = NegativeTraceLoss(negative_trace_loss_weight = args_loss_w
 
 uncertainty_kl_loss = UncertaintyKlLoss(uncertainty_kl_loss_weight = args_loss_weight['uncertainty_kl_loss_weight'], use_ssim_guided_uncertainty_kl_loss = args_loss_weight['use_ssim_guided_uncertainty_kl_loss']).to(device)
 
+uncertainty_negative_log_gaussian_pdf_likelihood_loss  = UncertaintyNegativeLogGaussianPdfLikelihoodLoss(uncertainty_nll_gaussian_pdf_likelihood_loss_weight = args_loss_weight['uncertainty_nll_gaussian_pdf_likelihood_loss_weight'], use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss = args_loss_weight['use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss']).to(device)
+
 # =============================================================================
 # print('The loss function is L1Loss')
 # loss_function = nn.L1Loss(size_average = False).to(device) 
@@ -3576,6 +3632,10 @@ for epoch in range(EPOCH_NUM):
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
         uncertainty_kl_loss_for_img_loss_training = 0.0
         uncertainty_kl_loss_for_img_loss_test = 0.0
+
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+        uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_training = 0.0
+        uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test = 0.0
 
     k_space_branch_k_space_loss_training = 0.0
     k_space_branch_k_space_loss_test = 0.0
@@ -3715,6 +3775,10 @@ for epoch in range(EPOCH_NUM):
             uncertainty_kl_loss_for_img_loss = uncertainty_kl_loss(img_outputs, log_of_variance_of_img_outputs, labels, SR_ssim_map_weighted)
             uncertainty_kl_loss_for_img_loss_training += uncertainty_kl_loss_for_img_loss.item()
 
+        if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+            uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss = uncertainty_negative_log_gaussian_pdf_likelihood_loss(img_outputs, img_outputs*img_outputs, labels, SR_ssim_map_weighted)
+            uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_training += uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss.item()
+
         if network_model_type == 'Secondary branch is k space branch':
             if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                 k_space_branch_k_space_loss = args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
@@ -3768,6 +3832,9 @@ for epoch in range(EPOCH_NUM):
 
         if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
             loss = loss + uncertainty_kl_loss_for_img_loss
+
+        if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+            loss = loss + uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss
 
         if network_model_type == 'Secondary branch is k space branch':
             loss = loss + k_space_branch_k_space_loss
@@ -3922,6 +3989,9 @@ for epoch in range(EPOCH_NUM):
             if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
                 uncertainty_kl_loss_for_img_loss_test = uncertainty_kl_loss(SR_img_test, log_of_variance_of_SR_img_test, labels, SR_ssim_map_test_weighted)
 
+            if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+                uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test = uncertainty_negative_log_gaussian_pdf_likelihood_loss(SR_img_test, variance_of_SR_img_test, labels, SR_ssim_map_test_weighted)
+
             if network_model_type_test == 'Secondary branch is k space branch':
                 if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                     k_space_branch_k_space_loss_test += args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
@@ -3963,6 +4033,9 @@ for epoch in range(EPOCH_NUM):
             if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
                 loss_test = loss_test + uncertainty_kl_loss_for_img_loss_test
 
+            if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+                loss_test = loss_test + uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test
+
             if network_model_type_test == 'Secondary branch is k space branch':
                 loss_test = loss_test + k_space_branch_k_space_loss_test
 
@@ -3997,6 +4070,9 @@ for epoch in range(EPOCH_NUM):
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
         uncertainty_kl_loss_for_img_loss_test = uncertainty_kl_loss_for_img_loss_test/batch_number_test
         print('uncertainty_kl_loss_for_img_loss_test: ', uncertainty_kl_loss_for_img_loss_test)
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+        uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test = uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test/batch_number_test
+        print('uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test: ', uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test)
     if network_model_type_test == 'Secondary branch is k space branch':
         k_space_branch_k_space_loss_test = k_space_branch_k_space_loss_test/batch_number_test
         print('k_space_branch_k_space_loss_test: ', k_space_branch_k_space_loss_test)
@@ -4024,6 +4100,8 @@ for epoch in range(EPOCH_NUM):
         negative_trace_for_img_loss_for_current_epoch = negative_trace_for_img_loss_training/ batch_number_training
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
         uncertainty_kl_loss_for_img_loss_for_current_epoch = uncertainty_kl_loss_for_img_loss_training/ batch_number_training
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+        uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_for_current_epoch = uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_training/ batch_number_training
     if network_model_type == 'Secondary branch is gradient map branch':
         gradient_grad_loss_for_current_epoch = gradient_grad_loss_training/ batch_number_training
     if network_model_type == 'Secondary branch is k space branch':
@@ -4099,6 +4177,9 @@ for epoch in range(EPOCH_NUM):
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
         f.write('The uncertainty_kl_loss_for_img_loss for epoch %d is : %f' % (epoch, uncertainty_kl_loss_for_img_loss_for_current_epoch))
         f.write('\n')
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+        f.write('The uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss for epoch %d is : %f' % (epoch, uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_for_current_epoch))
+        f.write('\n')
     if network_model_type == 'Secondary branch is gradient map branch':
         f.write('The gradient_grad_loss for epoch %d is : %f' % (epoch, gradient_grad_loss_for_current_epoch))
         f.write('\n')
@@ -4138,6 +4219,9 @@ for epoch in range(EPOCH_NUM):
         f.write('\n')
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True:
         f.write('The uncertainty_kl_loss_for_img_loss_validation for epoch %d is : %f' % (epoch, uncertainty_kl_loss_for_img_loss_test))
+        f.write('\n')
+    if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True:
+        f.write('The uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_validation for epoch %d is : %f' % (epoch, uncertainty_negative_log_gaussian_pdf_likelihood_loss_for_img_loss_test))
         f.write('\n')
     if network_model_type_test == 'Secondary branch is gradient map branch':
         f.write('The gradient_grad_loss_validation for epoch %d is : %f' % (epoch, gradient_grad_loss_test))
