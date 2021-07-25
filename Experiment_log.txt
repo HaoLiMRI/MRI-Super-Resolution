@@ -87,8 +87,10 @@ Date		Network								Dataset					Result							Device
 2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x2 128x3	pending							GV100
 2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x2 128x5	pending							GV100
 
+
 -------------------------------------------------------------------------------New RCAN for Artifact Reduction Tests------------------------------------------------------------------------------
 2021.xx.xx
+
 
 --------------------------------------------------------------------------------------RCAN Uncertainty Tests---------------------------------------------------------------------------
 2021.07.06	RCAN with char, SSIM, new non-selective probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9621 psnr 39.2556			A6000
