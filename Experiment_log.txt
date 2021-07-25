@@ -48,7 +48,7 @@ Date		Network								Dataset					Result							Device
 2021.xx.xx	Outlooker based UNet
 
 
--------------------------------------------------------------------------------New RCAN for cross modality synthesizing Tests------------------------------------------------------------------------------
+---------------------------------------------------------------------gMLP and Efficient Transformer for cross modality synthesizing Tests------------------------------------------------------------------------------
 2021.xx.xx
 
 
