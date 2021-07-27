@@ -45,10 +45,10 @@ Date		Network								Dataset					Result							Device
 2021.06.23	Efficient transformer+MultiScaleExtractor v1.0.5		HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9537 psnr 38.3155			A6000
 2021.07.09	gMLP+MultiScaleExtractor, order-switched decoder v1.0.5		HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9612 psnr 39.1378			A6000
 2021.07.14	gMLP+MultiScaleExtractor+, order-switched decoder v1.0.5	HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9611 psnr 39.0676			A6000
-2021.xx.xx	Outlooker based UNet
+2021.xx.xx	Outlooker based UNet						HCP 300 datasets, 3D 2x1 128x1		pending							
 
 
----------------------------------------------------------------------gMLP and Efficient Transformer for cross modality synthesizing Tests------------------------------------------------------------------------------
+----------------------------------------------------------------gMLP and Efficient Transformer for cross modality synthesizing--------------------------------------------------------
 2021.xx.xx
 
 
@@ -88,7 +88,7 @@ Date		Network								Dataset					Result							Device
 2021.07.xx	RCAN with Char, SSIM v1.0.3					Real dental 0.32mm datasets, 2x2 128x5	pending							
 
 
--------------------------------------------------------------------------------New RCAN for Artifact Reduction Tests------------------------------------------------------------------------------
+------------------------------------------------------------------------------New RCAN for Artifact Reduction Tests--------------------------------------------------------------------
 2021.xx.xx
 
 
@@ -98,9 +98,7 @@ Date		Network								Dataset					Result							Device
 2021.07.09	RCAN with char, SSIM, new non-selective probability v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9640 psnr 39.7724			GV100
 2021.07.24	RCAN with char, SSIM, Lap non-sel nll v1.0.3			HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9641 psnr 39.8083			GV100
 2021.07.24	RCAN decoupled 32ch with char, SSIM, Lap non-sel nll v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9640 psnr 39.7581			GV100
-2021.07.26	RCAN decoupled 64ch with char, SSIM, Lap non-sel nll v1.0.3	HCP 100 datasets, 3D 2x1 128x1		started							GV100
-2021.xx.xx	NIG loss
-2021.xx.xx	LIG loss
+2021.07.26	RCAN decoupled 64ch with char, SSIM, Lap non-sel nll v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9639 psnr 39.7038			GV100
 
 
 --------------------------------------------------------------------------------------------TTSR Test----------------------------------------------------------------------------------
