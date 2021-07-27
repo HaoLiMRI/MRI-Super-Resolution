@@ -270,6 +270,7 @@ Use_SSIM_Map_Guided_Pixel_Wise_Loss = False # stand for whether we want to use S
 Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss = False # stand for whether we let the network model to predict the variance for each pixel and use uncertainty KL loss to minimize the variance for each pixel as well.
 Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss = False # stand for whether we let the network model to predict the variance for each pixel and use uncertainty negative log Gaussian pdf likelihood loss to minimize the variance for each pixel as well.
 Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss = True# stand for whether we let the network model to predict the variance for each pixel and use uncertainty negative log Palpacian likelihood loss to minimize the variance for each pixel as well.
+Use_NIG_Regression_Loss = True # stard for whether Normal invers Gamma loss is used
 Use_Channel_Attention_For_Cross_Branch_Fusion = False # stand for whether we give weight for every channel of feature maps(from both image and secondary branch) before they fuse together
 Amplify_Small_Value_In_Gradient_Map = False # stand for whether we want to amplify small values in gradient map to emphasize the information from gradient values which stand for texture
 Amplify_High_Frequency_Value_In_K_Space_Loss = False # stand for whether we want to amplify high frequence loss values in k space loss
@@ -315,6 +316,7 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 100, 'k_space
                     'uncertainty_kl_loss_weight': 1, 'use_ssim_guided_uncertainty_kl_loss' : False,
                     'uncertainty_nll_gaussian_pdf_likelihood_loss_weight': 1, 'use_ssim_guided_uncertainty_nll_gaussian_pdf_likelihood_loss': False,
                     'uncertainty_nll_laplacian_likelihood_loss_weight': 1, 'use_ssim_guided_uncertainty_nll_laplacian_likelihood_loss': False,
+		    'uncertainty_GIN_Loss_weight': 1,
                     'decoupled_uncertainty_network': True,
                     'ssim_component_weight': 2.}
 
@@ -352,6 +354,12 @@ args_loss_weight = {'feature_map_weight': 20, 'pixel_wise_weight': 100, 'k_space
 if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True or Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True or Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
     args['out_colors'] = args['out_colors']*2    
 
+if Use_NIG_Regression_Loss == True:
+    args['out_colors'] = args['out_colors']*4
+    Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss = False
+    Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss = False
+    Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss = False
+	
 if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == False and Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == False:
     Use_Pixel_Wise_Loss = True
     
@@ -1344,6 +1352,50 @@ class UncertaintyNegativeLogLaplacianLikelihoodLoss(nn.Module):
         
         uncertainty_nll_laplacian_likelihood_loss = self.uncertainty_nll_laplacian_likelihood_loss_weight * tc.mean(selection_matrix * (tc.abs(HR - SR) / (variance_of_SR + self.eps) + tc.log(variance_of_SR + self.eps)))
         return uncertainty_nll_laplacian_likelihood_loss
+
+
+def NIG_NLL(y, gamma, v, alpha, beta, reduce=True):
+    twoBlambda = 2*beta*(1+v)
+
+    nll = 0.5*tc.log(np.pi/(v+1e-5))  \
+        - alpha*tc.log(twoBlambda+1e-5)  \
+        + (alpha+0.5) * tc.log(v*(y-gamma)**2 + twoBlambda+1e-5)  \
+        + tc.lgamma(alpha+1e-5)  \
+        - tc.lgamma(alpha+0.5)
+
+    return tc.mean(nll) if reduce else nll
+
+def KL_NIG(mu1, v1, a1, b1, mu2, v2, a2, b2):
+    KL = 0.5*(a1-1)/b1 * (v2*tc.square(mu2-mu1))  \
+        + 0.5*v2/v1  \
+        - 0.5*tc.log(tc.abs(v2)/tc.abs(v1))  \
+        - 0.5 + a2*tc.log(b1/b2)  \
+        - (tc.lgamma(a1) - tc.lgamma(a2))  \
+        + (a1 - a2)*tc.digamma(a1)  \
+        - (b1 - b2)*a1/b1
+    return KL
+
+def NIG_Reg(y, gamma, v, alpha, beta, omega=0.01, reduce=True, kl=False):
+    # error = tf.stop_gradient(tf.abs(y-gamma))
+    error = tc.abs(y-gamma)
+
+    if kl:
+        kl = KL_NIG(gamma, v, alpha, beta, gamma, omega, 1+omega, beta)
+        reg = error*kl
+    else:
+        evi = 2*v+(alpha)
+        reg = error*evi
+
+    return tc.mean(reg) if reduce else reg
+
+def EvidentialRegression(y_true, evidential_output, coeff=1.0):
+    gamma, v, alpha, beta = tc.chunk(evidential_output, 4, 1)
+    loss_nll = NIG_NLL(y_true, gamma, v, alpha, beta)
+#    print('loss_nll:', tc.isinf(loss_nll))
+    loss_reg = NIG_Reg(y_true, gamma, v, alpha, beta)
+#    print('loss_reg:', tc.isinf(loss_reg))
+    return loss_nll + coeff * loss_reg
+
 
 "Pyramidal Convolution(Py_Conv) Layer"
 """
@@ -2907,6 +2959,8 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
             self.modules_end_stage_fusion_of_outcome = nn.Sequential(*modules_end_stage_fusion_of_outcome)
             
         self.relu = nn.ReLU()
+	if Use_NIG_Regression_Loss == True:
+            self.evidence = nn.Softplus()
 
     def forward(self, x):
         # do NOT understand why need this, may NOT be useful for us 
@@ -2929,8 +2983,14 @@ class RCAN_Based_MRI_SR_Dual_Domain_2D(nn.Module):
 #            if (Maintain_in_plne_Size == True):
 #                res = self.down_size_converter(res) # extra down_size_converter is needed to shtik size of image scale times if we expect same size as input LR for SR output
                 x = self.tail(res) # data goes through upsampling module and one more conv layer
-            
-                if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True or Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
+            	
+		if Use_NIG_Regression_Loss == True:
+                    mu, logv, logalpha, logbeta = tc.chunk(x, 4, 1)
+                    v = self.evidence(logv)
+                    alpha = self.evidence(logalpha) + 1
+                    beta = self.evidence(logbeta)
+                    x = tc.cat((mu, v, alpha, beta),1)
+                elif Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True or Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
                     x = self.relu(x)
                 
             # do NOT understand why need this, may NOT be useful for us
@@ -3824,7 +3884,11 @@ for epoch in range(EPOCH_NUM):
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
         uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_training = []
         uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test = []
-
+	
+    if Use_NIG_Regression_Loss == True:
+        uncertainty_NIG_regression_loss_training = []
+        uncertainty_NIG_regression_loss_test = []
+    
     k_space_branch_k_space_loss_training = 0.0
     k_space_branch_k_space_loss_test = 0.0
     gradient_grad_loss_training = 0.0
@@ -3916,7 +3980,11 @@ for epoch in range(EPOCH_NUM):
         if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True or Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True or Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
             variance_of_img_outputs = img_outputs[:,int(args['out_colors']//2):args['out_colors'],:,:]
             img_outputs = img_outputs[:,0:int(args['out_colors']//2),:,:]
-
+	
+	if Use_NIG_Regression_Loss == True:
+            evidential_outputs = img_outputs.clone()
+            img_outputs = img_outputs[:,0,:,:].unsqueeze(1)
+		
         if Use_Feature_Map_Loss == True:
             SR_img_copies = tc.cat((img_outputs, img_outputs, img_outputs), 1)
             # print(SR_copies.size())
@@ -4010,7 +4078,11 @@ for epoch in range(EPOCH_NUM):
             uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss = uncertainty_negative_log_laplacian_likelihood_loss(img_outputs, variance_of_img_outputs, labels)
             uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_training.append(uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss.item())
 
-        if network_model_type == 'Secondary branch is k space branch':
+        if Use_NIG_Regression_Loss == True:
+            uncertainty_NIG_regression_loss = args_loss_weight['uncertainty_GIN_Loss_weight'] * EvidentialRegression(labels, evidential_outputs)
+            uncertainty_NIG_regression_loss_training.append(uncertainty_NIG_regression_loss.item())
+		
+	if network_model_type == 'Secondary branch is k space branch':
             if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                 k_space_branch_k_space_loss = args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
                     create_2d_Gaussian_weights(window_size = secondary_branch_outputs.shape[2], num_of_samples = secondary_branch_outputs.shape[0], channel = secondary_branch_outputs.shape[1]).to(device)*secondary_branch_outputs[:,:,:,:,0], 
@@ -4084,7 +4156,10 @@ for epoch in range(EPOCH_NUM):
             else:
                 loss = uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss
 
-        if network_model_type == 'Secondary branch is k space branch':
+        if Use_NIG_Regression_Loss == True:
+            loss = loss + uncertainty_NIG_regression_loss
+	
+	if network_model_type == 'Secondary branch is k space branch':
             loss = loss + k_space_branch_k_space_loss
 
         if network_model_type == 'Secondary branch is gradient map branch':
@@ -4175,7 +4250,11 @@ for epoch in range(EPOCH_NUM):
             if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_KL_Loss == True or Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussian_Pdf_Likelihood_Loss == True or Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
                 variance_of_SR_img_test = SR_img_test[:,int(args['out_colors']//2):args['out_colors'],:,:]
                 SR_img_test = SR_img_test[:,0:int(args['out_colors']//2),:,:]
-
+	
+	    if Use_NIG_Regression_Loss == True:
+                evidential_outputs_test = SR_img_test.clone()
+                SR_img_test = SR_img_test[:,0,:,:].unsqueeze(1)
+		
             if Use_Feature_Map_Loss == True:
                 SR_test_copies = tc.cat((SR_img_test, SR_img_test, SR_img_test), 1)
                 # print(SR_copies.size())
@@ -4259,6 +4338,9 @@ for epoch in range(EPOCH_NUM):
             if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
                 uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test.append(uncertainty_negative_log_laplacian_likelihood_loss(SR_img_test, variance_of_SR_img_test, labels).item())
 
+	    if Use_NIG_Regression_Loss == True:
+                uncertainty_NIG_regression_loss_test.append(args_loss_weight['uncertainty_GIN_Loss_weight'] * EvidentialRegression(labels, evidential_outputs_test).item())
+		
             if network_model_type_test == 'Secondary branch is k space branch':
                 if Amplify_High_Frequency_Value_In_K_Space_Loss == True:
                     k_space_branch_k_space_loss_test.append((args_loss_weight['k_space_branch_weight']*(loss_function_MSE(
@@ -4319,6 +4401,9 @@ for epoch in range(EPOCH_NUM):
             else:
                 loss_test = uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test
 
+	if Use_NIG_Regression_Loss == True:
+            loss_test = np.sum([loss_test, uncertainty_NIG_regression_loss_test],axis=0)
+		
         if network_model_type_test == 'Secondary branch is k space branch':
             loss_test = np.sum([loss_test, k_space_branch_k_space_loss_test],axis=0)
 
@@ -4366,7 +4451,10 @@ for epoch in range(EPOCH_NUM):
         if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
             uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test = np.mean(uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test)
             print('uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test: ', uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test)
-        if network_model_type_test == 'Secondary branch is k space branch':
+        if Use_NIG_Regression_Loss == True:
+            uncertainty_NIG_regression_loss_test = np.mean(uncertainty_NIG_regression_loss_test)
+            print('uncertainty_NIG_regression_loss_test: ', uncertainty_NIG_regression_loss_test)
+	if network_model_type_test == 'Secondary branch is k space branch':
             k_space_branch_k_space_loss_test = np.mean(k_space_branch_k_space_loss_test)
             print('k_space_branch_k_space_loss_test: ', k_space_branch_k_space_loss_test)
         if network_model_type_test == 'Secondary branch is gradient map branch':
@@ -4418,6 +4506,9 @@ for epoch in range(EPOCH_NUM):
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
         uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_for_current_epoch = np.mean(uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_training)
         print('uncertainty_negative_log_laplacian_likelihood_loss_training: ', uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_for_current_epoch)
+    if Use_NIG_Regression_Loss == True:
+        uncertainty_NIG_regression_loss_for_current_epoch = np.mean(uncertainty_NIG_regression_loss_training)
+        print('uncertainty_NIG_regression_loss_training: ', uncertainty_NIG_regression_loss_for_current_epoch)
     if network_model_type == 'Secondary branch is gradient map branch':
         gradient_grad_loss_for_current_epoch = np.mean(gradient_grad_loss_training)
         print("gradient_grad_loss_training: ", gradient_grad_loss_for_current_epoch)
@@ -4534,6 +4625,9 @@ for epoch in range(EPOCH_NUM):
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
         f.write('The uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss for epoch %d is : %f' % (epoch, uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_for_current_epoch))
         f.write('\n')
+    if Use_NIG_Regression_Loss == True:
+        f.write('The uncertainty_NIG_regression_loss for epoch %d is : %f' % (epoch, uncertainty_NIG_regression_loss_for_current_epoch))
+        f.write('\n')
     if network_model_type == 'Secondary branch is gradient map branch':
         f.write('The gradient_grad_loss for epoch %d is : %f' % (epoch, gradient_grad_loss_for_current_epoch))
         f.write('\n')
@@ -4586,6 +4680,9 @@ for epoch in range(EPOCH_NUM):
         f.write('\n')
     if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
         f.write('The uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_validation for epoch %d is : %f' % (epoch, uncertainty_negative_log_laplacian_likelihood_loss_for_img_loss_test))
+        f.write('\n')
+    if Use_NIG_Regression_Loss == True:
+        f.write('The uncertainty_NIG_regression_loss_validation for epoch %d is : %f' % (epoch, uncertainty_NIG_regression_loss_test))
         f.write('\n')
     if network_model_type_test == 'Secondary branch is gradient map branch':
         f.write('The gradient_grad_loss_validation for epoch %d is : %f' % (epoch, gradient_grad_loss_test))
