@@ -85,7 +85,7 @@ Date		Network								Dataset					Result							Device
 2021.07.20	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x3	Done, val ssim 0.9329 psnr 36.4323			GV100
 2021.07.21	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x5	Done, val ssim 0.9341 psnr 36.3995			GV100
 2021.xx.xx	Conventional UNet						HCP 100 datasets, 3D 2x1 128x1		pending							
-2021.xx.xx	Conventional UNet + channel attention				HCP 100 datasets, 3D 2x1 128x1		pending							
+2021.xx.xx	Conventional UNet + channel attention				HCP 100 datasets, 3D 2x1 128x1		started							
 2021.07.12	RCAN with HR ref, Char, SSIM v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Stopped, wrong results					GV100
 
 
