@@ -45,9 +45,9 @@ Date		Network								Dataset					Result							Device
 2021.07.09	gMLP+MultiScaleExtractor, order-switched decoder v1.0.5		HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9612 psnr 39.1378			A6000
 2021.07.14	gMLP+MultiScaleExtractor+, order-switched decoder v1.0.5	HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9611 psnr 39.0676			A6000
 2021.07.27	gMLP+conv decoder v1.0.5					HCP 300 datasets, 3D 2x1 128x3		Done, val ssim 0.9598 psnr 38.8149			A6000
+2021.08.12	Conventional UNet						HCP 300 datasets, 3D 2x1 128x1		started							A6000
 2021.xx.xx	Outlooker based UNet						HCP 300 datasets, 3D 2x1 128x1		pending							
 2021.xx.xx	cycleMLP based UNet						HCP 300 datasets, 3D 2x1 128x1		pending	
-2021.xx.xx	Conventional UNet						HCP 300 datasets, 3D 2x1 128x1		pending							
 
 
 ----------------------------------------------------------------gMLP and Efficient Transformer for cross modality synthesizing--------------------------------------------------------
@@ -85,7 +85,7 @@ Date		Network								Dataset					Result							Device
 2021.07.20	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x3	Done, val ssim 0.9329 psnr 36.4323			GV100
 2021.07.21	RCAN with Char, SSIM v1.0.3					Dental 0.44mm datasets, 3D 2x2 128x5	Done, val ssim 0.9341 psnr 36.3995			GV100
 2021.xx.xx	Conventional UNet						HCP 100 datasets, 3D 2x1 128x1		pending							
-2021.xx.xx	Conventional UNet + channel attention				HCP 100 datasets, 3D 2x1 128x1		pending							
+2021.08.11	Conventional UNet + channel attention				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9538 psnr 38.1777			A6000
 2021.07.12	RCAN with HR ref, Char, SSIM v1.2.2				HCP 100 datasets, 3D 2x1 128x1		Stopped, wrong results					GV100
 
 
