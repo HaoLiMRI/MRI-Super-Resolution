@@ -53,7 +53,7 @@ Date		Network								Dataset					Result							Device
 ----------------------------------------------------------------gMLP and Efficient Transformer for cross modality synthesizing--------------------------------------------------------
 2021.xx.xx	gMLP U-Net
 2021.xx.xx	gMLP+conv v1.0.2
-2021.08.03	gMLP+MultiScaleExtractor v1.0.5					HCP 300 datasets, 128x1			started							A6000
+2021.08.03	gMLP+MultiScaleExtractor v1.0.5					HCP 300 datasets, 128x1			Done, val ssim 0.9586 psnr 38.7936			GV100
 
 
 ------------------------------------------------------------------------------------------New RCAN Tests------------------------------------------------------------------------------
