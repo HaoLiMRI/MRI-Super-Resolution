@@ -46,10 +46,12 @@ Date		Network								Dataset					Result							Device
 2021.07.14	gMLP+MultiScaleExtractor+, order-switched decoder v1.0.5	HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9611 psnr 39.0676			A6000
 2021.07.27	gMLP+conv decoder v1.0.5					HCP 300 datasets, 3D 2x1 128x3		Done, val ssim 0.9598 psnr 38.8149			A6000
 2021.08.12	Conventional UNet						HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9586 psnr 38.7936			GV100
-2021.08.14	SRCNN								HCP 300 datasets, 3D 2x1 128x1		started							A6000
-2021.08.14	FSRCNN								HCP 300 datasets, 3D 2x1 128x1		started							A6000
-2021.08.14	SRResNet							HCP 300 datasets, 3D 2x1 128x1		started							GV100
-2021.08.14	VDSR								HCP 300 datasets, 3D 2x1 128x1		started							GV100
+2021.08.14	SRCNN								HCP 300 datasets, 3D 2x1 128x1		Done							A6000
+2021.08.14	FSRCNN								HCP 300 datasets, 3D 2x1 128x1		Done							A6000
+2021.08.14	SRResNet							HCP 300 datasets, 3D 2x1 128x1		Done							GV100
+2021.08.14	VDSR								HCP 300 datasets, 3D 2x1 128x1		Done							GV100
+2021.08.16	Conventional UNet + channel attention				HCP 300 datasets, 3D 2x1 128x1		started							A6000
+2021.07.14	Parelell gMLP+MultiScaleExtractor+, v1.0.5			HCP 300 datasets, 3D 2x1 128x1		started							A6000
 2021.xx.xx	DRRN								HCP 300 datasets, 3D 2x1 128x1		pending							
 2021.xx.xx	EDSR								HCP 300 datasets, 3D 2x1 128x1		pending	
 2021.xx.xx	Outlooker based UNet						HCP 300 datasets, 3D 2x1 128x1		pending							
