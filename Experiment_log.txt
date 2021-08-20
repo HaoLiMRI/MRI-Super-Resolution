@@ -50,7 +50,7 @@ Date		Network								Dataset					Result							Device
 2021.08.14	FSRCNN								HCP 300 datasets, 3D 2x1 128x1		Done							A6000
 2021.08.14	SRResNet							HCP 300 datasets, 3D 2x1 128x1		Done							GV100
 2021.08.14	VDSR								HCP 300 datasets, 3D 2x1 128x1		Done							GV100
-2021.08.16	Conventional UNet + channel attention				HCP 300 datasets, 3D 2x1 128x1		started							A6000
+2021.08.16	Conventional UNet + channel attention				HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9549 psnr 38.2925			A6000
 2021.07.14	Parelell gMLP+MultiScaleExtractor+, v1.0.5			HCP 300 datasets, 3D 2x1 128x1		started							A6000
 2021.xx.xx	DRRN								HCP 300 datasets, 3D 2x1 128x1		pending							
 2021.xx.xx	EDSR								HCP 300 datasets, 3D 2x1 128x1		pending	
