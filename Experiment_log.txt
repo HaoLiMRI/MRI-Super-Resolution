@@ -51,8 +51,8 @@ Date		Network								Dataset					Result							Device
 2021.08.14	SRResNet							HCP 300 datasets, 3D 2x1 128x1		Done							GV100
 2021.08.14	VDSR								HCP 300 datasets, 3D 2x1 128x1		Done							GV100
 2021.08.16	Conventional UNet + channel attention				HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9549 psnr 38.2925			A6000
-2021.07.14	Parelell gMLP+MultiScaleExtractor+, v1.0.5			HCP 300 datasets, 3D 2x1 128x1		started							A6000
-2021.xx.xx	DRRN								HCP 300 datasets, 3D 2x1 128x1		pending							
+2021.08.14	Parellel gMLP+MultiScaleExtractor+, v1.0.5			HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9611 psnr 39.1524			A6000
+2021.08.15	DRRN								HCP 300 datasets, 3D 2x1 128x1		Done							GV100
 2021.xx.xx	EDSR								HCP 300 datasets, 3D 2x1 128x1		pending	
 2021.xx.xx	Outlooker based UNet						HCP 300 datasets, 3D 2x1 128x1		pending							
 2021.xx.xx	cycleMLP based UNet						HCP 300 datasets, 3D 2x1 128x1		pending	
@@ -62,6 +62,7 @@ Date		Network								Dataset					Result							Device
 2021.xx.xx	gMLP U-Net
 2021.xx.xx	gMLP+conv v1.0.2
 2021.08.03	gMLP+MultiScaleExtractor v1.0.5					HCP 300 datasets, 128x1			Done, val ssim 0.8241 psnr 31,3180			A6000
+2021.08.03	gMLP+MultiScaleExtractor v1.0.5					IXI 100 datasets, 128x1			pending							A6000
 
 
 ------------------------------------------------------------------------------------------New RCAN Tests------------------------------------------------------------------------------
@@ -118,15 +119,17 @@ Date		Network								Dataset					Result							Device
 2021.07.24	RCAN decoupled 32ch with char, SSIM, Lap non-sel nll v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9640 psnr 39.7581			GV100
 2021.07.26	RCAN decoupled 64ch with char, SSIM, Lap non-sel nll v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9639 psnr 39.7038			GV100
 2021.xx.xx	RCAN with char, SSIM, NIG loss v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9638 psnr 39.7279			GV100
+2021.08.24	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 100 datasets, 3D 2x1 128x1		started							A6000
 2021.xx.xx	LIG loss
 
 
 --------------------------------------------------------------------------------------------TTSR Test----------------------------------------------------------------------------------
-2021.06.30	TTSR waveletswith Char, SSIM v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Terminated						A6000
+2021.06.30	TTSR waveletswith Char, SSIM v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Stopped, wrong results					A6000
 2021.06.30	TTSR with Char, SSIM v1.0.3					HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9642 psnr 39.666			A6000
 2021.07.05	TTSR with Char, SSIM, adv v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9632 psnr 39.379			A6000
 
 
+------------------------------------------------------------------------------------------3D DCSRN Tests-------------------------------------------------------------------------------
 
 
 
