@@ -54,6 +54,7 @@ Date		Network								Dataset					Result							Device
 2021.08.14	Parellel gMLP+MultiScaleExtractor+, v1.0.5			HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9611 psnr 39.1524			A6000
 2021.08.15	DRRN								HCP 300 datasets, 3D 2x1 128x1		Done							GV100
 2021.xx.xx	EDSR								HCP 300 datasets, 3D 2x1 128x1		pending	
+可以把multi extractor CNN和gMLP并行然后交换几次信息再fuse试一下（前面一两层用纯cnn，后面两个branch交换信息，这样参数量也小一些）。主要看俩个点：1.性能有没有提升；2.参数量统计一下看看和UNet with channel attention，gMLP UNet，efficient transformer UNet比一下在性能更好或者差不多的情况下参数量有没有更少。
 2021.xx.xx	Outlooker based UNet						HCP 300 datasets, 3D 2x1 128x1		pending							
 2021.xx.xx	cycleMLP based UNet						HCP 300 datasets, 3D 2x1 128x1		pending	
 
