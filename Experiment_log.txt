@@ -119,7 +119,7 @@ Date		Network								Dataset					Result							Device
 2021.07.24	RCAN decoupled 32ch with char, SSIM, Lap non-sel nll v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9640 psnr 39.7581			GV100
 2021.07.26	RCAN decoupled 64ch with char, SSIM, Lap non-sel nll v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9639 psnr 39.7038			GV100
 2021.xx.xx	RCAN with char, SSIM, NIG loss v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9638 psnr 39.7279			GV100
-2021.08.24	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 100 datasets, 3D 2x1 128x1		started							A6000
+2021.08.24	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9640 psnr 39.76			A6000
 2021.xx.xx	LIG loss
 
 
