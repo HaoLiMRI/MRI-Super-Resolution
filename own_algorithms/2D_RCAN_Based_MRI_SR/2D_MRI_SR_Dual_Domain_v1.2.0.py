@@ -1354,47 +1354,125 @@ class UncertaintyNegativeLogLaplacianLikelihoodLoss(nn.Module):
         return uncertainty_nll_laplacian_likelihood_loss
 
 
-def NIG_NLL(y, gamma, v, alpha, beta, reduce=True):
-    twoBlambda = 2*beta*(1+v)
+class EvidentialLossSumOfSquares(nn.Module):
+  """The evidential loss function on a matrix.
+  This class is implemented with slight modifications from the paper. The major
+  change is in the regularizer parameter mentioned in the paper. The regularizer
+  mentioned in the paper didnot give the required results, so we modified it 
+  with the KL divergence regularizer from the paper. In orderto overcome the problem
+  that KL divergence are missing near zero so we add the minimum values to alpha,
+  beta and lambda and compare distance with NIG(alpha=1.0, beta=0.1, lambda=1.0)
+  This class only allows for rank-4 inputs for the output `targets`, and expectes
+  `inputs` be of the form [mu, alpha, beta, lambda] 
+  alpha, beta and lambda needs to be positive values.
+  """
 
-    nll = 0.5*tc.log(np.pi/(v+1e-5))  \
-        - alpha*tc.log(twoBlambda+1e-5)  \
-        + (alpha+0.5) * tc.log(v*(y-gamma)**2 + twoBlambda+1e-5)  \
-        + tc.lgamma(alpha+1e-5)  \
-        - tc.lgamma(alpha+0.5)
+  def __init__(self, debug=False, return_all=False):
+    """Sets up loss function.
+    Args:
+      debug: When set to 'true' prints all the intermittent values
+      return_all: When set to 'true' returns all loss values without taking average
+    """
+    super(EvidentialLossSumOfSquares, self).__init__()
 
-    return tc.mean(nll) if reduce else nll
+    self.debug = debug
+    self.return_all_values = return_all
+    self.MAX_CLAMP_VALUE = 5.0   # Max you can go is 85 because exp(86) is nan  Now exp(5.0) is 143 which is max of a,b and l
 
-def KL_NIG(mu1, v1, a1, b1, mu2, v2, a2, b2):
-    KL = 0.5*(a1-1)/b1 * (v2*tc.square(mu2-mu1))  \
-        + 0.5*v2/v1  \
-        - 0.5*tc.log(tc.abs(v2)/tc.abs(v1))  \
-        - 0.5 + a2*tc.log(b1/b2)  \
-        - (tc.lgamma(a1) - tc.lgamma(a2))  \
-        + (a1 - a2)*tc.digamma(a1)  \
-        - (b1 - b2)*a1/b1
-    return KL
+  def kl_divergence_nig(self, mu1, mu2, alpha_1, beta_1, lambda_1):
+    alpha_2 = tc.ones_like(mu1)*1.0
+    beta_2 = tc.ones_like(mu1)*0.1
+    lambda_2 = tc.ones_like(mu1)*1.0
 
-def NIG_Reg(y, gamma, v, alpha, beta, omega=0.01, reduce=True, kl=False):
-    # error = tf.stop_gradient(tf.abs(y-gamma))
-    error = tc.abs(y-gamma)
+    t1 = 0.5 * (alpha_1/beta_1) * ((mu1 - mu2)**2)  * lambda_2
+    #t1 = 0.5 * (alpha_1/beta_1) * (torch.abs(mu1 - mu2))  * lambda_2
+    t2 = 0.5*lambda_2/lambda_1
+    t3 = alpha_2*tc.log(beta_1/beta_2)
+    t4 = -tc.lgamma(alpha_1) + tc.lgamma(alpha_2)
+    t5 = (alpha_1-alpha_2)*tc.digamma(alpha_1)
+    t6 = -(beta_1 - beta_2)*(alpha_1/beta_1)
+    return (t1+t2-0.5+t3+t4+t5+t6)
 
-    if kl:
-        kl = KL_NIG(gamma, v, alpha, beta, gamma, omega, 1+omega, beta)
-        reg = error*kl
+  def forward(self, inputs, targets):
+    """ Implements the loss function 
+    Args:
+      inputs: The output of the neural network. inputs has 4 dimension 
+        in the format [mu, alpha, beta, lambda]. Must be a tensor of
+        floats
+      targets: The expected output
+    Returns:
+      Based on the `return_all` it will return mean loss of batch or individual loss
+    """
+    assert tc.is_tensor(inputs)
+    assert tc.is_tensor(targets)
+    assert (inputs[:,1] > 0).all()
+    assert (inputs[:,2] > 0).all()
+    assert (inputs[:,3] > 0).all()
+
+#    targets = targets.view(-1)
+#    y = inputs[:,0].view(-1) #first column is mu,delta, predicted value
+#    a = inputs[:,1].view(-1) + 1.0 #alpha
+#    b = inputs[:,2].view(-1) + 0.1 #beta to avoid zero
+#    l = inputs[:,3].view(-1) + 1.0 #lamda
+    
+    targets = targets.squeeze(1)
+    y = inputs[:,0,:,:] #first column is mu,delta, predicted value
+    a = inputs[:,1,:,:] + 1.0 #alpha
+    b = inputs[:,2,:,:] + 0.1 #beta to avoid zero
+    l = inputs[:,3,:,:] + 1.0 #lamda
+    
+    if self.debug:
+      print("a :", a)
+      print("b :", b)
+      print("l :", l)
+
+    J1 = tc.lgamma(a - 0.5) 
+    J2 = -tc.log(tc.tensor([4.0])).to(device) 
+    J3 = -tc.lgamma(a)  
+    J4 = -tc.log(l) 
+    J5 = -0.5*tc.log(b) 
+    J6 = tc.log(2*b*(1 + l) + (2*a - 1)*l*(y-targets)**2)
+      
+    if self.debug:
+        print("lgama(a - 0.5) :", J1)
+        print("log(4):", J2)
+        print("lgama(a) :", J3)
+        print("log(l) :", J4)
+        print("log( ---- ) :", J6)
+        print("J1 :", J1.get_device())
+        print("J2 :", J2.get_device())
+        print("J3 :", J3.get_device())
+        print("J4 :", J4.get_device())
+        print("J5 :", J5.get_device())
+        print("J5 :", J6.get_device())
+    
+    
+    J = J1 + J2 + J3 + J4 + J5 + J6
+    #Kl_divergence = torch.abs(y - targets) * (2*a + l)/b ######## ?????
+    #Kl_divergence = ((y - targets)**2) * (2*a + l)
+    #Kl_divergence = torch.abs(y - targets) * (2*a + l)
+    #Kl_divergence = 0.0
+    #Kl_divergence = (torch.abs(y - targets) * (a-1) *  l)/b
+    Kl_divergence = self.kl_divergence_nig(y, targets, a, b, l)
+    
+    if self.debug:
+      print ("KL ",Kl_divergence.data.numpy())
+    loss = tc.exp(J) + Kl_divergence
+
+    if self.debug:
+      print ("loss :", loss.mean())
+    
+
+    if self.return_all_values:
+      ret_loss = loss
     else:
-        evi = 2*v+(alpha)
-        reg = error*evi
+      ret_loss = loss.mean()
+    #if torch.isnan(ret_loss):
+    #  ret_loss.item() = self.prev_loss + 10
+    #else:
+    #  self.prev_loss = ret_loss.item()
 
-    return tc.mean(reg) if reduce else reg
-
-def EvidentialRegression(y_true, evidential_output, coeff=1.0):
-    gamma, v, alpha, beta = tc.chunk(evidential_output, 4, 1)
-    loss_nll = NIG_NLL(y_true, gamma, v, alpha, beta)
-#    print('loss_nll:', tc.isinf(loss_nll))
-    loss_reg = NIG_Reg(y_true, gamma, v, alpha, beta)
-#    print('loss_reg:', tc.isinf(loss_reg))
-    return loss_nll + coeff * loss_reg
+    return ret_loss
 
 
 "Pyramidal Convolution(Py_Conv) Layer"
@@ -3809,6 +3887,8 @@ if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Gaussia
 if Predict_Variance_Of_Pixel_For_MRI_SR_And_Use_Uncertainty_Negative_Log_Laplacian_Likelihood_Loss == True:
     uncertainty_negative_log_laplacian_likelihood_loss = UncertaintyNegativeLogLaplacianLikelihoodLoss(uncertainty_nll_laplacian_likelihood_loss_weight = args_loss_weight['uncertainty_nll_laplacian_likelihood_loss_weight'], use_ssim_guided_uncertainty_nll_laplacian_likelihood_loss = args_loss_weight['use_ssim_guided_uncertainty_nll_laplacian_likelihood_loss']).to(device)
 
+if Use_NIG_Regression_Loss == True:
+    EvidentialRegression = EvidentialLossSumOfSquares()
 
 # =============================================================================
 # print('The loss function is L1Loss')
