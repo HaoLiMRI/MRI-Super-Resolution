@@ -54,7 +54,7 @@ Date		Network								Dataset					Result							Device
 2021.08.14	Parellel gMLP+MultiScaleExtractor+, v1.0.5			HCP 300 datasets, 3D 2x1 128x1		Done, val ssim 0.9611 psnr 39.1524			A6000
 2021.08.15	DRRN								HCP 300 datasets, 3D 2x1 128x1		Done							GV100
 2021.xx.xx	EDSR								HCP 300 datasets, 3D 2x1 128x1		pending	
-可以把multi extractor CNN和gMLP并行然后交换几次信息再fuse试一下（前面一两层用纯cnn，后面两个branch交换信息，这样参数量也小一些）。主要看俩个点：1.性能有没有提升；2.参数量统计一下看看和UNet with channel attention，gMLP UNet，efficient transformer UNet比一下在性能更好或者差不多的情况下参数量有没有更少。
+2021.08.28	New parellel gMLP+MultiScaleExtractor+, v1.0.5			HCP 300 datasets, 3D 2x1 128x1		started							A6000
 2021.xx.xx	Outlooker based UNet						HCP 300 datasets, 3D 2x1 128x1		pending							
 2021.xx.xx	cycleMLP based UNet						HCP 300 datasets, 3D 2x1 128x1		pending	
 
@@ -121,8 +121,9 @@ Date		Network								Dataset					Result							Device
 2021.07.26	RCAN decoupled 64ch with char, SSIM, Lap non-sel nll v1.0.3	HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9639 psnr 39.7038			GV100
 2021.xx.xx	RCAN with char, SSIM, NIG loss v1.0.3				HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9638 psnr 39.7279			GV100
 2021.08.24	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 100 datasets, 3D 2x1 128x1		Done, val ssim 0.9640 psnr 39.76			A6000
-2021.08.26	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 60 datasets, 3D 2x1 128x1		started							A6000
-2021.08.26	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 180 datasets, 3D 2x1 128x1		started							A6000
+2021.08.26	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 60 datasets, 3D 2x1 128x1		Done,							A6000
+2021.08.26	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 180 datasets, 3D 2x1 128x1		Done,							A6000
+2021.08.28	RCAN with char, SSIM, new NIG loss v1.0.3			HCP 40 datasets, 3D 2x1 128x1		started							A6000
 2021.xx.xx	LIG loss
 
 
