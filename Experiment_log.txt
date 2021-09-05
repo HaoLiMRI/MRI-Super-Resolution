@@ -110,10 +110,10 @@ Date		Network								Dataset					Result							Device
 
 
 ------------------------------------------------------------------------------New RCAN for Artifact Reduction Tests--------------------------------------------------------------------
-2021.09.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR		started							A6000
+2021.09.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR		Done, val ssim 0.9592 psnr 38.8361			A6000
 2021.09.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 36TR		started							A6000
-2021.xx.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 54TR		pending							A6000
-2021.xx.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR		pending							A6000
+2021.xx.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 54TR		Done, val ssim 0.9782 psnr 41.4138			A6000
+2021.xx.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR		started							A6000
 2021.xx.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR		pending							A6000
 2021.xx.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR		pending							A6000
 2021.xx.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 54TR		pending							A6000
