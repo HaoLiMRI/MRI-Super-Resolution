@@ -110,16 +110,16 @@ Date		Network								Dataset					Result							Device
 
 
 ------------------------------------------------------------------------------New RCAN for Artifact Reduction Tests--------------------------------------------------------------------
+2021.09.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 9TR		Done, val ssim 0.9392 psnr 36.8529			A6000
 2021.09.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR		Done, val ssim 0.9592 psnr 38.8361			A6000
 2021.09.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 36TR		Done, val ssim 0.9755 psnr 41.3229			A6000
 2021.09.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 54TR		Done, val ssim 0.9782 psnr 41.4138			A6000
 2021.09.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR		Done, val ssim 0.9826 psnr 42.6795			A6000
-2021.09.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 9TR		started							A6000
-2021.09.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR		started							A6000
-2021.09.09	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR		started							A6000
-2021.09.09	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR		started							A6000
+2021.09.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR		Done, val ssim 0.9387 psnr 36.7285			A6000
+2021.09.09	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR		Wrong result, restarted					A6000
+2021.09.09	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR		Done, val ssim 0.9754 psnr 40.9256			A6000
 2021.09.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 54TR		pending							A6000
-2021.09.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 72TR		pending							A6000
+2021.09.12	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 72TR		started							A6000
 
 
 --------------------------------------------------------------------------------------RCAN Uncertainty Tests---------------------------------------------------------------------------
