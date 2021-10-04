@@ -64,8 +64,10 @@ Date		Network								Dataset					Result							Device
 2021.xx.xx	gMLP U-Net
 2021.xx.xx	gMLP+conv v1.0.2
 2021.08.03	gMLP+MultiScaleExtractor v1.0.5					HCP 300 datasets, 128x1			Done, val ssim 0.8241 psnr 31.3180			A6000
-2021.09.20	gMLP+MultiScaleExtractor v1.0.5					IXI 100 datasets, 128x1			Done, val ssim 0.9515 psnr 33.0896			A6000
-2021.09.29	UNet								IXI 100 datasets, 128x1			started							A6000
+2021.09.20	gMLP+MultiScaleExtractor v1.0.5					IXI 100 datasets, PD to T2, 128x1	Done, val ssim 0.9515 psnr 33.0896			A6000
+2021.09.29	UNet								IXI 100 datasets, PD to T2, 128x1	Done							A6000
+2021.10.01	gMLP+MultiScaleExtractor v1.0.5					IXI 100 datasets, T2 to PD, 128x1	started							A6000
+2021.10.01	UNet								IXI 100 datasets, T2 to PD, 128x1	started							A6000
 
 
 ------------------------------------------------------------------------------------------New RCAN Tests------------------------------------------------------------------------------
