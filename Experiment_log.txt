@@ -61,13 +61,13 @@ Date		Network								Dataset					Result							Device
 
 
 ----------------------------------------------------------------gMLP and Efficient Transformer for cross modality synthesizing--------------------------------------------------------
-2021.xx.xx	gMLP U-Net
-2021.xx.xx	gMLP+conv v1.0.2
 2021.08.03	gMLP+MultiScaleExtractor v1.0.5					HCP 300 datasets, 128x1			Done, val ssim 0.8241 psnr 31.3180			A6000
 2021.09.20	gMLP+MultiScaleExtractor v1.0.5					IXI 100 datasets, PD to T2, 128x1	Done, val ssim 0.9515 psnr 33.0896			A6000
 2021.09.29	UNet								IXI 100 datasets, PD to T2, 128x1	Done							A6000
+2021.09.20	gMLP v1.0.5							IXI 100 datasets, PD to T2, 128x1	pending							A6000
 2021.10.01	gMLP+MultiScaleExtractor v1.0.5					IXI 100 datasets, T2 to PD, 128x1	started							A6000
-2021.10.01	UNet								IXI 100 datasets, T2 to PD, 128x1	started							A6000
+2021.10.01	UNet								IXI 100 datasets, T2 to PD, 128x1	pending							A6000
+2021.09.20	gMLP v1.0.5							IXI 100 datasets, T2 to PD, 128x1	pending							A6000
 
 
 ------------------------------------------------------------------------------------------New RCAN Tests------------------------------------------------------------------------------
@@ -113,23 +113,31 @@ Date		Network								Dataset					Result							Device
 
 
 ------------------------------------------------------------------------------New RCAN for Artifact Reduction Tests--------------------------------------------------------------------
-2021.09.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 9TR		Done							A6000
-2021.09.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR		Done							A6000
-2021.09.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 36TR		Done							A6000
-2021.09.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 54TR		Done							A6000
-2021.09.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR		Done							A6000
-2021.09.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR		Done							A6000
-2021.09.09	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR		Done							A6000
-2021.09.09	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR		Done							A6000
-2021.09.12	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 72TR		Done							A6000
-2021.09.15	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 9TR		Done							A6000
-2021.09.15	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR		Done							A6000
-2021.09.16	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 36TR		Done							A6000
-2021.09.16	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR		Done							A6000
-2021.09.17	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR		Done							A6000
-2021.09.17	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR		Done							A6000
-2021.09.17	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR		Done							A6000
-2021.09.17	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 72TR		Done							A6000
+2021.09.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 9TR, 1 slice	Done							A6000
+2021.09.01	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR, 1 slice	Done							A6000
+2021.09.02	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 36TR, 1 slice	Done							A6000
+2021.09.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 54TR, 1 slice	Done							A6000
+2021.09.05	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR, 1 slice	Done							A6000
+2021.09.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR, 1 slice	Done							A6000
+2021.09.09	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR, 1 slice	Done							A6000
+2021.09.09	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR, 1 slice	Done							A6000
+2021.09.12	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 72TR, 1 slice	Done							A6000
+2021.09.15	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 9TR, 1 slice	Done							A6000
+2021.09.15	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR, 1 slice	Done							A6000
+2021.09.16	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 36TR, 1 slice	Done							A6000
+2021.09.16	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR, 1 slice	Done							A6000
+2021.09.17	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR, 1 slice	Done							A6000
+2021.09.17	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR, 1 slice	Done							A6000
+2021.09.17	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR, 1 slice	Done							A6000
+2021.09.17	UNet with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 72TR, 1 slice	Done							A6000
+2021.10.06	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 9TR, 3 slices	started							A6000
+2021.10.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR, 3 slices	started							A6000
+2021.10.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 36TR, 3 slices	started							A6000
+2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR, 3 slices	pending							A6000
+2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR, 3 slices	pending							A6000
+2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR, 3 slices	pending							A6000
+2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR, 3 slices	pending							A6000
+2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 72TR, 3 slices	pending							A6000
 
 
 --------------------------------------------------------------------------------------RCAN Uncertainty Tests---------------------------------------------------------------------------
