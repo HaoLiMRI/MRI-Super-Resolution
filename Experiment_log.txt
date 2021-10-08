@@ -133,9 +133,9 @@ Date		Network								Dataset					Result							Device
 2021.10.06	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 9TR, 3 slices	started							A6000
 2021.10.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 18TR, 3 slices	started							A6000
 2021.10.07	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 36TR, 3 slices	started							A6000
-2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR, 3 slices	pending							A6000
-2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR, 3 slices	pending							A6000
-2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR, 3 slices	pending							A6000
+2021.10.08	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-0 72TR, 3 slices	started							A6000
+2021.10.08	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 9TR, 3 slices	started							A6000
+2021.10.08	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 18TR, 3 slices	started							A6000
 2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 36TR, 3 slices	pending							A6000
 2021.10.xx	RCAN with Char, SSIM v1.0.3					HCP 100 datasets, 3D 5-5 72TR, 3 slices	pending							A6000
 
