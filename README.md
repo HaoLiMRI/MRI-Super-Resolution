@@ -1,4 +1,4 @@
-# MRI-Super-Resolution
+# Project_7_a: MRI-Super-Resolution
 
 3月1日开始的任务：TTSR with SSIM Loss, 4x TTSR, wavelet TTSR 2x and 4x.
 
